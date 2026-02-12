@@ -1,0 +1,14 @@
+.companyTag {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: white;
+  background-color: var(--company-color, #3b82f6);
+  transition: background-color 0.2s ease;
+}
+
+.companyTag:hover {
+  opacity: 0.9;
+}

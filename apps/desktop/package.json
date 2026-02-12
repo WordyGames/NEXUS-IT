@@ -1,0 +1,81 @@
+{
+  "name": "@nexus-it/desktop",
+  "version": "1.0.0",
+  "description": "NEXUS IT Desktop App - Gestión de equipos y tickets",
+  "main": "dist/electron/main.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:react\" \"npm run dev:electron\"",
+    "dev:react": "vite",
+    "dev:electron": "wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .",
+    "build": "tsc && vite build && electron-builder",
+    "build:react": "vite build",
+    "build:electron": "tsc --project tsconfig.electron.json",
+    "dist": "npm run build:react && npm run build:electron && electron-builder",
+    "dist:win": "npm run build:react && npm run build:electron && electron-builder --win",
+    "dist:mac": "npm run build:react && npm run build:electron && electron-builder --mac",
+    "clean": "rimraf dist build"
+  },
+  "build": {
+    "appId": "com.nexus-it.desktop",
+    "productName": "NEXUS IT",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "assets/icon.icns"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "publish": {
+      "provider": "generic",
+      "url": "https://your-update-server.com"
+    }
+  },
+  "dependencies": {
+    "@nexus-it/shared": "*",
+    "@types/qrcode": "^1.5.6",
+    "electron-is-dev": "^2.0.0",
+    "electron-updater": "^6.1.7",
+    "firebase": "^10.7.2",
+    "jspdf": "^4.1.0",
+    "lucide-react": "^0.563.0",
+    "qrcode": "^1.5.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.21.1",
+    "recharts": "^3.7.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "@types/react": "^18.2.46",
+    "@types/react-dom": "^18.2.18",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.16",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "postcss": "^8.4.32",
+    "rimraf": "^5.0.5",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10",
+    "wait-on": "^7.2.0"
+  }
+}

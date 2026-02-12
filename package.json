@@ -1,0 +1,29 @@
+{
+  "name": "nexus-it",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sistema de gestión TI para 4 empresas con apps desktop y móvil",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "clean": "rimraf node_modules packages/*/node_modules apps/*/node_modules packages/*/dist apps/*/dist",
+    "desktop": "npm run dev --workspace=apps/desktop",
+    "mobile": "npm run start --workspace=apps/mobile",
+    "shared": "npm run build --workspace=packages/shared"
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.5",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "dependencies": {
+    "firebase": "^12.9.0"
+  }
+}

@@ -1,0 +1,14 @@
+.companyBadge {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: white;
+  background-color: var(--company-color, #3b82f6);
+  transition: background-color 0.2s ease;
+}
+
+.companyBadge:hover {
+  opacity: 0.9;
+}
