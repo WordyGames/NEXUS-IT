@@ -55,7 +55,8 @@ function App() {
                 </PrivateRoute>
               }
             >
-              <Route index element={<Tickets />} />
+              <Route index element={<Dashboard />} />
+              <Route path="tickets" element={<Tickets />} />
             </Route>
             <Route
               path="/"
