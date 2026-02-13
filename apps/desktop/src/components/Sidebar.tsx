@@ -11,21 +11,15 @@ const Sidebar: React.FC = () => {
   // Menú para usuarios admin
   const adminNavItems = [
     { path: '/dashboard', label: 'Dashboard', icon: '📊', admin: false },
-    { path: '/equipment', label: 'Equipos', icon: '💻', admin: true },
     { path: '/tickets', label: 'Tickets', icon: '🎫', admin: false },
-    { path: '/maintenances', label: 'Mantenimientos', icon: '🔧', admin: true },
-    { path: '/reports', label: 'Reportes', icon: '📈', admin: true },
     { path: '/warranty-report', label: 'Garantías', icon: '📅', admin: true },
-    { path: '/notifications', label: 'Notificaciones', icon: '🔔', admin: false },
-    { path: '/users', label: 'Usuarios', icon: '👥', admin: true },
-    { path: '/settings', label: 'Configuración', icon: '⚙️', admin: true }
+    { path: '/users', label: 'Usuarios', icon: '👥', admin: true }
   ];
 
   // Menú para usuarios normales
   const userNavItems = [
     { path: '/dashboard', label: 'Dashboard', icon: '📊', admin: false },
-    { path: '/tickets', label: 'Mis Tickets', icon: '🎫', admin: false },
-    { path: '/notifications', label: 'Notificaciones', icon: '🔔', admin: false }
+    { path: '/tickets', label: 'Mis Tickets', icon: '🎫', admin: false }
   ];
 
   const navItems = isAdmin ? adminNavItems : userNavItems;
