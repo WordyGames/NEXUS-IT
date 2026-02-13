@@ -69,10 +69,8 @@ const Dashboard = () => {
         // Cargar equipos asignados al usuario actual
         if (!isAdmin && userData?.id) {
           const allEquipment = await getEquipment({ assignedTo: userData.id });
-          setUserEquipment(allEquipment);          
-          // Cargar tickets del usuario
-          const userTickets = await getTickets({ createdBy: userData.id });
-          setUserTicketsCount(userTickets.length);          
+          setUserEquipment(allEquipment);
+          
           // Cargar tickets del usuario
           const userTickets = await getTickets({ createdBy: userData.id });
           setUserTicketsCount(userTickets.length);
