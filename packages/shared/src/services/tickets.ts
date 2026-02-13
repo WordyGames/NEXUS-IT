@@ -44,6 +44,9 @@ export const getTickets = async (filters?: TicketFilters): Promise<Ticket[]> => 
     if (filters?.createdBy) {
       constraints.push(where('createdBy', '==', filters.createdBy));
     }
+    if (filters?.createdByName) {
+      constraints.push(where('createdByName', '==', filters.createdByName));
+    }
     
     constraints.push(orderBy('createdAt', 'desc'));
     

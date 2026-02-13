@@ -27,7 +27,7 @@ const Tickets = () => {
 
   useEffect(() => {
     loadTickets();
-  }, [companyFilter, isAdmin, userData?.id]);
+  }, [companyFilter, isAdmin, userData?.id, userData?.username, userData?.name, userData?.company]);
 
   useEffect(() => {
     // Si viene un ID de ticket en la URL, abrirlo automáticamente
@@ -39,16 +39,69 @@ const Tickets = () => {
     }
   }, [ticketIdFromUrl, tickets]);
 
+  const getTicketSortValue = (ticket: Ticket) => {
+    const createdAt: any = ticket.createdAt;
+    if (!createdAt) return 0;
+    if (createdAt instanceof Date) return createdAt.getTime();
+    if (typeof createdAt === 'object' && 'toDate' in createdAt) {
+      return createdAt.toDate().getTime();
+    }
+    if (typeof createdAt === 'object' && 'seconds' in createdAt) {
+      return createdAt.seconds * 1000;
+    }
+    const parsed = new Date(createdAt).getTime();
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+
+  const loadUserTickets = async () => {
+    if (!userData) return [] as Ticket[];
+
+    const queries: Promise<Ticket[]>[] = [];
+
+    if (userData.id) {
+      queries.push(getTickets({ createdBy: userData.id }));
+    }
+
+    if (userData.username && userData.username !== userData.id) {
+      queries.push(getTickets({ createdBy: userData.username }));
+    }
+
+    if (userData.name) {
+      queries.push(getTickets({ createdByName: userData.name }));
+    }
+
+    const results = await Promise.all(queries);
+    const unique = new Map<string, Ticket>();
+
+    results.flat().forEach((ticket) => {
+      unique.set(ticket.id, ticket);
+    });
+
+    let merged = Array.from(unique.values());
+
+    if (userData.company) {
+      merged = merged.filter((ticket) => ticket.company === userData.company);
+    }
+
+    merged.sort((a, b) => getTicketSortValue(b) - getTicketSortValue(a));
+    return merged;
+  };
+
   const loadTickets = async () => {
     try {
       setLoading(true);
+
+      if (!isAdmin) {
+        const userTickets = await loadUserTickets();
+        setTickets(userTickets);
+        return;
+      }
+
       const filters: any = {};
-      if (isAdmin && companyFilter) {
+      if (companyFilter) {
         filters.company = companyFilter;
       }
-      if (!isAdmin && userData?.id) {
-        filters.createdBy = userData.id;
-      }
+
       const data = await getTickets(Object.keys(filters).length ? filters : undefined);
       setTickets(data);
     } catch (error) {

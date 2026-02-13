@@ -249,6 +249,7 @@ export interface TicketFilters {
   category?: TicketCategory;
   assignedTo?: string;
   createdBy?: string;
+  createdByName?: string;
   search?: string;
 }
 

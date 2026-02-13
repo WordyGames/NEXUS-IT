@@ -6,7 +6,8 @@ import {
   getUsers,
   createUser,
   updateUser,
-  changePassword
+  changePassword,
+  deleteUser
 } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -15,6 +16,7 @@ import {
   Lock, 
   UserCheck, 
   UserX,
+  Trash2,
   Building2,
   Shield,
   User as UserIcon
@@ -26,7 +28,7 @@ const Users = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const { isAdmin } = useAuth();
+  const { isAdmin, userData } = useAuth();
 
   // Form states
   const [formData, setFormData] = useState({
@@ -102,6 +104,26 @@ const Users = () => {
       alert('Contraseña actualizada correctamente');
     } catch (error: any) {
       alert(error.message || 'Error al cambiar contraseña');
+    }
+  };
+
+  const handleDeleteUser = async (user: User) => {
+    if (userData?.id === user.id) {
+      alert('No puedes eliminar tu propio usuario');
+      return;
+    }
+
+    const confirmDelete = window.confirm(
+      `¿Seguro que deseas eliminar a ${user.name}? Esta acción no se puede deshacer.`
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+      await deleteUser(user.id);
+      await loadUsers();
+    } catch (error: any) {
+      alert(error.message || 'Error al eliminar usuario');
     }
   };
 
@@ -279,6 +301,18 @@ const Users = () => {
                       >
                         {user.isActive ? <UserX size={18} /> : <UserCheck size={18} />}
                       </button>
+                      <button
+                        onClick={() => handleDeleteUser(user)}
+                        className={`${
+                          userData?.id === user.id
+                            ? 'text-gray-300 cursor-not-allowed'
+                            : 'text-red-600 hover:text-red-900'
+                        }`}
+                        title={userData?.id === user.id ? 'No puedes eliminar tu usuario' : 'Eliminar usuario'}
+                        disabled={userData?.id === user.id}
+                      >
+                        <Trash2 size={18} />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -442,6 +476,8 @@ const Users = () => {
                 </label>
                 <input
                   type="password"
+                  aria-label="Nueva contraseña"
+                  placeholder="Nueva contraseña"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"

@@ -4,6 +4,7 @@ import {
   getDoc,
   getDocs,
   addDoc,
+  deleteDoc,
   setDoc,
   updateDoc,
   query,
@@ -295,6 +296,19 @@ export const updateUser = async (uid: string, data: Partial<User>): Promise<void
     });
   } catch (error) {
     console.error('Error updating user:', error);
+    throw error;
+  }
+};
+
+/**
+ * Elimina un usuario
+ */
+export const deleteUser = async (uid: string): Promise<void> => {
+  try {
+    const docRef = doc(db, COLLECTION_NAME, uid);
+    await deleteDoc(docRef);
+  } catch (error) {
+    console.error('Error deleting user:', error);
     throw error;
   }
 };

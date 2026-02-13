@@ -10,7 +10,8 @@ import {
   getUpcomingMaintenances,
   getOverdueMaintenances,
   Maintenance,
-  Equipment
+  Equipment,
+  Ticket
 } from '@nexus-it/shared';
 import CompanyCard from '../components/CompanyCard';
 import { AlertTriangle, Calendar, TrendingUp, Clock, CheckCircle, AlertCircle } from 'lucide-react';
@@ -54,6 +55,54 @@ const Dashboard = () => {
     return new Date(date); // String o número
   };
 
+  const getTicketSortValue = (ticket: Ticket) => {
+    const createdAt: any = ticket.createdAt;
+    if (!createdAt) return 0;
+    if (createdAt instanceof Date) return createdAt.getTime();
+    if (typeof createdAt === 'object' && 'toDate' in createdAt) {
+      return createdAt.toDate().getTime();
+    }
+    if (typeof createdAt === 'object' && 'seconds' in createdAt) {
+      return createdAt.seconds * 1000;
+    }
+    const parsed = new Date(createdAt).getTime();
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+
+  const loadUserTickets = async () => {
+    if (!userData) return [] as Ticket[];
+
+    const queries: Promise<Ticket[]>[] = [];
+
+    if (userData.id) {
+      queries.push(getTickets({ createdBy: userData.id }));
+    }
+
+    if (userData.username && userData.username !== userData.id) {
+      queries.push(getTickets({ createdBy: userData.username }));
+    }
+
+    if (userData.name) {
+      queries.push(getTickets({ createdByName: userData.name }));
+    }
+
+    const results = await Promise.all(queries);
+    const unique = new Map<string, Ticket>();
+
+    results.flat().forEach((ticket) => {
+      unique.set(ticket.id, ticket);
+    });
+
+    let merged = Array.from(unique.values());
+
+    if (userData.company) {
+      merged = merged.filter((ticket) => ticket.company === userData.company);
+    }
+
+    merged.sort((a, b) => getTicketSortValue(b) - getTicketSortValue(a));
+    return merged;
+  };
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -73,15 +122,11 @@ const Dashboard = () => {
           setUserEquipment(allEquipment);
           
           // Cargar tickets del usuario
-          const userTickets = await getTickets({ createdBy: userData.id });
+          const userTickets = await loadUserTickets();
           setUserTicketsCount(userTickets.length);
           
           // Obtener los 5 tickets más recientes
-          const sortedTickets = userTickets.sort((a, b) => {
-            const dateA = a.createdAt?.seconds || 0;
-            const dateB = b.createdAt?.seconds || 0;
-            return dateB - dateA;
-          }).slice(0, 5);
+          const sortedTickets = userTickets.slice(0, 5);
           setRecentTickets(sortedTickets);
         }
 
