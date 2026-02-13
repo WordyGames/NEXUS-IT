@@ -12,8 +12,6 @@ import {
 } from '@nexus-it/shared';
 import TicketForm from '../components/TicketForm';
 import TicketDetail from '../components/TicketDetail';
-import { Download } from 'lucide-react';
-import { exportTicketsToExcel } from '../utils/exportToExcel';
 
 const Tickets = () => {
   const { userData, isAdmin } = useAuth();
@@ -189,14 +187,6 @@ const Tickets = () => {
               ))}
             </select>
           )}
-          <button
-            onClick={() => exportTicketsToExcel(tickets, 'tickets')}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2"
-            disabled={tickets.length === 0}
-          >
-            <Download size={18} />
-            Exportar Excel
-          </button>
           <button
             onClick={() => setShowForm(true)}
             className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
