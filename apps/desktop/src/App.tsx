@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { AuthProvider } from './contexts/AuthContext';
 import { UpdaterProvider } from './contexts/UpdaterContext';
 import PrivateRoute from './components/PrivateRoute';
@@ -79,6 +80,7 @@ function App() {
               <Route path="settings" element={<Settings />} />
             </Route>
           </Routes>
+          <SpeedInsights />
         </UpdaterProvider>
       </AuthProvider>
     </Router>
