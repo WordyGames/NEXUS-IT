@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Ticket, TicketStatus, TicketPriority, addTicketComment, updateTicket, triggerTicketStatusChange, triggerTicketComment } from '@nexus-it/shared';
 import { MessageCircle, Clock, User, AlertCircle, CheckCircle, X } from 'lucide-react';
 

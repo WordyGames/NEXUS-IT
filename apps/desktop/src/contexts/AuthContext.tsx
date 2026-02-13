@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { 
   User, 
   UserRole, 
@@ -13,7 +13,7 @@ interface AuthContextType {
   currentSession: UserSession | null;
   userData: User | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<User>;
+  login: (username: string, password: string) => Promise<User | null>;
   logout: () => Promise<void>;
   isAdmin: boolean;
   refreshUser: () => Promise<void>;

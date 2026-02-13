@@ -26,6 +26,17 @@ const MyEquipment = () => {
     }
   };
 
+  const getDateFromTimestamp = (dateOrTimestamp: Date | any): string => {
+    if (!dateOrTimestamp) return '';
+    if (dateOrTimestamp instanceof Date) {
+      return dateOrTimestamp.toLocaleDateString();
+    }
+    if (dateOrTimestamp.seconds) {
+      return new Date(dateOrTimestamp.seconds * 1000).toLocaleDateString();
+    }
+    return '';
+  };
+
   const getEquipmentIcon = (type: string) => {
     switch (type.toLowerCase()) {
       case 'laptop': return <Computer className="text-blue-500" size={40} />;
@@ -100,11 +111,11 @@ const MyEquipment = () => {
                   </span>
                 </div>
 
-                {eq.serialNumber && (
+                {eq.specs?.serialNumber && (
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Serie:</span>
                     <span className="font-medium text-gray-800 dark:text-white">
-                      {eq.serialNumber}
+                      {eq.specs.serialNumber}
                     </span>
                   </div>
                 )}
@@ -141,7 +152,7 @@ const MyEquipment = () => {
               {eq.warrantyExpiration && (
                 <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                   <p className="text-xs text-gray-600 dark:text-gray-400">
-                    Garantía vence: {new Date(eq.warrantyExpiration.seconds * 1000).toLocaleDateString()}
+                    Garantía vence: {getDateFromTimestamp(eq.warrantyExpiration)}
                   </p>
                 </div>
               )}

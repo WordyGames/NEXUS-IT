@@ -1,3 +1,4 @@
+import React from 'react';
 import { Company } from '@nexus-it/shared';
 
 interface CompanyCardProps {

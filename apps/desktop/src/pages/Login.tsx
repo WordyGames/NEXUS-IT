@@ -18,6 +18,10 @@ const Login = () => {
 
     try {
       const user = await login(username, password);
+      if (!user) {
+        setError('No se pudo obtener los datos del usuario');
+        return;
+      }
       navigate(user.role === UserRole.ADMIN ? '/dashboard' : '/portal');
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión');
