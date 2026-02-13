@@ -7,8 +7,13 @@ import PrivateRoute from './components/PrivateRoute';
 import { GlobalSearch } from './components/GlobalSearch';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Equipment from './pages/Equipment';
 import MyEquipment from './pages/MyEquipment';
 import Tickets from './pages/Tickets';
+import Maintenances from './pages/Maintenances';
+import Reports from './pages/Reports';
+import { NotificationsPage } from './pages/Notifications';
+import Settings from './pages/Settings';
 import Users from './pages/Users';
 import Layout from './components/Layout';
 import PortalLayout from './components/PortalLayout';
@@ -66,10 +71,15 @@ function App() {
             >
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
+              <Route path="equipment" element={<Equipment />} />
               <Route path="tickets" element={<Tickets />} />
               <Route path="tickets/:id" element={<Tickets />} />
+              <Route path="maintenances" element={<Maintenances />} />
+              <Route path="reports" element={<Reports />} />
               <Route path="warranty-report" element={<WarrantyReport />} />
+              <Route path="notifications" element={<NotificationsPage />} />
               <Route path="users" element={<Users />} />
+              <Route path="settings" element={<Settings />} />
             </Route>
           </Routes>
         </UpdaterProvider>
