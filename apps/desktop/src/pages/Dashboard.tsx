@@ -6,6 +6,7 @@ import {
   getEquipmentStats, 
   getTicketStats, 
   getEquipment,
+  getTickets,
   getUpcomingMaintenances,
   getOverdueMaintenances,
   Maintenance,
@@ -30,6 +31,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<Stats | null>(null);
   const [userEquipment, setUserEquipment] = useState<any[]>([]);
+  const [userTicketsCount, setUserTicketsCount] = useState(0);
   const [upcomingMaintenances, setUpcomingMaintenances] = useState<Maintenance[]>([]);
   const [overdueMaintenances, setOverdueMaintenances] = useState<Maintenance[]>([]);
   const [warrantyAlerts, setWarrantyAlerts] = useState<WarrantyAlert>({ expired: 0, expiringSoon: 0 });
@@ -67,7 +69,13 @@ const Dashboard = () => {
         // Cargar equipos asignados al usuario actual
         if (!isAdmin && userData?.id) {
           const allEquipment = await getEquipment({ assignedTo: userData.id });
-          setUserEquipment(allEquipment);
+          setUserEquipment(allEquipment);          
+          // Cargar tickets del usuario
+          const userTickets = await getTickets({ createdBy: userData.id });
+          setUserTicketsCount(userTickets.length);          
+          // Cargar tickets del usuario
+          const userTickets = await getTickets({ createdBy: userData.id });
+          setUserTicketsCount(userTickets.length);
         }
 
         // Cargar alertas de mantenimiento y garantías para admin
@@ -195,7 +203,7 @@ const Dashboard = () => {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Mis Tickets</p>
                 <p className="text-3xl font-bold text-gray-800 dark:text-white">
-                  {stats?.tickets.total || 0}
+                  {userTicketsCount}
                 </p>
               </div>
               <div className="text-4xl">🎫</div>
