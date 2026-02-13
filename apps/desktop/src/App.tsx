@@ -7,6 +7,7 @@ import { GlobalSearch } from './components/GlobalSearch';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Equipment from './pages/Equipment';
+import MyEquipment from './pages/MyEquipment';
 import Tickets from './pages/Tickets';
 import Maintenances from './pages/Maintenances';
 import Reports from './pages/Reports';
@@ -56,6 +57,7 @@ function App() {
               }
             >
               <Route index element={<Dashboard />} />
+              <Route path="equipment" element={<MyEquipment />} />
               <Route path="tickets" element={<Tickets />} />
             </Route>
             <Route

@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Ticket } from 'lucide-react';
+import { LayoutDashboard, Ticket, Computer } from 'lucide-react';
 
 interface PortalSidebarProps {
   collapsed: boolean;
@@ -24,6 +24,20 @@ const PortalSidebar: React.FC<PortalSidebarProps> = ({ collapsed }) => {
             title="Dashboard"
           >
             <LayoutDashboard size={20} />
+          </NavLink>
+
+          <NavLink
+            to="/portal/equipment"
+            className={({ isActive }) =>
+              `flex items-center justify-center p-3 rounded-lg transition-colors ${
+                isActive
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`
+            }
+            title="Mis Equipos"
+          >
+            <Computer size={20} />
           </NavLink>
 
           <NavLink
@@ -65,6 +79,20 @@ const PortalSidebar: React.FC<PortalSidebarProps> = ({ collapsed }) => {
         >
           <LayoutDashboard size={20} />
           <span>Dashboard</span>
+        </NavLink>
+
+        <NavLink
+          to="/portal/equipment"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              isActive
+                ? 'bg-blue-500 text-white'
+                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`
+          }
+        >
+          <Computer size={20} />
+          <span>Mis Equipos</span>
         </NavLink>
 
         <NavLink

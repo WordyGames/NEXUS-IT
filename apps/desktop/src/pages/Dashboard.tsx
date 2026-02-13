@@ -32,6 +32,7 @@ const Dashboard = () => {
   const [stats, setStats] = useState<Stats | null>(null);
   const [userEquipment, setUserEquipment] = useState<any[]>([]);
   const [userTicketsCount, setUserTicketsCount] = useState(0);
+  const [recentTickets, setRecentTickets] = useState<any[]>([]);
   const [upcomingMaintenances, setUpcomingMaintenances] = useState<Maintenance[]>([]);
   const [overdueMaintenances, setOverdueMaintenances] = useState<Maintenance[]>([]);
   const [warrantyAlerts, setWarrantyAlerts] = useState<WarrantyAlert>({ expired: 0, expiringSoon: 0 });
@@ -74,6 +75,14 @@ const Dashboard = () => {
           // Cargar tickets del usuario
           const userTickets = await getTickets({ createdBy: userData.id });
           setUserTicketsCount(userTickets.length);
+          
+          // Obtener los 5 tickets más recientes
+          const sortedTickets = userTickets.sort((a, b) => {
+            const dateA = a.createdAt?.seconds || 0;
+            const dateB = b.createdAt?.seconds || 0;
+            return dateB - dateA;
+          }).slice(0, 5);
+          setRecentTickets(sortedTickets);
         }
 
         // Cargar alertas de mantenimiento y garantías para admin
@@ -145,7 +154,7 @@ const Dashboard = () => {
             </p>
           </div>
           <div className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 rounded-full text-sm font-medium">
-            v2.1 ✨
+            v2.5 ✨
           </div>
         </div>
 
@@ -213,6 +222,61 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+
+        {/* Tickets Recientes */}
+        {recentTickets.length > 0 && (
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+              Tickets Recientes
+            </h2>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+              <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                {recentTickets.map((ticket) => (
+                  <div key={ticket.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold text-gray-800 dark:text-white">
+                            #{ticket.ticketNumber}
+                          </span>
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            ticket.status === 'open' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100' :
+                            ticket.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100' :
+                            ticket.status === 'resolved' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100' :
+                            'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-100'
+                          }`}>
+                            {ticket.status === 'open' ? 'Abierto' : 
+                             ticket.status === 'in_progress' ? 'En Progreso' :
+                             ticket.status === 'resolved' ? 'Resuelto' : 'Cerrado'}
+                          </span>
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            ticket.priority === 'urgent' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100' :
+                            ticket.priority === 'high' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100' :
+                            ticket.priority === 'medium' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100' :
+                            'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-100'
+                          }`}>
+                            {ticket.priority === 'urgent' ? 'Urgente' : 
+                             ticket.priority === 'high' ? 'Alta' :
+                             ticket.priority === 'medium' ? 'Media' : 'Baja'}
+                          </span>
+                        </div>
+                        <p className="text-gray-800 dark:text-white font-medium">{ticket.subject}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
+                          {ticket.description}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                          {ticket.createdAt && new Date(ticket.createdAt.seconds * 1000).toLocaleDateString('es-ES', {
+                            year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
