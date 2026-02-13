@@ -27,7 +27,7 @@ const Tickets = () => {
 
   useEffect(() => {
     loadTickets();
-  }, [companyFilter, isAdmin, userData?.id, userData?.username, userData?.name, userData?.company]);
+  }, [companyFilter, isAdmin, userData?.id]);
 
   useEffect(() => {
     // Si viene un ID de ticket en la URL, abrirlo automáticamente
@@ -54,37 +54,25 @@ const Tickets = () => {
   };
 
   const loadUserTickets = async () => {
-    if (!userData) return [] as Ticket[];
+    if (!userData?.id) return [] as Ticket[];
 
-    const queries: Promise<Ticket[]>[] = [];
+    try {
+      // Buscar tickets creados por este usuario (usando ID)
+      const userTickets = await getTickets({ createdBy: userData.id });
 
-    if (userData.id) {
-      queries.push(getTickets({ createdBy: userData.id }));
+      // Filtrar por empresa si el usuario tiene una empresa asignada
+      let filtered = userTickets;
+      if (userData.company) {
+        filtered = filtered.filter((ticket) => ticket.company === userData.company);
+      }
+
+      // Ordenar por fecha más reciente primero
+      filtered.sort((a, b) => getTicketSortValue(b) - getTicketSortValue(a));
+      return filtered;
+    } catch (error) {
+      console.error('Error loading user tickets:', error);
+      return [];
     }
-
-    if (userData.username && userData.username !== userData.id) {
-      queries.push(getTickets({ createdBy: userData.username }));
-    }
-
-    if (userData.name) {
-      queries.push(getTickets({ createdByName: userData.name }));
-    }
-
-    const results = await Promise.all(queries);
-    const unique = new Map<string, Ticket>();
-
-    results.flat().forEach((ticket) => {
-      unique.set(ticket.id, ticket);
-    });
-
-    let merged = Array.from(unique.values());
-
-    if (userData.company) {
-      merged = merged.filter((ticket) => ticket.company === userData.company);
-    }
-
-    merged.sort((a, b) => getTicketSortValue(b) - getTicketSortValue(a));
-    return merged;
   };
 
   const loadTickets = async () => {
