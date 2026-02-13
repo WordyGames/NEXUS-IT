@@ -137,13 +137,18 @@ const Dashboard = () => {
   if (!isAdmin) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-2">
-            Mi Panel
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Mis equipos asignados y tickets
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-2">
+              Mi Panel
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              {userData?.company} - Mis equipos asignados y tickets
+            </p>
+          </div>
+          <div className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 rounded-full text-sm font-medium">
+            v2.1 ✨
+          </div>
         </div>
 
         {/* Equipos Asignados */}
