@@ -19,6 +19,45 @@ import { generateTicketNumber } from '../utils/helpers';
 const COLLECTION_NAME = 'tickets';
 const COMMENTS_COLLECTION = 'comments';
 
+const getTicketSortValue = (ticket: Ticket) => {
+  const createdAt: any = ticket.createdAt;
+  if (!createdAt) return 0;
+  if (createdAt instanceof Date) return createdAt.getTime();
+  if (typeof createdAt === 'object' && 'toDate' in createdAt) {
+    return createdAt.toDate().getTime();
+  }
+  if (typeof createdAt === 'object' && 'seconds' in createdAt) {
+    return createdAt.seconds * 1000;
+  }
+  const parsed = new Date(createdAt).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+const isIndexError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.toLowerCase().includes('index') || message.includes('FAILED_PRECONDITION');
+};
+
+const fetchTickets = async (constraints: QueryConstraint[], includeOrderBy: boolean) => {
+  const effectiveConstraints = includeOrderBy
+    ? [...constraints, orderBy('createdAt', 'desc')]
+    : constraints;
+
+  const q = query(collection(db, COLLECTION_NAME), ...effectiveConstraints);
+  const querySnapshot = await getDocs(q);
+
+  let tickets = querySnapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  })) as Ticket[];
+
+  if (!includeOrderBy) {
+    tickets.sort((a, b) => getTicketSortValue(b) - getTicketSortValue(a));
+  }
+
+  return tickets;
+};
+
 /**
  * Obtiene todos los tickets con filtros opcionales
  */
@@ -48,15 +87,12 @@ export const getTickets = async (filters?: TicketFilters): Promise<Ticket[]> => 
       constraints.push(where('createdByName', '==', filters.createdByName));
     }
     
-    constraints.push(orderBy('createdAt', 'desc'));
-    
-    const q = query(collection(db, COLLECTION_NAME), ...constraints);
-    const querySnapshot = await getDocs(q);
-    
-    let tickets = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as Ticket[];
+    let tickets = await fetchTickets(constraints, true).catch(async (error) => {
+      if (isIndexError(error)) {
+        return fetchTickets(constraints, false);
+      }
+      throw error;
+    });
     
     // Filtro de búsqueda en cliente
     if (filters?.search) {
