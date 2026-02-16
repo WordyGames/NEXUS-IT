@@ -4,8 +4,15 @@ import {
   Company, 
   getUsers, 
   User,
-  triggerEquipmentNotifications 
+  triggerEquipmentNotifications,
+  uploadFile,
+  generateStoragePath,
+  validateFile,
+  formatFileSize,
+  Attachment
 } from '@nexus-it/shared';
+import { useAuth } from '../contexts/AuthContext';
+import { Upload, X } from 'lucide-react';
 
 interface EquipmentFormProps {
   equipment: Equipment | null;
@@ -29,9 +36,12 @@ const formatDateForInput = (date: any): string => {
 };
 
 const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) => {
+  const { userData } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [detecting, setDetecting] = useState(false);
+  const [attachments, setAttachments] = useState<any[]>(equipment?.attachments || []);
+  const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
     company: equipment?.company || Company.GRUPO_AMEX,
     name: equipment?.name || '',
@@ -97,6 +107,47 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
     }
   };
 
+  const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !userData) return;
+
+    setUploading(true);
+    try {
+      const file = e.target.files[0];
+      const validation = validateFile(file, 5, ['image/jpeg', 'image/png', 'image/jpg', 'image/webp']);
+      
+      if (!validation.valid) {
+        alert(validation.error);
+        return;
+      }
+
+      const entityId = equipment?.id || `temp-${Date.now()}`;
+      const storagePath = generateStoragePath('equipment', entityId, file.name);
+      const downloadURL = await uploadFile(file, storagePath);
+
+      const newAttachment: Attachment = {
+        id: Date.now().toString(),
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        url: downloadURL,
+        uploadedBy: userData.id,
+        uploadedByName: userData.name,
+        createdAt: new Date()
+      };
+
+      setAttachments([newAttachment]); // Solo 1 foto principal
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      alert('Error al subir la foto');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setAttachments([]);
+  };
+
   // Determinar qué campos mostrar según el tipo
   const getFieldsForType = () => {
     const baseFields = ['name', 'company', 'type', 'location', 'status', 'assignedTo', 'purchaseDate', 'warrantyExpiration'];
@@ -137,6 +188,7 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
     try {
       const submitData = {
         ...formData,
+        attachments, // Incluir fotos/archivos
         purchaseDate: formData.purchaseDate ? new Date(formData.purchaseDate) : undefined,
         warrantyExpiration: formData.warrantyExpiration ? new Date(formData.warrantyExpiration) : undefined
       };
@@ -290,7 +342,7 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
         </p>
 
         {/* Botón para detectar specs automáticamente */}
-        {(formData.type === 'desktop' || formData.type === 'laptop') && (
+        {(formData.type === 'desktop' || formData.type === 'laptop') && window.electron?.detectSystemSpecs && (
           <div className="mb-4">
             <button
               type="button"
@@ -314,6 +366,59 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
             </p>
           </div>
         )}
+
+        {/* Foto del equipo */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Foto del Equipo
+          </label>
+          
+          {attachments.length === 0 ? (
+            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 text-center">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileInput}
+                disabled={uploading}
+                className="hidden"
+                id="equipment-photo"
+              />
+              <label
+                htmlFor="equipment-photo"
+                className="cursor-pointer flex flex-col items-center gap-2"
+              >
+                <Upload size={32} className={uploading ? 'text-gray-400' : 'text-blue-500'} />
+                <div className="text-sm">
+                  <p className="font-medium text-gray-700 dark:text-gray-300">
+                    {uploading ? 'Subiendo foto...' : 'Tomar foto o seleccionar imagen'}
+                  </p>
+                  <p className="text-gray-500 dark:text-gray-400 text-xs">
+                    JPG, PNG o WEBP. Máximo 5MB
+                  </p>
+                </div>
+              </label>
+            </div>
+          ) : (
+            <div className="relative">
+              <img
+                src={attachments[0].url}
+                alt="Foto del equipo"
+                className="w-full h-48 object-cover rounded-lg"
+              />
+              <button
+                type="button"
+                onClick={handleRemovePhoto}
+                title="Eliminar foto"
+                className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition"
+              >
+                <X size={16} />
+              </button>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {attachments[0].fileName} ({formatFileSize(attachments[0].fileSize)})
+              </p>
+            </div>
+          )}
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">

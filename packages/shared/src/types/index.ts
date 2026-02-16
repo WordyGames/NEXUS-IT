@@ -32,6 +32,7 @@ export interface Equipment {
   warrantyExpiration?: Date | Timestamp;
   status: 'active' | 'inactive' | 'maintenance' | 'retired';
   notes?: string;
+  attachments?: Attachment[]; // Fotos o documentos del equipo
   createdAt: Date | Timestamp;
   updatedAt: Date | Timestamp;
   createdBy: string;

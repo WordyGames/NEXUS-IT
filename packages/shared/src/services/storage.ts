@@ -62,7 +62,7 @@ export const getFileURL = async (path: string): Promise<string> => {
  * @returns Ruta para storage
  */
 export const generateStoragePath = (
-  type: 'tickets' | 'maintenances' | 'attachments',
+  type: 'tickets' | 'maintenances' | 'equipment' | 'attachments',
   entityId: string,
   filename: string
 ): string => {
