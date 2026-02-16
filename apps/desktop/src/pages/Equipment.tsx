@@ -101,22 +101,31 @@ const Equipment = () => {
     }
   };
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: any): Promise<string> => {
     try {
       if (editingEquipment) {
-        await updateEquipment(editingEquipment.id, data);
+        const { id: _ignoredId, ...updateData } = data;
+        await updateEquipment(editingEquipment.id, updateData);
+        
+        setShowForm(false);
+        setEditingEquipment(null);
+        await loadEquipment();
+        return editingEquipment.id;
       } else {
-        await createEquipment({
+        const createdId = await createEquipment({
           ...data,
           createdBy: userData?.id || ''
         });
+
+        setShowForm(false);
+        setEditingEquipment(null);
+        await loadEquipment();
+        return createdId;
       }
-      setShowForm(false);
-      setEditingEquipment(null);
-      await loadEquipment();
     } catch (error) {
       console.error('Error saving equipment:', error);
       alert('Error al guardar el equipo');
+      throw error;
     }
   };
 

@@ -12,7 +12,7 @@ export interface SystemSpecs {
 
 declare global {
   interface Window {
-    electron: {
+    electron?: {
       detectSystemSpecs: () => Promise<SystemSpecs>;
       onUpdateAvailable: (callback: (info: any) => void) => void;
       onDownloadProgress: (callback: (progress: any) => void) => void;

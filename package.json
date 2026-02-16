@@ -12,6 +12,7 @@
     "build": "npm run build --workspace=apps/desktop",
     "clean": "rimraf node_modules packages/*/node_modules apps/*/node_modules packages/*/dist apps/*/dist",
     "desktop": "npm run dev --workspace=apps/desktop",
+    "desktop:portable": "npm run dist:portable --workspace=apps/desktop",
     "mobile": "npm run start --workspace=apps/mobile",
     "shared": "npm run build --workspace=packages/shared"
   },

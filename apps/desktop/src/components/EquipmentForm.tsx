@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Equipment, 
   Company, 
@@ -9,14 +9,16 @@ import {
   generateStoragePath,
   validateFile,
   formatFileSize,
-  Attachment
+  Attachment,
+  deleteFile,
+  resolveAttachmentStoragePath
 } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
 import { Upload, X } from 'lucide-react';
 
 interface EquipmentFormProps {
   equipment: Equipment | null;
-  onSubmit: (data: any) => Promise<void>;
+  onSubmit: (data: any) => Promise<string | void>;
   onCancel: () => void;
 }
 
@@ -35,13 +37,31 @@ const formatDateForInput = (date: any): string => {
   return d.toISOString().split('T')[0];
 };
 
+const generateEntityId = (existingId?: string): string => {
+  if (existingId) return existingId;
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+  return `equipment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+};
+
+const getAttachmentKey = (attachment: Attachment): string => {
+  return attachment.storagePath || attachment.url || attachment.id;
+};
+
 const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) => {
   const { userData } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [detecting, setDetecting] = useState(false);
-  const [attachments, setAttachments] = useState<any[]>(equipment?.attachments || []);
+  const [attachments, setAttachments] = useState<Attachment[]>(equipment?.attachments || []);
+  const [pendingDeleteAttachments, setPendingDeleteAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [entityId] = useState<string>(() => generateEntityId(equipment?.id));
+  const initialAttachmentKeys = useMemo(
+    () => new Set((equipment?.attachments || []).map(getAttachmentKey)),
+    [equipment?.attachments]
+  );
   const [formData, setFormData] = useState({
     company: equipment?.company || Company.GRUPO_AMEX,
     name: equipment?.name || '',
@@ -79,15 +99,36 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
     }
   };
 
+  const isInitialAttachment = (attachment: Attachment): boolean => {
+    return initialAttachmentKeys.has(getAttachmentKey(attachment));
+  };
+
+  const cleanupAttachmentsFromStorage = async (attachmentsToDelete: Attachment[]) => {
+    if (attachmentsToDelete.length === 0) return;
+
+    const deletions = attachmentsToDelete.map(async (attachment) => {
+      const storagePath = resolveAttachmentStoragePath(attachment);
+      if (!storagePath) return;
+      await deleteFile(storagePath);
+    });
+
+    const results = await Promise.allSettled(deletions);
+    const failedDeletes = results.filter((result) => result.status === 'rejected');
+    if (failedDeletes.length > 0) {
+      console.error(`Error deleting ${failedDeletes.length} equipment attachment(s) from storage`);
+    }
+  };
+
   const handleDetectSpecs = async () => {
     setDetecting(true);
     try {
       // Verificar que estamos en Electron
-      if (!window.electron?.detectSystemSpecs) {
+      const detectSystemSpecs = window.electron?.detectSystemSpecs;
+      if (!detectSystemSpecs) {
         throw new Error('Esta función solo está disponible en la aplicación desktop de Electron');
       }
 
-      const specs = await window.electron.detectSystemSpecs();
+      const specs = await detectSystemSpecs();
       
       // Actualizar specs y también el nombre del equipo con el modelo si está disponible
       setFormData({
@@ -120,7 +161,6 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
         return;
       }
 
-      const entityId = equipment?.id || `temp-${Date.now()}`;
       const storagePath = generateStoragePath('equipment', entityId, file.name);
       const downloadURL = await uploadFile(file, storagePath);
 
@@ -130,6 +170,7 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
         fileType: file.type,
         fileSize: file.size,
         url: downloadURL,
+        storagePath,
         uploadedBy: userData.id,
         uploadedByName: userData.name,
         createdAt: new Date()
@@ -144,8 +185,30 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
     }
   };
 
-  const handleRemovePhoto = () => {
+  const handleRemovePhoto = async () => {
+    if (attachments.length === 0) return;
+
+    const [attachmentToRemove] = attachments;
     setAttachments([]);
+
+    if (isInitialAttachment(attachmentToRemove)) {
+      setPendingDeleteAttachments((prev) => {
+        const key = getAttachmentKey(attachmentToRemove);
+        if (prev.some((attachment) => getAttachmentKey(attachment) === key)) {
+          return prev;
+        }
+        return [...prev, attachmentToRemove];
+      });
+      return;
+    }
+
+    await cleanupAttachmentsFromStorage([attachmentToRemove]);
+  };
+
+  const handleCancel = async () => {
+    const transientAttachments = attachments.filter((attachment) => !isInitialAttachment(attachment));
+    await cleanupAttachmentsFromStorage(transientAttachments);
+    onCancel();
   };
 
   // Determinar qué campos mostrar según el tipo
@@ -186,29 +249,36 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
     e.preventDefault();
     setLoading(true);
     try {
-      const submitData = {
+      const submitData: any = {
         ...formData,
         attachments, // Incluir fotos/archivos
         purchaseDate: formData.purchaseDate ? new Date(formData.purchaseDate) : undefined,
         warrantyExpiration: formData.warrantyExpiration ? new Date(formData.warrantyExpiration) : undefined
       };
+
+      if (!equipment) {
+        submitData.id = entityId;
+      }
       
-      await onSubmit(submitData);
+      const persistedEquipmentId = await onSubmit(submitData);
+      const finalEquipmentId = equipment?.id || persistedEquipmentId || entityId;
       
       // Generar notificación de garantía si aplica
       if (formData.company) {
         const equipmentData = {
           ...submitData,
-          id: equipment?.id || Date.now().toString(),
+          id: finalEquipmentId,
           company: formData.company as Company,
           createdAt: new Date(),
           updatedAt: new Date(),
-          createdBy: 'system',
+          createdBy: userData?.id || 'system',
           status: formData.status as 'active' | 'inactive' | 'maintenance' | 'retired'
         } as Equipment;
         
         await triggerEquipmentNotifications(equipmentData);
       }
+
+      await cleanupAttachmentsFromStorage(pendingDeleteAttachments);
     } finally {
       setLoading(false);
     }
@@ -407,7 +477,7 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
               />
               <button
                 type="button"
-                onClick={handleRemovePhoto}
+                onClick={() => { void handleRemovePhoto(); }}
                 title="Eliminar foto"
                 className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition"
               >
@@ -439,7 +509,7 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
             </button>
             <button
               type="button"
-              onClick={onCancel}
+              onClick={() => { void handleCancel(); }}
               className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition"
             >
               Cancelar

@@ -7,6 +7,7 @@ export interface Attachment {
   fileType: string; // image/jpeg, application/pdf, etc.
   fileSize: number; // en bytes
   url: string; // URL de descarga en Storage
+  storagePath?: string; // Ruta en Firebase Storage para poder eliminar/reubicar
   uploadedBy: string; // ID del usuario
   uploadedByName: string;
   createdAt: Date | Timestamp;

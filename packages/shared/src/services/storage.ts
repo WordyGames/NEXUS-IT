@@ -72,6 +72,38 @@ export const generateStoragePath = (
 };
 
 /**
+ * Extrae la ruta de Firebase Storage a partir de una URL pública de descarga
+ */
+export const extractStoragePathFromURL = (url: string): string | null => {
+  try {
+    const parsed = new URL(url);
+    const marker = '/o/';
+    const markerIndex = parsed.pathname.indexOf(marker);
+    if (markerIndex === -1) return null;
+
+    const encodedPath = parsed.pathname.slice(markerIndex + marker.length);
+    if (!encodedPath) return null;
+
+    return decodeURIComponent(encodedPath);
+  } catch (error) {
+    console.error('Error extracting storage path from URL:', error);
+    return null;
+  }
+};
+
+/**
+ * Obtiene la ruta de storage desde un attachment (directa o derivada de URL)
+ */
+export const resolveAttachmentStoragePath = (attachment: {
+  storagePath?: string;
+  url?: string;
+}): string | null => {
+  if (attachment.storagePath) return attachment.storagePath;
+  if (!attachment.url) return null;
+  return extractStoragePathFromURL(attachment.url);
+};
+
+/**
  * Valida que el archivo sea válido
  * @param file Archivo a validar
  * @param maxSizeMB Tamaño máximo en MB

@@ -13,6 +13,7 @@
     "build:electron": "tsc --project tsconfig.electron.json",
     "dist": "npm run build:react && npm run build:electron && electron-builder",
     "dist:win": "npm run build:react && npm run build:electron && electron-builder --win",
+    "dist:portable": "npm run build:react && npm run build:electron && electron-builder --win portable",
     "dist:mac": "npm run build:react && npm run build:electron && electron-builder --mac",
     "clean": "rimraf dist build"
   },

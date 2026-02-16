@@ -71,6 +71,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
           fileType: file.type,
           fileSize: file.size,
           url: downloadURL,
+          storagePath,
           uploadedBy: userId,
           uploadedByName: userName,
           createdAt: new Date()

@@ -4,6 +4,7 @@ import {
   getDoc,
   getDocs,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -14,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Equipment, EquipmentFilters } from '../types';
+import { deleteFile, resolveAttachmentStoragePath } from './storage';
 
 const COLLECTION_NAME = 'equipment';
 
@@ -100,11 +102,25 @@ export const getEquipmentById = async (id: string): Promise<Equipment | null> =>
 /**
  * Crea un nuevo equipo
  */
-export const createEquipment = async (equipment: Omit<Equipment, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+export const createEquipment = async (
+  equipment: Omit<Equipment, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }
+): Promise<string> => {
   try {
     const now = Timestamp.now();
+    const { id: providedId, ...equipmentData } = equipment;
+
+    if (providedId) {
+      const docRef = doc(db, COLLECTION_NAME, providedId);
+      await setDoc(docRef, {
+        ...equipmentData,
+        createdAt: now,
+        updatedAt: now
+      });
+      return providedId;
+    }
+
     const docRef = await addDoc(collection(db, COLLECTION_NAME), {
-      ...equipment,
+      ...equipmentData,
       createdAt: now,
       updatedAt: now
     });
@@ -137,6 +153,29 @@ export const updateEquipment = async (id: string, data: Partial<Equipment>): Pro
 export const deleteEquipment = async (id: string): Promise<void> => {
   try {
     const docRef = doc(db, COLLECTION_NAME, id);
+
+    // Limpiar adjuntos asociados en Storage antes de eliminar el documento
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const equipment = docSnap.data() as Equipment;
+      const attachments = equipment.attachments || [];
+
+      if (attachments.length > 0) {
+        const deletions = attachments.map(async (attachment) => {
+          const storagePath = resolveAttachmentStoragePath(attachment);
+          if (!storagePath) return;
+          await deleteFile(storagePath);
+        });
+
+        const results = await Promise.allSettled(deletions);
+        const failedDeletes = results.filter((result) => result.status === 'rejected');
+
+        if (failedDeletes.length > 0) {
+          console.error(`Error deleting ${failedDeletes.length} equipment attachment(s) from storage`);
+        }
+      }
+    }
+
     await deleteDoc(docRef);
   } catch (error) {
     console.error('Error deleting equipment:', error);
