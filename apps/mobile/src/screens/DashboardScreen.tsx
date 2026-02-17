@@ -93,6 +93,14 @@ const DashboardScreen = ({ navigation }: any) => {
         >
           <Text style={styles.actionButtonText}>Ver Tickets</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => navigation.navigate('MobileEnrollment')}
+        >
+          <Text style={styles.actionButtonText}>Alta de Equipo (Celular)</Text>
+        </TouchableOpacity>
+
       </View>
     </ScrollView>
   );

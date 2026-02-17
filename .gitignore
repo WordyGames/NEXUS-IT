@@ -27,6 +27,7 @@ release/
 *.mobileprovision
 *.orig.*
 web-build/
+apps/mobile/dist-update/
 
 # Misc
 .DS_Store

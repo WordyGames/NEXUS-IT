@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Ticket, TicketStatus, TicketPriority, addTicketComment, updateTicket, triggerTicketStatusChange, triggerTicketComment } from '@nexus-it/shared';
 import { MessageCircle, Clock, User, AlertCircle, CheckCircle, X } from 'lucide-react';
+import { useUiFeedback } from '../contexts/UiFeedbackContext';
 
 interface TicketDetailProps {
   ticket: Ticket;
@@ -12,6 +13,7 @@ interface TicketDetailProps {
 }
 
 const TicketDetail = ({ ticket, onClose, onUpdate, currentUserId, currentUserName, isAdmin }: TicketDetailProps) => {
+  const { showToast } = useUiFeedback();
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [newStatus, setNewStatus] = useState(ticket.status);
@@ -20,7 +22,11 @@ const TicketDetail = ({ ticket, onClose, onUpdate, currentUserId, currentUserNam
     e.preventDefault();
     
     if (!newComment.trim()) {
-      alert('El comentario no puede estar vacío');
+      showToast({
+        type: 'warning',
+        title: 'Comentario requerido',
+        message: 'El comentario no puede estar vacío'
+      });
       return;
     }
 
@@ -43,8 +49,17 @@ const TicketDetail = ({ ticket, onClose, onUpdate, currentUserId, currentUserNam
       
       setNewComment('');
       onUpdate();
+      showToast({
+        type: 'success',
+        title: 'Comentario agregado',
+        message: 'Se agregó el comentario al ticket'
+      });
     } catch (error: any) {
-      alert('Error al agregar comentario: ' + error.message);
+      showToast({
+        type: 'error',
+        title: 'Error al comentar',
+        message: error.message || 'No se pudo agregar el comentario'
+      });
     } finally {
       setLoading(false);
     }
@@ -75,8 +90,17 @@ const TicketDetail = ({ ticket, onClose, onUpdate, currentUserId, currentUserNam
       
       setNewStatus(status);
       onUpdate();
+      showToast({
+        type: 'success',
+        title: 'Estado actualizado',
+        message: `El ticket ahora está en estado ${getStatusLabel(status)}`
+      });
     } catch (error: any) {
-      alert('Error al cambiar estado: ' + error.message);
+      showToast({
+        type: 'error',
+        title: 'Error al cambiar estado',
+        message: error.message || 'No se pudo cambiar el estado del ticket'
+      });
     } finally {
       setLoading(false);
     }

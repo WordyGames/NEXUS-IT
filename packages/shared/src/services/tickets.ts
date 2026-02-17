@@ -4,6 +4,7 @@ import {
   getDoc,
   getDocs,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -15,6 +16,7 @@ import {
 import { db } from '../config/firebase';
 import { Ticket, TicketFilters, TicketComment, TicketStatus } from '../types';
 import { generateTicketNumber } from '../utils/helpers';
+import { deleteFile, resolveAttachmentStoragePath } from './storage';
 
 const COLLECTION_NAME = 'tickets';
 const COMMENTS_COLLECTION = 'comments';
@@ -132,18 +134,29 @@ export const getTicketById = async (id: string): Promise<Ticket | null> => {
 /**
  * Crea un nuevo ticket
  */
-export const createTicket = async (ticket: Omit<Ticket, 'id' | 'ticketNumber' | 'createdAt' | 'updatedAt' | 'comments'>): Promise<string> => {
+export const createTicket = async (
+  ticket: Omit<Ticket, 'id' | 'ticketNumber' | 'createdAt' | 'updatedAt' | 'comments'> & { id?: string }
+): Promise<string> => {
   try {
     const now = Timestamp.now();
     const ticketNumber = generateTicketNumber();
-    
-    const docRef = await addDoc(collection(db, COLLECTION_NAME), {
-      ...ticket,
+
+    const { id: providedId, ...ticketData } = ticket;
+    const payload = {
+      ...ticketData,
       ticketNumber,
       comments: [],
       createdAt: now,
       updatedAt: now
-    });
+    };
+
+    if (providedId) {
+      const docRef = doc(db, COLLECTION_NAME, providedId);
+      await setDoc(docRef, payload);
+      return providedId;
+    }
+
+    const docRef = await addDoc(collection(db, COLLECTION_NAME), payload);
     return docRef.id;
   } catch (error) {
     console.error('Error creating ticket:', error);
@@ -185,6 +198,32 @@ export const updateTicket = async (id: string, data: Partial<Ticket>): Promise<v
 export const deleteTicket = async (id: string): Promise<void> => {
   try {
     const docRef = doc(db, COLLECTION_NAME, id);
+
+    // Limpiar adjuntos del ticket antes de eliminarlo
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const ticket = docSnap.data() as Ticket;
+      const ticketAttachments = ticket.attachments || [];
+      const commentsAttachments = (ticket.comments || [])
+        .flatMap((comment) => comment.attachments || []);
+      const attachments = [...ticketAttachments, ...commentsAttachments];
+
+      if (attachments.length > 0) {
+        const deletions = attachments.map(async (attachment) => {
+          const storagePath = resolveAttachmentStoragePath(attachment);
+          if (!storagePath) return;
+          await deleteFile(storagePath);
+        });
+
+        const results = await Promise.allSettled(deletions);
+        const failedDeletes = results.filter((result) => result.status === 'rejected');
+
+        if (failedDeletes.length > 0) {
+          console.error(`Error deleting ${failedDeletes.length} ticket attachment(s) from storage`);
+        }
+      }
+    }
+
     await deleteDoc(docRef);
   } catch (error) {
     console.error('Error deleting ticket:', error);

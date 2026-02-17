@@ -63,16 +63,18 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
 
   yPos = 35;
 
-  // ===== INFORMACIÓN DEL EMPLEADO =====
-  doc.setFontSize(11);
-  doc.setTextColor(colors.secondary);
-  doc.setFont('helvetica', 'bold');
-  doc.text('INFORMACIÓN DEL EMPLEADO', margin + 3, yPos);
-  yPos += 2;
-
-  yPos += 12;
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(10);
+  const addSectionTitle = (title: string) => {
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'bold');
+    const titleX = margin + 3;
+    doc.text(title, titleX, yPos);
+    const titleWidth = doc.getTextWidth(title);
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.3);
+    doc.line(titleX, yPos + 0.8, titleX + titleWidth, yPos + 0.8);
+    yPos += 14;
+  };
 
   const addField = (label: string, value: string) => {
     doc.setFont('helvetica', 'bold');
@@ -82,21 +84,21 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
     yPos += 6;
   };
 
+  // ===== INFORMACIÓN DEL EMPLEADO =====
+  addSectionTitle('INFORMACIÓN DEL EMPLEADO');
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(10);
+
   addField('Nombre', employee.name || 'N/A');
   addField('Puesto', employee.position || 'N/A');
   addField('Departamento', employee.department || 'N/A');
+  addField('Teléfono', employee.phone || 'N/A');
   addField('Empresa', equipment.company);
 
   yPos += 5;
 
   // ===== EQUIPO ASIGNADO =====
-  doc.setFontSize(11);
-  doc.setTextColor(colors.secondary);
-  doc.setFont('helvetica', 'bold');
-  doc.text('EQUIPO ASIGNADO', margin + 3, yPos);
-  yPos += 2;
-
-  yPos += 12;
+  addSectionTitle('EQUIPO ASIGNADO');
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(10);
 
@@ -105,6 +107,9 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   addField('Marca', equipment.specs.manufacturer || 'N/A');
   addField('Modelo', equipment.specs.model || 'N/A');
   addField('Serial', equipment.specs.serialNumber || 'N/A');
+  addField('IMEI', equipment.specs.imei || 'N/A');
+  addField('Teléfono', equipment.specs.phoneNumber || 'N/A');
+  addField('Cuenta Google', equipment.specs.googleAccountEmail || 'N/A');
   addField('CPU', equipment.specs.cpu || 'N/A');
   addField('RAM', equipment.specs.ram || 'N/A');
   addField('Storage', equipment.specs.storage || 'N/A');
@@ -113,13 +118,7 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   yPos += 5;
 
   // ===== CONDICIONES Y RESPONSABILIDADES =====
-  doc.setFontSize(11);
-  doc.setTextColor(colors.secondary);
-  doc.setFont('helvetica', 'bold');
-  doc.text('CONDICIONES Y RESPONSABILIDADES', margin + 3, yPos);
-  yPos += 2;
-
-  yPos += 12;
+  addSectionTitle('CONDICIONES Y RESPONSABILIDADES');
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(9);
 
@@ -142,13 +141,7 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
 
   // ===== NOTAS ADICIONALES =====
   if (notes && notes.trim()) {
-    doc.setFontSize(11);
-    doc.setTextColor(colors.secondary);
-    doc.setFont('helvetica', 'bold');
-    doc.text('NOTAS ADICIONALES', margin + 3, yPos);
-    yPos += 2;
-
-    yPos += 12;
+    addSectionTitle('NOTAS ADICIONALES');
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(9);
 
@@ -162,13 +155,8 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   const firmasOffset = equipment.company === Company.ESPECIAS_NATURALES ? 95 : 75;
   yPos = Math.max(yPos + 10, pageHeight - firmasOffset);
 
-  doc.setFontSize(11);
-  doc.setTextColor(colors.secondary);
-  doc.setFont('helvetica', 'bold');
-  doc.text('FIRMAS', margin + 3, yPos);
-  yPos += 2;
-
-  yPos += 15;
+  addSectionTitle('FIRMAS');
+  yPos += 1;
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(10);
 

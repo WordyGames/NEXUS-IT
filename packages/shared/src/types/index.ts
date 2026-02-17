@@ -25,7 +25,7 @@ export interface Equipment {
   id: string;
   company: Company;
   name: string;
-  type: 'desktop' | 'laptop' | 'server' | 'printer' | 'router' | 'switch' | 'other';
+  type: 'desktop' | 'laptop' | 'phone' | 'server' | 'printer' | 'router' | 'switch' | 'other';
   specs: EquipmentSpecs;
   location: string;
   assignedTo?: string;
@@ -58,6 +58,9 @@ export interface EquipmentSpecs {
   
   // Otros
   serialNumber?: string;
+  imei?: string;
+  phoneNumber?: string;
+  googleAccountEmail?: string;
   model?: string;
   manufacturer?: string;
   
@@ -296,6 +299,9 @@ export interface CartaResponsiva {
     cpu?: string;
     ram?: string;
     serialNumber?: string;
+    imei?: string;
+    phoneNumber?: string;
+    googleAccountEmail?: string;
   };
   notes?: string; // Notas adicionales
   generatedBy: string;

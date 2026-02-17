@@ -6,37 +6,46 @@ import LoginScreen from './src/screens/LoginScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
 import EquipmentScreen from './src/screens/EquipmentScreen';
 import TicketsScreen from './src/screens/TicketsScreen';
+import MobileEnrollmentScreen from './src/screens/MobileEnrollmentScreen';
+import { AppErrorBoundary } from './src/components/AppErrorBoundary';
 
 const Stack = createNativeStackNavigator();
 
 export default function App() {
   return (
-    <AuthProvider>
-      <NavigationContainer>
-        <StatusBar style="auto" />
-        <Stack.Navigator initialRouteName="Login">
-          <Stack.Screen 
-            name="Login" 
-            component={LoginScreen} 
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="Dashboard" 
-            component={DashboardScreen}
-            options={{ title: 'NEXUS IT' }}
-          />
-          <Stack.Screen 
-            name="Equipment" 
-            component={EquipmentScreen}
-            options={{ title: 'Equipos' }}
-          />
-          <Stack.Screen 
-            name="Tickets" 
-            component={TicketsScreen}
-            options={{ title: 'Tickets' }}
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </AuthProvider>
+    <AppErrorBoundary>
+      <AuthProvider>
+        <NavigationContainer>
+          <StatusBar style="auto" />
+          <Stack.Navigator initialRouteName="Login">
+            <Stack.Screen 
+              name="Login" 
+              component={LoginScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="Dashboard" 
+              component={DashboardScreen}
+              options={{ title: 'NEXUS IT' }}
+            />
+            <Stack.Screen 
+              name="Equipment" 
+              component={EquipmentScreen}
+              options={{ title: 'Equipos' }}
+            />
+            <Stack.Screen
+              name="MobileEnrollment"
+              component={MobileEnrollmentScreen}
+              options={{ title: 'Alta de Equipo (Movil)' }}
+            />
+            <Stack.Screen 
+              name="Tickets" 
+              component={TicketsScreen}
+              options={{ title: 'Tickets' }}
+            />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </AuthProvider>
+    </AppErrorBoundary>
   );
 }

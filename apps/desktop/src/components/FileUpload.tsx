@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Upload, X, Download, File as FileIcon, Image } from 'lucide-react';
 import { Attachment, uploadFile, generateStoragePath, validateFile, formatFileSize } from '@nexus-it/shared';
+import { useUiFeedback } from '../contexts/UiFeedbackContext';
 
 interface FileUploadProps {
   entityId: string;
@@ -26,6 +27,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<{ [key: string]: string }>({});
   const [dragActive, setDragActive] = useState(false);
+  const { showToast } = useUiFeedback();
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -39,15 +41,25 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
   const processFiles = async (files: FileList) => {
     if (attachments.length >= maxFiles) {
-      alert(`Máximo ${maxFiles} archivos permitidos`);
+      showToast({
+        type: 'warning',
+        title: 'Límite de adjuntos',
+        message: `Máximo ${maxFiles} archivos permitidos`
+      });
       return;
     }
 
     setUploading(true);
     try {
+      let nextAttachments = [...attachments];
+
       for (let i = 0; i < files.length; i++) {
-        if (attachments.length + i >= maxFiles) {
-          alert(`Solo puedo agregar ${maxFiles - attachments.length} más`);
+        if (nextAttachments.length >= maxFiles) {
+          showToast({
+            type: 'warning',
+            title: 'Límite de adjuntos',
+            message: `Solo puedo agregar ${maxFiles - nextAttachments.length} más`
+          });
           break;
         }
 
@@ -56,7 +68,11 @@ const FileUpload: React.FC<FileUploadProps> = ({
         // Validar archivo
         const validation = validateFile(file, maxSizeMB);
         if (!validation.valid) {
-          alert(`${file.name}: ${validation.error}`);
+          showToast({
+            type: 'error',
+            title: 'Archivo no válido',
+            message: `${file.name}: ${validation.error}`
+          });
           continue;
         }
 
@@ -89,11 +105,16 @@ const FileUpload: React.FC<FileUploadProps> = ({
           reader.readAsDataURL(file);
         }
 
-        onAttachmentsChange([...attachments, newAttachment]);
+        nextAttachments = [...nextAttachments, newAttachment];
+        onAttachmentsChange(nextAttachments);
       }
     } catch (error) {
       console.error('Error uploading files:', error);
-      alert('Error al subir archivos');
+      showToast({
+        type: 'error',
+        title: 'Error de carga',
+        message: 'Error al subir archivos'
+      });
     } finally {
       setUploading(false);
       setDragActive(false);

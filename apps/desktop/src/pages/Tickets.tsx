@@ -14,9 +14,11 @@ import TicketForm from '../components/TicketForm';
 import TicketDetail from '../components/TicketDetail';
 import { Download } from 'lucide-react';
 import { exportTicketsToExcel } from '../utils/exportToExcel';
+import { useUiFeedback } from '../contexts/UiFeedbackContext';
 
 const Tickets = () => {
   const { userData, isAdmin } = useAuth();
+  const { showToast } = useUiFeedback();
   const { id: ticketIdFromUrl } = useParams<{ id: string }>();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,14 +120,13 @@ const Tickets = () => {
     }
   };
 
-  const handleCreateTicket = async (data: any) => {
+  const handleCreateTicket = async (data: any): Promise<string> => {
     try {
       if (!userData?.id) {
-        alert('Error: Usuario no autenticado');
-        return;
+        throw new Error('Usuario no autenticado');
       }
 
-      await createTicket({
+      const createdId = await createTicket({
         ...data,
         createdBy: userData.id,
         createdByName: userData.name
@@ -133,8 +134,15 @@ const Tickets = () => {
 
       setShowForm(false);
       await loadTickets();
+      showToast({ type: 'success', title: 'Ticket creado', message: 'El ticket se guardó correctamente' });
+      return createdId;
     } catch (error: any) {
-      alert(error.message || 'Error al crear ticket');
+      showToast({
+        type: 'error',
+        title: 'Error al crear ticket',
+        message: error.message || 'No se pudo crear el ticket'
+      });
+      throw error;
     }
   };
 

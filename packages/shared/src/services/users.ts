@@ -25,19 +25,92 @@ const getStorage = () => {
 const COLLECTION_NAME = 'users';
 const SESSIONS_COLLECTION = 'sessions';
 
+const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+const toUtf8Bytes = (value: string): number[] => {
+  if (typeof TextEncoder !== 'undefined') {
+    return Array.from(new TextEncoder().encode(value));
+  }
+
+  const bytes: number[] = [];
+
+  for (let i = 0; i < value.length; i++) {
+    const codePoint = value.charCodeAt(i);
+
+    if (codePoint < 0x80) {
+      bytes.push(codePoint);
+      continue;
+    }
+
+    if (codePoint < 0x800) {
+      bytes.push(
+        0xc0 | (codePoint >> 6),
+        0x80 | (codePoint & 0x3f)
+      );
+      continue;
+    }
+
+    if (codePoint >= 0xd800 && codePoint <= 0xdbff && i + 1 < value.length) {
+      const next = value.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        i += 1;
+        const fullCodePoint = 0x10000 + (((codePoint & 0x3ff) << 10) | (next & 0x3ff));
+        bytes.push(
+          0xf0 | (fullCodePoint >> 18),
+          0x80 | ((fullCodePoint >> 12) & 0x3f),
+          0x80 | ((fullCodePoint >> 6) & 0x3f),
+          0x80 | (fullCodePoint & 0x3f)
+        );
+        continue;
+      }
+    }
+
+    bytes.push(
+      0xe0 | (codePoint >> 12),
+      0x80 | ((codePoint >> 6) & 0x3f),
+      0x80 | (codePoint & 0x3f)
+    );
+  }
+
+  return bytes;
+};
+
+const bytesToBase64 = (bytes: number[]): string => {
+  let output = '';
+
+  for (let i = 0; i < bytes.length; i += 3) {
+    const byte1 = bytes[i] ?? 0;
+    const byte2 = bytes[i + 1] ?? 0;
+    const byte3 = bytes[i + 2] ?? 0;
+
+    const chunk = (byte1 << 16) | (byte2 << 8) | byte3;
+
+    output += BASE64_CHARS[(chunk >> 18) & 0x3f];
+    output += BASE64_CHARS[(chunk >> 12) & 0x3f];
+    output += i + 1 < bytes.length ? BASE64_CHARS[(chunk >> 6) & 0x3f] : '=';
+    output += i + 2 < bytes.length ? BASE64_CHARS[chunk & 0x3f] : '=';
+  }
+
+  return output;
+};
+
+const encodeBase64 = (value: string): string => {
+  return bytesToBase64(toUtf8Bytes(value));
+};
+
 /**
  * Hash simple de contraseña (en producción usar bcrypt)
  */
 const hashPassword = async (password: string): Promise<string> => {
-  // Por ahora usamos btoa, en producción deberías usar bcrypt o similar
-  return btoa(password);
+  // Por ahora usamos base64, en producción deberías usar bcrypt o similar
+  return encodeBase64(password);
 };
 
 /**
  * Verifica contraseña
  */
 const verifyPassword = async (password: string, hash: string): Promise<boolean> => {
-  return btoa(password) === hash;
+  return encodeBase64(password) === hash;
 };
 
 /**

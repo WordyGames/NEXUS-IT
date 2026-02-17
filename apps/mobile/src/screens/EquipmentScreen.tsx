@@ -4,11 +4,12 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  ActivityIndicator
+  ActivityIndicator,
+  TouchableOpacity
 } from 'react-native';
 import { getEquipment, Equipment } from '@nexus-it/shared';
 
-const EquipmentScreen = () => {
+const EquipmentScreen = ({ navigation }: any) => {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -37,6 +38,13 @@ const EquipmentScreen = () => {
 
   return (
     <ScrollView style={styles.container}>
+      <TouchableOpacity
+        style={styles.enrollButton}
+        onPress={() => navigation.navigate('MobileEnrollment')}
+      >
+        <Text style={styles.enrollButtonText}>Dar de alta telefono / equipo desde este celular</Text>
+      </TouchableOpacity>
+
       {equipment.map((eq) => (
         <View key={eq.id} style={styles.card}>
           <Text style={styles.name}>{eq.name}</Text>
@@ -58,6 +66,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f3f4f6',
     padding: 15,
+  },
+  enrollButton: {
+    backgroundColor: '#1d4ed8',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 14
+  },
+  enrollButtonText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center'
   },
   loadingContainer: {
     flex: 1,

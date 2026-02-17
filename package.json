@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",
     "build": "npm run build --workspace=apps/desktop",
+    "brand:assets": "node scripts/generate-brand-assets.cjs",
     "clean": "rimraf node_modules packages/*/node_modules apps/*/node_modules packages/*/dist apps/*/dist",
     "desktop": "npm run dev --workspace=apps/desktop",
     "desktop:portable": "npm run dist:portable --workspace=apps/desktop",
@@ -17,6 +18,9 @@
     "shared": "npm run build --workspace=packages/shared"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "expo-modules-autolinking": "^1.10.3",
+    "png-to-ico": "^3.0.1",
     "rimraf": "^5.0.5",
     "typescript": "^5.3.3"
   },
@@ -25,6 +29,12 @@
     "npm": ">=9.0.0"
   },
   "dependencies": {
-    "firebase": "^12.9.0"
+    "firebase": "^12.9.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "overrides": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
   }
 }

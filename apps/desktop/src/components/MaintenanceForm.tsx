@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import {
   Maintenance,
@@ -11,50 +11,73 @@ import {
   getEquipment,
   getUsers,
   triggerMaintenanceNotifications,
+  deleteFile,
+  resolveAttachmentStoragePath
 } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
+import { useUiFeedback } from '../contexts/UiFeedbackContext';
 import FileUpload from './FileUpload';
 
 interface MaintenanceFormProps {
   onClose: () => void;
-  onSubmit: (maintenance: Omit<Maintenance, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  onSubmit: (maintenance: Omit<Maintenance, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string | void>;
   initialData?: Maintenance;
 }
 
+const generateEntityId = (existingId?: string): string => {
+  if (existingId) return existingId;
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+  return `maintenance-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+};
+
+const getAttachmentKey = (attachment: Attachment): string => {
+  return attachment.storagePath || attachment.url || attachment.id;
+};
+
+const generateTaskId = (): string => {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+  return `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+};
+
+const toDate = (date: any): Date => {
+  if (!date) return new Date();
+  if (date.toDate) return date.toDate();
+  if (date instanceof Date) return date;
+  return new Date(date);
+};
+
 const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProps) => {
   const { userData } = useAuth();
+  const { showToast } = useUiFeedback();
   const [loading, setLoading] = useState(false);
   const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
   const [usersList, setUsersList] = useState<User[]>([]);
+  const [entityId] = useState<string>(() => generateEntityId(initialData?.id));
   const [attachments, setAttachments] = useState<Attachment[]>(initialData?.attachments || []);
-  
-  // Helper para convertir fecha de Firebase
-  const toDate = (date: any): Date => {
-    if (!date) return new Date();
-    if (date.toDate) return date.toDate(); // Firestore Timestamp
-    if (date instanceof Date) return date;
-    return new Date(date); // String o número
-  };
-  
-  // Datos del formulario
+  const [pendingDeleteAttachments, setPendingDeleteAttachments] = useState<Attachment[]>([]);
+  const initialAttachmentKeys = useMemo(
+    () => new Set((initialData?.attachments || []).map(getAttachmentKey)),
+    [initialData?.attachments]
+  );
+
   const [equipmentId, setEquipmentId] = useState(initialData?.equipmentId || '');
   const [type, setType] = useState<MaintenanceType>(initialData?.type || MaintenanceType.PREVENTIVO);
   const [title, setTitle] = useState(initialData?.title || '');
   const [description, setDescription] = useState(initialData?.description || '');
   const [scheduledDate, setScheduledDate] = useState(
-    initialData?.scheduledDate
-      ? toDate(initialData.scheduledDate).toISOString().split('T')[0]
-      : ''
+    initialData?.scheduledDate ? toDate(initialData.scheduledDate).toISOString().split('T')[0] : ''
   );
   const [assignedTo, setAssignedTo] = useState(initialData?.assignedTo || '');
   const [frequency, setFrequency] = useState<Maintenance['frequency'] | ''>(initialData?.frequency || '');
   const [cost, setCost] = useState(initialData?.cost?.toString() || '');
   const [notes, setNotes] = useState(initialData?.notes || '');
-  const [tasks, setTasks] = useState<MaintenanceTask[]>(
-    initialData?.tasks || [
-      { id: Date.now().toString(), description: '', completed: false }
-    ]
-  );
+  const [tasks, setTasks] = useState<MaintenanceTask[]>(() => (
+    initialData?.tasks || [{ id: generateTaskId(), description: '', completed: false }]
+  ));
 
   useEffect(() => {
     loadData();
@@ -64,62 +87,133 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
     try {
       const [equipment, users] = await Promise.all([
         getEquipment({ status: 'active' }),
-        getUsers(),
+        getUsers()
       ]);
       setEquipmentList(equipment);
-      setUsersList(users.filter(u => u.isActive));
+      setUsersList(users.filter((u) => u.isActive));
     } catch (error) {
       console.error('Error loading data:', error);
     }
   };
 
+  const isInitialAttachment = (attachment: Attachment): boolean => {
+    return initialAttachmentKeys.has(getAttachmentKey(attachment));
+  };
+
+  const cleanupAttachmentsFromStorage = async (attachmentsToDelete: Attachment[]) => {
+    if (attachmentsToDelete.length === 0) return;
+
+    const deletions = attachmentsToDelete.map(async (attachment) => {
+      const storagePath = resolveAttachmentStoragePath(attachment);
+      if (!storagePath) return;
+      await deleteFile(storagePath);
+    });
+
+    const results = await Promise.allSettled(deletions);
+    const failedDeletes = results.filter((result) => result.status === 'rejected');
+
+    if (failedDeletes.length > 0) {
+      console.error(`Error deleting ${failedDeletes.length} maintenance attachment(s) from storage`);
+    }
+  };
+
+  const handleAttachmentsChange = (nextAttachments: Attachment[]) => {
+    const removedAttachments = attachments.filter((current) => (
+      !nextAttachments.some((next) => getAttachmentKey(next) === getAttachmentKey(current))
+    ));
+
+    setAttachments(nextAttachments);
+    if (removedAttachments.length === 0) return;
+
+    const persistedAttachments = removedAttachments.filter(isInitialAttachment);
+    const transientAttachments = removedAttachments.filter((attachment) => !isInitialAttachment(attachment));
+
+    if (persistedAttachments.length > 0) {
+      setPendingDeleteAttachments((prev) => {
+        const byKey = new Map<string, Attachment>(prev.map((attachment) => [getAttachmentKey(attachment), attachment]));
+        nextAttachments.forEach((attachment) => byKey.delete(getAttachmentKey(attachment)));
+        persistedAttachments.forEach((attachment) => {
+          byKey.set(getAttachmentKey(attachment), attachment);
+        });
+        return Array.from(byKey.values());
+      });
+    }
+
+    if (transientAttachments.length > 0) {
+      void cleanupAttachmentsFromStorage(transientAttachments);
+    }
+  };
+
+  const handleCancel = async () => {
+    const transientAttachments = attachments.filter((attachment) => !isInitialAttachment(attachment));
+    await cleanupAttachmentsFromStorage(transientAttachments);
+    onClose();
+  };
+
   const handleAddTask = () => {
-    setTasks([...tasks, { id: crypto.randomUUID(), description: '', completed: false }]);
+    setTasks([...tasks, { id: generateTaskId(), description: '', completed: false }]);
   };
 
   const handleRemoveTask = (id: string) => {
     if (tasks.length > 1) {
-      setTasks(tasks.filter(t => t.id !== id));
+      setTasks(tasks.filter((t) => t.id !== id));
     }
   };
 
-  const handleTaskChange = (id: string, description: string) => {
-    setTasks(tasks.map(t => t.id === id ? { ...t, description } : t));
+  const handleTaskChange = (id: string, taskDescription: string) => {
+    setTasks(tasks.map((t) => (t.id === id ? { ...t, description: taskDescription } : t)));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!equipmentId || !title || !scheduledDate || tasks.some(t => !t.description.trim())) {
-      alert('Por favor completa todos los campos requeridos y las tareas del checklist');
+
+    if (!equipmentId || !title.trim() || !scheduledDate) {
+      showToast({
+        type: 'warning',
+        title: 'Campos requeridos',
+        message: 'Completa equipo, titulo y fecha programada'
+      });
       return;
     }
 
-    const selectedEquipment = equipmentList.find(eq => eq.id === equipmentId);
-    const selectedUser = usersList.find(u => u.id === assignedTo);
-    
+    if (tasks.some((t) => !t.description.trim())) {
+      showToast({
+        type: 'warning',
+        title: 'Checklist incompleto',
+        message: 'Completa la descripcion de todas las tareas'
+      });
+      return;
+    }
+
+    const selectedEquipment = equipmentList.find((eq) => eq.id === equipmentId);
+    const selectedUser = usersList.find((u) => u.id === assignedTo);
+
     if (!selectedEquipment) {
-      alert('Equipo no encontrado');
+      showToast({
+        type: 'error',
+        title: 'Equipo no encontrado',
+        message: 'Selecciona un equipo valido antes de guardar'
+      });
       return;
     }
 
     setLoading(true);
     try {
-      const maintenanceData: Omit<Maintenance, 'id' | 'createdAt' | 'updatedAt'> = {
+      const maintenanceData: Omit<Maintenance, 'id' | 'createdAt' | 'updatedAt'> & { id?: string } = {
         equipmentId,
         equipmentName: selectedEquipment.name,
         company: selectedEquipment.company,
         type,
         status: initialData?.status || MaintenanceStatus.PROGRAMADO,
-        title,
-        description,
+        title: title.trim(),
+        description: description.trim(),
         scheduledDate: new Date(scheduledDate),
-        tasks: tasks.filter(t => t.description.trim()),
+        tasks: tasks.filter((t) => t.description.trim()),
+        attachments,
         createdBy: userData?.id || '',
-        createdByName: userData?.name || '',
-      } as any;
+        createdByName: userData?.name || ''
+      };
 
-      // Solo agregar campos opcionales si tienen valor
       if (assignedTo) {
         maintenanceData.assignedTo = assignedTo;
         if (selectedUser) {
@@ -127,13 +221,13 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
         }
       }
       if (frequency) {
-        maintenanceData.frequency = frequency as any;
+        maintenanceData.frequency = frequency;
       }
       if (cost) {
         maintenanceData.cost = parseFloat(cost);
       }
-      if (notes) {
-        maintenanceData.notes = notes;
+      if (notes.trim()) {
+        maintenanceData.notes = notes.trim();
       }
       if (initialData?.completedDate) {
         maintenanceData.completedDate = initialData.completedDate;
@@ -141,26 +235,32 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
       if (initialData?.nextMaintenanceDate) {
         maintenanceData.nextMaintenanceDate = initialData.nextMaintenanceDate;
       }
-      if (attachments.length > 0) {
-        maintenanceData.attachments = attachments;
+
+      if (!initialData) {
+        maintenanceData.id = entityId;
       }
 
-      await onSubmit(maintenanceData);
-      
-      // Generar notificación de mantenimiento próximo
-      const maintenanceWithId = {
+      const persistedId = (await onSubmit(maintenanceData)) || initialData?.id || entityId;
+
+      await cleanupAttachmentsFromStorage(pendingDeleteAttachments);
+      setPendingDeleteAttachments([]);
+
+      const maintenanceForNotification: Maintenance = {
         ...maintenanceData,
-        id: Date.now().toString(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as Maintenance;
-      
-      await triggerMaintenanceNotifications(maintenanceWithId);
-      
+        id: persistedId,
+        createdAt: initialData?.createdAt || new Date(),
+        updatedAt: new Date()
+      };
+
+      await triggerMaintenanceNotifications(maintenanceForNotification);
       onClose();
     } catch (error) {
       console.error('Error submitting maintenance:', error);
-      alert('Error al guardar el mantenimiento');
+      showToast({
+        type: 'error',
+        title: 'Error al guardar mantenimiento',
+        message: 'No se pudo guardar el mantenimiento'
+      });
     } finally {
       setLoading(false);
     }
@@ -169,13 +269,12 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
         <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
             {initialData ? 'Editar Mantenimiento' : 'Nuevo Mantenimiento'}
           </h2>
           <button
-            onClick={onClose}
+            onClick={() => { void handleCancel(); }}
             aria-label="Cerrar formulario"
             title="Cerrar"
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -184,9 +283,7 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Equipo y Tipo */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -221,31 +318,29 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
               >
                 <option value={MaintenanceType.PREVENTIVO}>Preventivo</option>
                 <option value={MaintenanceType.CORRECTIVO}>Correctivo</option>
-                <option value={MaintenanceType.ACTUALIZACION}>Actualización</option>
-                <option value={MaintenanceType.INSPECCION}>Inspección</option>
+                <option value={MaintenanceType.ACTUALIZACION}>Actualizacion</option>
+                <option value={MaintenanceType.INSPECCION}>Inspeccion</option>
               </select>
             </div>
           </div>
 
-          {/* Título */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Título <span className="text-red-500">*</span>
+              Titulo <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-              placeholder="Ej: Limpieza y revisión general"
+              placeholder="Ej: Limpieza y revision general"
               required
             />
           </div>
 
-          {/* Descripción */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Descripción
+              Descripcion
             </label>
             <textarea
               value={description}
@@ -256,7 +351,6 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
             />
           </div>
 
-          {/* Fecha, Técnico y Frecuencia */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -297,7 +391,7 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
               <select
                 aria-label="Seleccionar frecuencia"
                 value={frequency}
-                onChange={(e) => setFrequency(e.target.value as any)}
+                onChange={(e) => setFrequency(e.target.value as Maintenance['frequency'] | '')}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
               >
                 <option value="">Una vez</option>
@@ -310,7 +404,6 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
             </div>
           </div>
 
-          {/* Checklist de Tareas */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -352,7 +445,6 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
             </div>
           </div>
 
-          {/* Costo y Notas */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -382,26 +474,24 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
             </div>
           </div>
 
-          {/* Adjuntos */}
           <div className="pt-2">
             <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Adjuntos (Fotos, reportes, certificados, etc.)
             </h3>
             <FileUpload
-              entityId={initialData?.id || 'new'}
+              entityId={entityId}
               entityType="maintenances"
               attachments={attachments}
-              onAttachmentsChange={setAttachments}
+              onAttachmentsChange={handleAttachmentsChange}
               userId={userData?.id || ''}
               userName={userData?.name || ''}
             />
           </div>
 
-          {/* Botones */}
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => { void handleCancel(); }}
               className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
               disabled={loading}
             >

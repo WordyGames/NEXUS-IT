@@ -10,6 +10,7 @@ import {
   deleteUser
 } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
+import { useUiFeedback } from '../contexts/UiFeedbackContext';
 import { 
   UserPlus, 
   Edit2, 
@@ -29,6 +30,7 @@ const Users = () => {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const { isAdmin, userData } = useAuth();
+  const { showToast, confirm } = useUiFeedback();
 
   // Form states
   const [formData, setFormData] = useState({
@@ -62,23 +64,73 @@ const Users = () => {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const normalizedUsername = formData.username.trim().toLowerCase();
+    const normalizedName = formData.name.trim();
+    const normalizedDepartment = formData.department.trim();
+    const normalizedPhone = formData.phone.trim();
+
+    if (normalizedUsername.length < 3) {
+      showToast({
+        type: 'warning',
+        title: 'Usuario invalido',
+        message: 'El nombre de usuario debe tener al menos 3 caracteres'
+      });
+      return;
+    }
+
+    if (!/^[a-z0-9._-]+$/.test(normalizedUsername)) {
+      showToast({
+        type: 'warning',
+        title: 'Usuario invalido',
+        message: 'Solo se permiten letras minusculas, numeros, punto, guion y guion bajo'
+      });
+      return;
+    }
+
+    if (formData.password.trim().length < 6) {
+      showToast({
+        type: 'warning',
+        title: 'Contrasena invalida',
+        message: 'La contrasena debe tener al menos 6 caracteres'
+      });
+      return;
+    }
+
+    if (normalizedName.length < 3) {
+      showToast({
+        type: 'warning',
+        title: 'Nombre invalido',
+        message: 'Captura el nombre completo del usuario'
+      });
+      return;
+    }
     
     try {
       await createUser(
-        formData.username,
-        formData.password,
-        formData.name,
+        normalizedUsername,
+        formData.password.trim(),
+        normalizedName,
         formData.company,
         formData.role,
-        formData.department,
-        formData.phone
+        normalizedDepartment,
+        normalizedPhone
       );
       
       setShowCreateModal(false);
       resetForm();
       await loadUsers();
+      showToast({
+        type: 'success',
+        title: 'Usuario creado',
+        message: 'El usuario se creo correctamente'
+      });
     } catch (error: any) {
-      alert(error.message || 'Error al crear usuario');
+      showToast({
+        type: 'error',
+        title: 'Error al crear usuario',
+        message: error.message || 'No se pudo crear el usuario'
+      });
     }
   };
 
@@ -86,8 +138,17 @@ const Users = () => {
     try {
       await updateUser(user.id, { isActive: !user.isActive });
       await loadUsers();
+      showToast({
+        type: 'success',
+        title: user.isActive ? 'Usuario desactivado' : 'Usuario activado',
+        message: `${user.name} fue ${user.isActive ? 'desactivado' : 'activado'} correctamente`
+      });
     } catch (error: any) {
-      alert(error.message || 'Error al actualizar usuario');
+      showToast({
+        type: 'error',
+        title: 'Error al actualizar usuario',
+        message: error.message || 'No se pudo actualizar el usuario'
+      });
     }
   };
 
@@ -95,35 +156,67 @@ const Users = () => {
     e.preventDefault();
     
     if (!selectedUser) return;
+    if (newPassword.trim().length < 6) {
+      showToast({
+        type: 'warning',
+        title: 'Contrasena invalida',
+        message: 'La contrasena debe tener al menos 6 caracteres'
+      });
+      return;
+    }
     
     try {
-      await changePassword(selectedUser.id, newPassword);
+      await changePassword(selectedUser.id, newPassword.trim());
       setShowPasswordModal(false);
       setNewPassword('');
       setSelectedUser(null);
-      alert('Contraseña actualizada correctamente');
+      showToast({
+        type: 'success',
+        title: 'Contrasena actualizada',
+        message: 'La contrasena se actualizo correctamente'
+      });
     } catch (error: any) {
-      alert(error.message || 'Error al cambiar contraseña');
+      showToast({
+        type: 'error',
+        title: 'Error al cambiar contrasena',
+        message: error.message || 'No se pudo cambiar la contrasena'
+      });
     }
   };
 
   const handleDeleteUser = async (user: User) => {
     if (userData?.id === user.id) {
-      alert('No puedes eliminar tu propio usuario');
+      showToast({
+        type: 'warning',
+        title: 'Operacion no permitida',
+        message: 'No puedes eliminar tu propio usuario'
+      });
       return;
     }
 
-    const confirmDelete = window.confirm(
-      `¿Seguro que deseas eliminar a ${user.name}? Esta acción no se puede deshacer.`
-    );
-
-    if (!confirmDelete) return;
+    const accepted = await confirm({
+      title: 'Eliminar usuario',
+      message: `¿Seguro que deseas eliminar a ${user.name}? Esta accion no se puede deshacer.`,
+      confirmText: 'Eliminar',
+      cancelText: 'Cancelar',
+      intent: 'danger'
+    });
+    if (!accepted) return;
 
     try {
       await deleteUser(user.id);
       await loadUsers();
+      showToast({
+        type: 'success',
+        title: 'Usuario eliminado',
+        message: `Se elimino a ${user.name} correctamente`
+      });
     } catch (error: any) {
-      alert(error.message || 'Error al eliminar usuario');
+      showToast({
+        type: 'error',
+        title: 'Error al eliminar usuario',
+        message: error.message || 'No se pudo eliminar el usuario'
+      });
     }
   };
 

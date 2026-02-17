@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useEffect, useState } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
 import { UpdaterProvider } from './contexts/UpdaterContext';
+import { UiFeedbackProvider } from './contexts/UiFeedbackContext';
 import PrivateRoute from './components/PrivateRoute';
 import { GlobalSearch } from './components/GlobalSearch';
 import Login from './pages/Login';
@@ -43,45 +44,47 @@ function App() {
     <Router>
       <AuthProvider>
         <UpdaterProvider>
-          <GlobalSearch 
-            isOpen={searchOpen} 
-            onClose={() => setSearchOpen(false)}
-          />
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route
-              path="/portal"
-              element={
-                <PrivateRoute>
-                  <PortalLayout />
-                </PrivateRoute>
-              }
-            >
-              <Route index element={<Dashboard />} />
-              <Route path="equipment" element={<MyEquipment />} />
-              <Route path="tickets" element={<Tickets />} />
-            </Route>
-            <Route
-              path="/"
-              element={
-                <PrivateRoute>
-                  <Layout />
-                </PrivateRoute>
-              }
-            >
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="equipment" element={<Equipment />} />
-              <Route path="tickets" element={<Tickets />} />
-              <Route path="tickets/:id" element={<Tickets />} />
-              <Route path="maintenances" element={<Maintenances />} />
-              <Route path="reports" element={<Reports />} />
-              <Route path="warranty-report" element={<WarrantyReport />} />
-              <Route path="notifications" element={<NotificationsPage />} />
-              <Route path="users" element={<Users />} />
-              <Route path="settings" element={<Settings />} />
-            </Route>
-          </Routes>
+          <UiFeedbackProvider>
+            <GlobalSearch 
+              isOpen={searchOpen} 
+              onClose={() => setSearchOpen(false)}
+            />
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route
+                path="/portal"
+                element={
+                  <PrivateRoute>
+                    <PortalLayout />
+                  </PrivateRoute>
+                }
+              >
+                <Route index element={<Dashboard />} />
+                <Route path="equipment" element={<MyEquipment />} />
+                <Route path="tickets" element={<Tickets />} />
+              </Route>
+              <Route
+                path="/"
+                element={
+                  <PrivateRoute>
+                    <Layout />
+                  </PrivateRoute>
+                }
+              >
+                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="equipment" element={<Equipment />} />
+                <Route path="tickets" element={<Tickets />} />
+                <Route path="tickets/:id" element={<Tickets />} />
+                <Route path="maintenances" element={<Maintenances />} />
+                <Route path="reports" element={<Reports />} />
+                <Route path="warranty-report" element={<WarrantyReport />} />
+                <Route path="notifications" element={<NotificationsPage />} />
+                <Route path="users" element={<Users />} />
+                <Route path="settings" element={<Settings />} />
+              </Route>
+            </Routes>
+          </UiFeedbackProvider>
         </UpdaterProvider>
       </AuthProvider>
     </Router>

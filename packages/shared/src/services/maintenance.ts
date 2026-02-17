@@ -4,6 +4,7 @@ import {
   getDoc,
   getDocs,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -14,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Maintenance, MaintenanceFilters, MaintenanceStatus, MaintenanceTask } from '../types';
+import { deleteFile, resolveAttachmentStoragePath } from './storage';
 
 const COLLECTION_NAME = 'maintenances';
 
@@ -160,39 +162,47 @@ export const getOverdueMaintenances = async (): Promise<Maintenance[]> => {
 /**
  * Crea un nuevo mantenimiento
  */
-export const createMaintenance = async (maintenance: Omit<Maintenance, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+export const createMaintenance = async (
+  maintenance: Omit<Maintenance, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }
+): Promise<string> => {
   try {
     const now = Timestamp.now();
+    const { id: providedId, ...maintenanceData } = maintenance;
     
     // Limpiar campos undefined que Firebase no acepta
     const cleanData: any = {
-      equipmentId: maintenance.equipmentId,
-      equipmentName: maintenance.equipmentName,
-      company: maintenance.company,
-      type: maintenance.type,
-      status: maintenance.status,
-      title: maintenance.title,
-      description: maintenance.description,
-      scheduledDate: maintenance.scheduledDate,
-      tasks: maintenance.tasks,
-      createdBy: maintenance.createdBy,
-      createdByName: maintenance.createdByName,
+      equipmentId: maintenanceData.equipmentId,
+      equipmentName: maintenanceData.equipmentName,
+      company: maintenanceData.company,
+      type: maintenanceData.type,
+      status: maintenanceData.status,
+      title: maintenanceData.title,
+      description: maintenanceData.description,
+      scheduledDate: maintenanceData.scheduledDate,
+      tasks: maintenanceData.tasks,
+      createdBy: maintenanceData.createdBy,
+      createdByName: maintenanceData.createdByName,
       createdAt: now,
       updatedAt: now,
     };
     
     // Solo agregar campos opcionales si tienen valor
-    if (maintenance.assignedTo) cleanData.assignedTo = maintenance.assignedTo;
-    if (maintenance.assignedToName) cleanData.assignedToName = maintenance.assignedToName;
-    if (maintenance.frequency) cleanData.frequency = maintenance.frequency;
-    if (maintenance.cost !== undefined) cleanData.cost = maintenance.cost;
-    if (maintenance.notes) cleanData.notes = maintenance.notes;
-    if (maintenance.completedDate) cleanData.completedDate = maintenance.completedDate;
-    if (maintenance.nextMaintenanceDate) cleanData.nextMaintenanceDate = maintenance.nextMaintenanceDate;
-    if (maintenance.attachments && maintenance.attachments.length > 0) cleanData.attachments = maintenance.attachments;
-    
+    if (maintenanceData.assignedTo) cleanData.assignedTo = maintenanceData.assignedTo;
+    if (maintenanceData.assignedToName) cleanData.assignedToName = maintenanceData.assignedToName;
+    if (maintenanceData.frequency) cleanData.frequency = maintenanceData.frequency;
+    if (maintenanceData.cost !== undefined) cleanData.cost = maintenanceData.cost;
+    if (maintenanceData.notes) cleanData.notes = maintenanceData.notes;
+    if (maintenanceData.completedDate) cleanData.completedDate = maintenanceData.completedDate;
+    if (maintenanceData.nextMaintenanceDate) cleanData.nextMaintenanceDate = maintenanceData.nextMaintenanceDate;
+    if (maintenanceData.attachments && maintenanceData.attachments.length > 0) cleanData.attachments = maintenanceData.attachments;
+
+    if (providedId) {
+      const docRef = doc(db, COLLECTION_NAME, providedId);
+      await setDoc(docRef, cleanData);
+      return providedId;
+    }
+
     const docRef = await addDoc(collection(db, COLLECTION_NAME), cleanData);
-    
     return docRef.id;
   } catch (error) {
     console.error('Error creating maintenance:', error);
@@ -359,6 +369,29 @@ export const updateMaintenanceStatus = async (id: string, status: MaintenanceSta
 export const deleteMaintenance = async (id: string): Promise<void> => {
   try {
     const docRef = doc(db, COLLECTION_NAME, id);
+
+    // Limpiar adjuntos asociados en Storage antes de eliminar el documento
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const maintenance = docSnap.data() as Maintenance;
+      const attachments = maintenance.attachments || [];
+
+      if (attachments.length > 0) {
+        const deletions = attachments.map(async (attachment) => {
+          const storagePath = resolveAttachmentStoragePath(attachment);
+          if (!storagePath) return;
+          await deleteFile(storagePath);
+        });
+
+        const results = await Promise.allSettled(deletions);
+        const failedDeletes = results.filter((result) => result.status === 'rejected');
+
+        if (failedDeletes.length > 0) {
+          console.error(`Error deleting ${failedDeletes.length} maintenance attachment(s) from storage`);
+        }
+      }
+    }
+
     await deleteDoc(docRef);
   } catch (error) {
     console.error('Error deleting maintenance:', error);

@@ -3,35 +3,58 @@
     "name": "NEXUS IT",
     "slug": "nexus-it-mobile",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0F3D5E"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/7364821a-0d76-420d-bc8d-b765a745c433"
+    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.nexusit.mobile"
+      "bundleIdentifier": "com.nexusit.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "La app usa la camara para tomar la foto del equipo.",
+        "NSPhotoLibraryUsageDescription": "La app usa tu galeria para adjuntar foto del equipo.",
+        "NSPhotoLibraryAddUsageDescription": "La app puede guardar y compartir la carta responsiva."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0F3D5E"
       },
-      "package": "com.nexusit.mobile"
+      "package": "com.nexusit.mobile",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "plugins": [
+      "expo-image-picker",
+      "./plugins/withExpoProjectDependency"
+    ],
     "extra": {
       "eas": {
-        "projectId": "nexus-it-mobile"
+        "projectId": "7364821a-0d76-420d-bc8d-b765a745c433"
       }
-    }
+    },
+    "owner": "wordygames"
   }
 }

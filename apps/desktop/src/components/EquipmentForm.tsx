@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
+import {
   Equipment, 
   Company, 
   getUsers, 
@@ -14,6 +14,7 @@ import {
   resolveAttachmentStoragePath
 } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
+import { useUiFeedback } from '../contexts/UiFeedbackContext';
 import { Upload, X } from 'lucide-react';
 
 interface EquipmentFormProps {
@@ -49,8 +50,13 @@ const getAttachmentKey = (attachment: Attachment): string => {
   return attachment.storagePath || attachment.url || attachment.id;
 };
 
+const SERIAL_NUMBER_REGEX = /^[A-Za-z0-9._/-]+$/;
+
+const sanitizeText = (value: string): string => value.trim();
+
 const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) => {
   const { userData } = useAuth();
+  const { showToast } = useUiFeedback();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [detecting, setDetecting] = useState(false);
@@ -79,6 +85,9 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
       os: equipment?.specs?.os || '',
       hostname: equipment?.specs?.hostname || '',
       serialNumber: equipment?.specs?.serialNumber || '',
+      imei: equipment?.specs?.imei || '',
+      phoneNumber: equipment?.specs?.phoneNumber || '',
+      googleAccountEmail: equipment?.specs?.googleAccountEmail || '',
       ipAddress: equipment?.specs?.ipAddress || '',
       macAddress: equipment?.specs?.macAddress || '',
       model: equipment?.specs?.model || '',
@@ -131,18 +140,26 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
       const specs = await detectSystemSpecs();
       
       // Actualizar specs y también el nombre del equipo con el modelo si está disponible
-      setFormData({
-        ...formData,
-        name: specs.model || formData.name, // Usar modelo detectado como nombre
+      setFormData((prev) => ({
+        ...prev,
+        name: specs.model || prev.name,
         specs: {
-          ...formData.specs,
+          ...prev.specs,
           ...specs
         }
+      }));
+      showToast({
+        type: 'success',
+        title: 'Especificaciones detectadas',
+        message: 'La informacion del equipo se detecto correctamente'
       });
-      alert('¡Especificaciones detectadas correctamente!');
     } catch (error: any) {
       console.error('Error detectando specs:', error);
-      alert('Error al detectar especificaciones: ' + error.message);
+      showToast({
+        type: 'error',
+        title: 'Error al detectar especificaciones',
+        message: error.message || 'No se pudieron detectar las especificaciones'
+      });
     } finally {
       setDetecting(false);
     }
@@ -157,7 +174,11 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
       const validation = validateFile(file, 5, ['image/jpeg', 'image/png', 'image/jpg', 'image/webp']);
       
       if (!validation.valid) {
-        alert(validation.error);
+        showToast({
+          type: 'warning',
+          title: 'Archivo no valido',
+          message: validation.error || 'Selecciona una imagen valida'
+        });
         return;
       }
 
@@ -179,7 +200,11 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
       setAttachments([newAttachment]); // Solo 1 foto principal
     } catch (error) {
       console.error('Error uploading photo:', error);
-      alert('Error al subir la foto');
+      showToast({
+        type: 'error',
+        title: 'Error al subir foto',
+        message: 'No se pudo subir la foto del equipo'
+      });
     } finally {
       setUploading(false);
     }
@@ -221,6 +246,8 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
         return [...baseFields, 'specs.manufacturer', 'specs.model', 'specs.cpu', 'specs.gpu', 'specs.ram', 'specs.storage', 'specs.os', 'specs.hostname', 'specs.serialNumber'];
       case 'server':
         return [...baseFields, 'specs.manufacturer', 'specs.model', 'specs.cpu', 'specs.ram', 'specs.storage', 'specs.os', 'specs.hostname', 'specs.ipAddress', 'specs.serialNumber'];
+      case 'phone':
+        return [...baseFields, 'specs.manufacturer', 'specs.model', 'specs.os', 'specs.ram', 'specs.storage', 'specs.serialNumber', 'specs.imei', 'specs.phoneNumber', 'specs.googleAccountEmail'];
       case 'printer':
         return [...baseFields, 'specs.manufacturer', 'specs.model', 'specs.serialNumber', 'specs.ipAddress'];
       case 'router':
@@ -247,13 +274,79 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedName = sanitizeText(formData.name);
+    const normalizedLocation = sanitizeText(formData.location);
+    const normalizedSpecs = Object.fromEntries(
+      Object.entries(formData.specs).map(([key, value]) => [key, sanitizeText(value || '')])
+    ) as typeof formData.specs;
+
+    if (!normalizedName) {
+      showToast({
+        type: 'warning',
+        title: 'Nombre requerido',
+        message: 'Captura el nombre del equipo'
+      });
+      return;
+    }
+
+    if (!normalizedLocation) {
+      showToast({
+        type: 'warning',
+        title: 'Ubicacion requerida',
+        message: 'Captura la ubicacion del equipo'
+      });
+      return;
+    }
+
+    if (normalizedSpecs.serialNumber && !SERIAL_NUMBER_REGEX.test(normalizedSpecs.serialNumber)) {
+      showToast({
+        type: 'warning',
+        title: 'Serial invalido',
+        message: 'El numero serial solo puede incluir letras, numeros, punto, guion, diagonal y guion bajo'
+      });
+      return;
+    }
+
+    const purchaseDateValue = formData.purchaseDate ? new Date(formData.purchaseDate) : undefined;
+    const warrantyDateValue = formData.warrantyExpiration ? new Date(formData.warrantyExpiration) : undefined;
+
+    if (purchaseDateValue && Number.isNaN(purchaseDateValue.getTime())) {
+      showToast({
+        type: 'warning',
+        title: 'Fecha de compra invalida',
+        message: 'Revisa la fecha de compra antes de guardar'
+      });
+      return;
+    }
+
+    if (warrantyDateValue && Number.isNaN(warrantyDateValue.getTime())) {
+      showToast({
+        type: 'warning',
+        title: 'Fecha de garantia invalida',
+        message: 'Revisa la fecha de vencimiento de garantia'
+      });
+      return;
+    }
+
+    if (purchaseDateValue && warrantyDateValue && warrantyDateValue < purchaseDateValue) {
+      showToast({
+        type: 'warning',
+        title: 'Fechas inconsistentes',
+        message: 'La garantia no puede vencer antes de la fecha de compra'
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const submitData: any = {
         ...formData,
+        name: normalizedName,
+        location: normalizedLocation,
+        specs: normalizedSpecs,
         attachments, // Incluir fotos/archivos
-        purchaseDate: formData.purchaseDate ? new Date(formData.purchaseDate) : undefined,
-        warrantyExpiration: formData.warrantyExpiration ? new Date(formData.warrantyExpiration) : undefined
+        purchaseDate: purchaseDateValue,
+        warrantyExpiration: warrantyDateValue
       };
 
       if (!equipment) {
@@ -317,6 +410,7 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
           >
             <option value="desktop">Desktop</option>
             <option value="laptop">Laptop</option>
+            <option value="phone">Teléfono</option>
             <option value="server">Servidor</option>
             <option value="printer">Impresora</option>
             <option value="router">Router</option>
@@ -393,6 +487,9 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
       'specs.os': 'Sistema Operativo',
       'specs.hostname': 'Hostname',
       'specs.serialNumber': 'Número Serial',
+      'specs.imei': 'IMEI',
+      'specs.phoneNumber': 'Teléfono',
+      'specs.googleAccountEmail': 'Cuenta Google (correo)',
       'specs.ipAddress': 'Dirección IP',
       'specs.macAddress': 'Dirección MAC',
       'specs.model': 'Modelo',

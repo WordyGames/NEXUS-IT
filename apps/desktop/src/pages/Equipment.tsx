@@ -17,9 +17,11 @@ import EquipmentQRCode from '../components/EquipmentQRCode';
 import { Download } from 'lucide-react';
 import { exportEquipmentToExcel } from '../utils/exportToExcel';
 import { generateCartaResponsivaPDF } from '../utils/cartaResponsivaPDF';
+import { useUiFeedback } from '../contexts/UiFeedbackContext';
 
 const Equipment = () => {
   const { userData, isAdmin } = useAuth();
+  const { showToast, confirm } = useUiFeedback();
   const [equipment, setEquipment] = useState<EquipmentType[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -55,14 +57,30 @@ const Equipment = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Estás seguro de eliminar este equipo?')) return;
+    const accepted = await confirm({
+      title: 'Eliminar equipo',
+      message: '¿Estas seguro de eliminar este equipo? Esta accion no se puede deshacer.',
+      confirmText: 'Eliminar',
+      cancelText: 'Cancelar',
+      intent: 'danger'
+    });
+    if (!accepted) return;
 
     try {
       await deleteEquipment(id);
       await loadEquipment();
+      showToast({
+        type: 'success',
+        title: 'Equipo eliminado',
+        message: 'El equipo se elimino correctamente'
+      });
     } catch (error) {
       console.error('Error deleting equipment:', error);
-      alert('Error al eliminar el equipo');
+      showToast({
+        type: 'error',
+        title: 'Error al eliminar',
+        message: 'No se pudo eliminar el equipo'
+      });
     }
   };
 
@@ -74,7 +92,11 @@ const Equipment = () => {
   const handleGenerateCarta = async (eq: EquipmentType) => {
     try {
       if (!eq.assignedTo) {
-        alert('Este equipo no tiene un usuario asignado. Asigna un usuario primero.');
+        showToast({
+          type: 'warning',
+          title: 'Equipo sin asignar',
+          message: 'Asigna un usuario al equipo antes de generar la carta responsiva'
+        });
         return;
       }
 
@@ -83,7 +105,11 @@ const Equipment = () => {
       const assignedUser = users.find(u => u.id === eq.assignedTo);
 
       if (!assignedUser) {
-        alert('No se encontró información del usuario asignado.');
+        showToast({
+          type: 'error',
+          title: 'Usuario no encontrado',
+          message: 'No se encontro informacion del usuario asignado'
+        });
         return;
       }
 
@@ -94,10 +120,19 @@ const Equipment = () => {
         generatedBy: userData?.name || 'Sistema',
         notes: eq.notes
       });
+      showToast({
+        type: 'success',
+        title: 'Carta responsiva generada',
+        message: 'El PDF se genero correctamente'
+      });
 
     } catch (error) {
       console.error('Error generating carta responsiva:', error);
-      alert('Error al generar la carta responsiva');
+      showToast({
+        type: 'error',
+        title: 'Error al generar carta',
+        message: 'No se pudo generar la carta responsiva'
+      });
     }
   };
 
@@ -110,6 +145,11 @@ const Equipment = () => {
         setShowForm(false);
         setEditingEquipment(null);
         await loadEquipment();
+        showToast({
+          type: 'success',
+          title: 'Equipo actualizado',
+          message: 'Los cambios se guardaron correctamente'
+        });
         return editingEquipment.id;
       } else {
         const createdId = await createEquipment({
@@ -120,11 +160,20 @@ const Equipment = () => {
         setShowForm(false);
         setEditingEquipment(null);
         await loadEquipment();
+        showToast({
+          type: 'success',
+          title: 'Equipo creado',
+          message: 'El equipo se guardo correctamente'
+        });
         return createdId;
       }
     } catch (error) {
       console.error('Error saving equipment:', error);
-      alert('Error al guardar el equipo');
+      showToast({
+        type: 'error',
+        title: 'Error al guardar equipo',
+        message: 'No se pudo guardar el equipo'
+      });
       throw error;
     }
   };

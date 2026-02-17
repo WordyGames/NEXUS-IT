@@ -8,17 +8,20 @@ import {
   createMaintenance,
   updateMaintenance,
   deleteMaintenance,
+  getMaintenanceById,
   getUpcomingMaintenances,
   getOverdueMaintenances,
   Company,
 } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
+import { useUiFeedback } from '../contexts/UiFeedbackContext';
 import MaintenanceForm from '../components/MaintenanceForm';
 import MaintenanceStatusEditor from '../components/MaintenanceStatusEditor';
 import { exportMaintenancesToExcel } from '../utils/exportToExcel';
 
 const Maintenances = () => {
   const { isAdmin } = useAuth();
+  const { showToast, confirm } = useUiFeedback();
   const [maintenances, setMaintenances] = useState<Maintenance[]>([]);
   const [upcomingMaintenances, setUpcomingMaintenances] = useState<Maintenance[]>([]);
   const [overdueMaintenances, setOverdueMaintenances] = useState<Maintenance[]>([]);
@@ -63,48 +66,86 @@ const Maintenances = () => {
     }
   };
 
-  const handleCreateMaintenance = async (data: Omit<Maintenance, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const handleCreateMaintenance = async (data: Omit<Maintenance, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
     try {
-      const result = await createMaintenance(data);
+      const createdId = await createMaintenance(data as any);
       await loadMaintenances();
       setShowForm(false);
-      
-      // Buscar el mantenimiento recién creado
-      const allMaintenances = await getMaintenances({});
-      const created = allMaintenances.find(m => m.company === data.company && m.title === data.title && m.equipmentId === data.equipmentId);
-      
+
+      const created = await getMaintenanceById(createdId);
       if (created) {
         setJustCreatedMaintenance(created);
         setShowStatusEditor(true);
       }
+
+      showToast({
+        type: 'success',
+        title: 'Mantenimiento creado',
+        message: 'El mantenimiento se guardó correctamente'
+      });
+      return createdId;
     } catch (error) {
       console.error('Error creating maintenance:', error);
+      showToast({
+        type: 'error',
+        title: 'Error al crear mantenimiento',
+        message: 'No se pudo guardar el mantenimiento'
+      });
       throw error;
     }
   };
 
-  const handleUpdateMaintenance = async (data: Omit<Maintenance, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const handleUpdateMaintenance = async (data: Omit<Maintenance, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
     try {
       if (selectedMaintenance) {
         await updateMaintenance(selectedMaintenance.id, data as any);
         await loadMaintenances();
         setShowForm(false);
         setSelectedMaintenance(undefined);
+        showToast({
+          type: 'success',
+          title: 'Mantenimiento actualizado',
+          message: 'Los cambios se guardaron correctamente'
+        });
+        return selectedMaintenance.id;
       }
+      throw new Error('No hay mantenimiento seleccionado para actualizar');
     } catch (error) {
       console.error('Error updating maintenance:', error);
+      showToast({
+        type: 'error',
+        title: 'Error al actualizar mantenimiento',
+        message: 'No se pudieron guardar los cambios'
+      });
       throw error;
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('¿Estás seguro de eliminar este mantenimiento?')) {
-      try {
-        await deleteMaintenance(id);
-        await loadMaintenances();
-      } catch (error) {
-        console.error('Error deleting maintenance:', error);
-      }
+    const accepted = await confirm({
+      title: 'Eliminar mantenimiento',
+      message: '¿Estás seguro de eliminar este mantenimiento? Esta acción no se puede deshacer.',
+      confirmText: 'Eliminar',
+      cancelText: 'Cancelar',
+      intent: 'danger'
+    });
+    if (!accepted) return;
+
+    try {
+      await deleteMaintenance(id);
+      await loadMaintenances();
+      showToast({
+        type: 'success',
+        title: 'Mantenimiento eliminado',
+        message: 'El mantenimiento se eliminó correctamente'
+      });
+    } catch (error) {
+      console.error('Error deleting maintenance:', error);
+      showToast({
+        type: 'error',
+        title: 'Error al eliminar',
+        message: 'No se pudo eliminar el mantenimiento'
+      });
     }
   };
 
