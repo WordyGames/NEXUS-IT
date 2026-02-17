@@ -38,7 +38,8 @@ const CONDITIONS = [
   'El equipo debe ser devuelto en las mismas condiciones al término de la relación laboral.',
   'No se permite el uso del equipo para fines personales sin autorización expresa.',
   'El equipo es propiedad de la empresa y debe ser utilizado únicamente para actividades laborales.',
-  'Cualquier software adicional deberá ser autorizado por el departamento de TI.'
+  'Cualquier software adicional deberá ser autorizado por el departamento de TI.',
+  'Cualquier daño o pérdida del equipo será responsabilidad del empleado, por lo cual asumirá el costo del reemplazo o reparación.'
 ];
 
 const escapeHtml = (value: string): string => (
@@ -96,7 +97,7 @@ const buildHtml = (
     employeeSignatureDataUri: string | null;
   }
 ): string => {
-  const { employee, equipment, generatedBy, notes } = data;
+  const { employee, equipment, generatedBy } = data;
   const {
     backgroundDataUri,
     dateString,
@@ -110,14 +111,16 @@ const buildHtml = (
     `<li><span class="num">${index + 1}.</span> ${escapeHtml(condition)}</li>`
   )).join('');
 
-  const notesSection = notes?.trim()
-    ? `
-      <div class="section">
-        <h3 class="section-title">NOTAS ADICIONALES</h3>
-        <div class="notes-box">${escapeHtml(notes.trim())}</div>
-      </div>
-    `
-    : '';
+  const googleAccountForNotes = equipment.specs.googleAccountEmail?.trim() || '________________________';
+  const notesSection = `
+    <div class="section">
+      <h3 class="section-title">NOTAS ADICIONALES</h3>
+      <table class="info">
+        ${field('Cuenta Google', googleAccountForNotes)}
+        ${field('Clave', '________________________')}
+      </table>
+    </div>
+  `;
 
   const backgroundHtml = backgroundDataUri
     ? `<img class="background" src="${backgroundDataUri}" alt="Fondo carta responsiva" />`
@@ -239,25 +242,8 @@ const buildHtml = (
           font-weight: 700;
           min-width: 4mm;
         }
-        .notes-box {
-          font-size: 9px;
-          line-height: 1.45;
-          white-space: pre-wrap;
-        }
-        .spacer {
-          flex: 1;
-        }
         .signatures-block {
-          margin-top: 4mm;
-        }
-        .signatures-title {
-          margin: 0 0 6mm;
-          font-size: 11px;
-          color: #000000;
-          font-weight: 700;
-          text-decoration: underline;
-          text-decoration-thickness: 0.22mm;
-          text-underline-offset: 0.8mm;
+          margin-top: 2mm;
         }
         .signatures {
           display: flex;
@@ -330,8 +316,7 @@ const buildHtml = (
             <h3 class="section-title">INFORMACIÓN DEL EMPLEADO</h3>
             <table class="info">
               ${field('Nombre', employee.name || 'N/A')}
-              ${field('Puesto', employee.position || 'N/A')}
-              ${field('Departamento', employee.department || 'N/A')}
+              ${field('Puesto', employee.position || employee.department || 'N/A')}
               ${field('Empresa', equipment.company || 'N/A')}
             </table>
           </div>
@@ -346,7 +331,6 @@ const buildHtml = (
               ${field('Serial', equipment.specs.serialNumber || 'N/A')}
               ${field('IMEI', equipment.specs.imei || 'N/A')}
               ${field('Telefono', equipment.specs.phoneNumber || 'N/A')}
-              ${field('Cuenta Google', equipment.specs.googleAccountEmail || 'N/A')}
               ${field('CPU', equipment.specs.cpu || 'N/A')}
               ${field('RAM', equipment.specs.ram || 'N/A')}
               ${field('Storage', equipment.specs.storage || 'N/A')}
@@ -361,10 +345,7 @@ const buildHtml = (
 
           ${notesSection}
 
-          <div class="spacer"></div>
-
           <div class="signatures-block">
-            <p class="signatures-title">FIRMAS</p>
             <div class="signatures">
               <div class="signature">
                 <div class="signature-box">

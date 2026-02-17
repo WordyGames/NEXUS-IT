@@ -3,10 +3,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { 
+  Company,
   User, 
   UserRole, 
   UserSession,
   db,
+  createUser,
   signIn, 
   signOut, 
   getUserById 
@@ -17,6 +19,14 @@ interface AuthContextType {
   userData: User | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
+  register: (payload: {
+    username: string;
+    password: string;
+    name: string;
+    position: string;
+    company: Company;
+    phone?: string;
+  }) => Promise<void>;
   logout: () => Promise<void>;
   isAdmin: boolean;
   refreshUser: () => Promise<void>;
@@ -124,6 +134,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUserData(data);
   };
 
+  const register: AuthContextType['register'] = async ({
+    username,
+    password,
+    name,
+    position,
+    company,
+    phone
+  }) => {
+    await createUser(
+      username.trim().toLowerCase(),
+      password,
+      name.trim(),
+      company,
+      UserRole.USER,
+      position.trim(),
+      (phone || '').trim(),
+      position.trim()
+    );
+
+    await login(username.trim().toLowerCase(), password);
+  };
+
   const logout = async () => {
     await AsyncStorage.removeItem(MOBILE_SESSION_KEY);
     await signOut();
@@ -140,6 +172,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     userData,
     loading,
     login,
+    register,
     logout,
     isAdmin: userData?.role === UserRole.ADMIN,
     refreshUser

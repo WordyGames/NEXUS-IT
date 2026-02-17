@@ -490,7 +490,10 @@ const MobileEnrollmentScreen = () => {
           value={form.specs.phoneNumber}
           onChangeText={(value) => setForm((prev) => ({ ...prev, specs: { ...prev.specs, phoneNumber: value } }))}
           placeholder="Telefono de linea / SIM (manual)"
-          keyboardType="phone-pad"
+          keyboardType="default"
+          inputMode="tel"
+          autoCapitalize="none"
+          autoCorrect={false}
         />
         <TextInput
           style={styles.input}

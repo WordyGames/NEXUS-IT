@@ -26,7 +26,7 @@ const COMPANY_BACKGROUNDS = {
 };
 
 export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Promise<void> => {
-  const { employee, equipment, generatedBy, notes } = data;
+  const { employee, equipment, generatedBy } = data;
   const colors = COMPANY_COLORS[equipment.company];
 
   const doc = new jsPDF({
@@ -90,8 +90,7 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   doc.setFontSize(10);
 
   addField('Nombre', employee.name || 'N/A');
-  addField('Puesto', employee.position || 'N/A');
-  addField('Departamento', employee.department || 'N/A');
+  addField('Puesto', employee.position || employee.department || 'N/A');
   addField('Teléfono', employee.phone || 'N/A');
   addField('Empresa', equipment.company);
 
@@ -109,7 +108,6 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   addField('Serial', equipment.specs.serialNumber || 'N/A');
   addField('IMEI', equipment.specs.imei || 'N/A');
   addField('Teléfono', equipment.specs.phoneNumber || 'N/A');
-  addField('Cuenta Google', equipment.specs.googleAccountEmail || 'N/A');
   addField('CPU', equipment.specs.cpu || 'N/A');
   addField('RAM', equipment.specs.ram || 'N/A');
   addField('Storage', equipment.specs.storage || 'N/A');
@@ -128,7 +126,8 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
     'El equipo debe ser devuelto en las mismas condiciones al término de la relación laboral.',
     'No se permite el uso del equipo para fines personales sin autorización expresa.',
     'El equipo es propiedad de la empresa y debe ser utilizado únicamente para actividades laborales.',
-    'Cualquier software adicional deberá ser autorizado por el departamento de TI.'
+    'Cualquier software adicional deberá ser autorizado por el departamento de TI.',
+    'Cualquier daño o pérdida del equipo será responsabilidad del empleado, por lo cual asumirá el costo del reemplazo o reparación.'
   ];
 
   conditions.forEach((condition, index) => {
@@ -140,23 +139,17 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   yPos += 5;
 
   // ===== NOTAS ADICIONALES =====
-  if (notes && notes.trim()) {
-    addSectionTitle('NOTAS ADICIONALES');
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(9);
+  addSectionTitle('NOTAS ADICIONALES');
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(10);
+  addField('Cuenta Google', equipment.specs.googleAccountEmail || '________________________');
+  addField('Clave', '________________________');
 
-    const notesLines = doc.splitTextToSize(notes, pageWidth - 2 * margin - 10);
-    doc.text(notesLines, margin + 5, yPos);
-    yPos += notesLines.length * 5 + 5;
-  }
+  // ===== BLOQUE DE FIRMAS =====
+  // Subimos la zona de firmas para que no quede tan abajo
+  const firmasOffset = equipment.company === Company.ESPECIAS_NATURALES ? 120 : 105;
+  yPos = Math.max(yPos + 8, pageHeight - firmasOffset);
 
-  // ===== FIRMAS =====
-  // Ajustar posición de firmas según empresa
-  const firmasOffset = equipment.company === Company.ESPECIAS_NATURALES ? 95 : 75;
-  yPos = Math.max(yPos + 10, pageHeight - firmasOffset);
-
-  addSectionTitle('FIRMAS');
-  yPos += 1;
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(10);
 

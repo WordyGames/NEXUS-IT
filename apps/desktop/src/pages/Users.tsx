@@ -114,7 +114,8 @@ const Users = () => {
         formData.company,
         formData.role,
         normalizedDepartment,
-        normalizedPhone
+        normalizedPhone,
+        normalizedDepartment
       );
       
       setShowCreateModal(false);

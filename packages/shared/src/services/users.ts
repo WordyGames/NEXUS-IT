@@ -123,7 +123,8 @@ export const createUser = async (
   company: Company,
   role: UserRole = UserRole.USER,
   department?: string,
-  phone?: string
+  phone?: string,
+  position?: string
 ): Promise<string> => {
   try {
     // Verificar que el username no exista
@@ -143,6 +144,7 @@ export const createUser = async (
       role,
       company,
       department: department || '',
+      position: position || department || '',
       phone: phone || '',
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),

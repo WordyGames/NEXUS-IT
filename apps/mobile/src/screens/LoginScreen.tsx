@@ -59,6 +59,14 @@ const LoginScreen = ({ navigation }: any) => {
               {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => navigation.navigate('Register')}
+            disabled={loading}
+          >
+            <Text style={styles.secondaryButtonText}>Crear cuenta nueva</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -115,6 +123,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  secondaryButton: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#3b82f6',
+    borderRadius: 8,
+    alignItems: 'center',
+    paddingVertical: 12
+  },
+  secondaryButtonText: {
+    color: '#1d4ed8',
+    fontSize: 15,
+    fontWeight: '600'
+  }
 });
 
 export default LoginScreen;
