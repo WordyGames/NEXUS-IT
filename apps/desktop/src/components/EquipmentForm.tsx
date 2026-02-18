@@ -88,6 +88,7 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
       imei: equipment?.specs?.imei || '',
       phoneNumber: equipment?.specs?.phoneNumber || '',
       googleAccountEmail: equipment?.specs?.googleAccountEmail || '',
+      googleAccountPassword: equipment?.specs?.googleAccountPassword || '',
       ipAddress: equipment?.specs?.ipAddress || '',
       macAddress: equipment?.specs?.macAddress || '',
       model: equipment?.specs?.model || '',
@@ -247,7 +248,7 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
       case 'server':
         return [...baseFields, 'specs.manufacturer', 'specs.model', 'specs.cpu', 'specs.ram', 'specs.storage', 'specs.os', 'specs.hostname', 'specs.ipAddress', 'specs.serialNumber'];
       case 'phone':
-        return [...baseFields, 'specs.manufacturer', 'specs.model', 'specs.os', 'specs.ram', 'specs.storage', 'specs.serialNumber', 'specs.imei', 'specs.phoneNumber', 'specs.googleAccountEmail'];
+        return [...baseFields, 'specs.manufacturer', 'specs.model', 'specs.os', 'specs.ram', 'specs.storage', 'specs.serialNumber', 'specs.imei', 'specs.phoneNumber', 'specs.googleAccountEmail', 'specs.googleAccountPassword'];
       case 'printer':
         return [...baseFields, 'specs.manufacturer', 'specs.model', 'specs.serialNumber', 'specs.ipAddress'];
       case 'router':
@@ -458,7 +459,7 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
         )}
         {!['company', 'type', 'status', 'assignedTo', 'purchaseDate', 'warrantyExpiration'].includes(fieldName) && (
           <input
-            type="text"
+            type={fieldName === 'specs.googleAccountPassword' ? 'password' : 'text'}
             value={value || ''}
             onChange={(e) => handleChange(fieldName, e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
@@ -490,6 +491,7 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
       'specs.imei': 'IMEI',
       'specs.phoneNumber': 'Teléfono',
       'specs.googleAccountEmail': 'Cuenta Google (correo)',
+      'specs.googleAccountPassword': 'Clave de Cuenta Google',
       'specs.ipAddress': 'Dirección IP',
       'specs.macAddress': 'Dirección MAC',
       'specs.model': 'Modelo',

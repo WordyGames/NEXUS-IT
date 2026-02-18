@@ -105,6 +105,15 @@ const Users = () => {
       });
       return;
     }
+
+    if (normalizedPhone.length < 8) {
+      showToast({
+        type: 'warning',
+        title: 'Telefono invalido',
+        message: 'Captura un telefono valido para registrar la cuenta'
+      });
+      return;
+    }
     
     try {
       await createUser(
@@ -518,7 +527,7 @@ const Users = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Teléfono
+                  Teléfono *
                 </label>
                 <input
                   type="tel"
@@ -527,6 +536,7 @@ const Users = () => {
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                  required
                 />
               </div>
 

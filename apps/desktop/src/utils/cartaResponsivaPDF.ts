@@ -143,7 +143,7 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(10);
   addField('Cuenta Google', equipment.specs.googleAccountEmail || '________________________');
-  addField('Clave', '________________________');
+  addField('Clave', equipment.specs.googleAccountPassword || '________________________');
 
   // ===== BLOQUE DE FIRMAS =====
   // Subimos la zona de firmas para que no quede tan abajo

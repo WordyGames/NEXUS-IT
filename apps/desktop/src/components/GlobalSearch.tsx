@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, X, Monitor, User, Wrench } from 'lucide-react';
+import { Search, X, Monitor, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getEquipment, getUsers } from '@nexus-it/shared';
 import { Equipment, User as UserType } from '@nexus-it/shared';
@@ -21,14 +21,54 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose }) =
   const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [allEquipment, setAllEquipment] = useState<Equipment[]>([]);
+  const [allUsers, setAllUsers] = useState<UserType[]>([]);
+  const [dataLoaded, setDataLoaded] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!isOpen) {
       setSearchTerm('');
       setResults([]);
+      setLoading(false);
       return;
     }
+
+    if (dataLoaded) return;
+
+    let active = true;
+
+    const loadSearchData = async () => {
+      setLoading(true);
+      try {
+        const [equipmentData, usersData] = await Promise.all([
+          getEquipment({}),
+          getUsers()
+        ]);
+
+        if (!active) return;
+
+        setAllEquipment(equipmentData);
+        setAllUsers(usersData);
+        setDataLoaded(true);
+      } catch (error) {
+        console.error('Error loading search data:', error);
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadSearchData();
+
+    return () => {
+      active = false;
+    };
+  }, [isOpen, dataLoaded]);
+
+  useEffect(() => {
+    if (!isOpen) return;
 
     const debounceTimer = setTimeout(async () => {
       if (searchTerm.length < 2) {
@@ -36,13 +76,11 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose }) =
         return;
       }
 
-      setLoading(true);
       try {
         const searchResults: SearchResult[] = [];
         const searchLower = searchTerm.toLowerCase();
 
         // Buscar equipos
-        const allEquipment = await getEquipment({});
         allEquipment.forEach((equipment) => {
           const matches = 
             equipment.name?.toLowerCase().includes(searchLower) ||
@@ -60,7 +98,6 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose }) =
         });
 
         // Buscar usuarios
-        const allUsers = await getUsers();
         allUsers.forEach((user) => {
           const matches = 
             user.name?.toLowerCase().includes(searchLower) ||
@@ -80,13 +117,11 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose }) =
         setResults(searchResults.slice(0, 10)); // Limitar a 10 resultados
       } catch (error) {
         console.error('Error searching:', error);
-      } finally {
-        setLoading(false);
       }
     }, 300);
 
     return () => clearTimeout(debounceTimer);
-  }, [searchTerm, isOpen]);
+  }, [searchTerm, isOpen, allEquipment, allUsers]);
 
   const handleResultClick = (result: SearchResult) => {
     if (result.type === 'equipment') {
@@ -138,7 +173,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose }) =
         <div className="max-h-96 overflow-y-auto">
           {loading && (
             <div className="p-8 text-center text-gray-500">
-              Buscando...
+              Preparando búsqueda...
             </div>
           )}
 

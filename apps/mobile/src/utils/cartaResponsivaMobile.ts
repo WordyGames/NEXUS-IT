@@ -112,12 +112,13 @@ const buildHtml = (
   )).join('');
 
   const googleAccountForNotes = equipment.specs.googleAccountEmail?.trim() || '________________________';
+  const googlePasswordForNotes = equipment.specs.googleAccountPassword?.trim() || '________________________';
   const notesSection = `
     <div class="section">
       <h3 class="section-title">NOTAS ADICIONALES</h3>
       <table class="info">
         ${field('Cuenta Google', googleAccountForNotes)}
-        ${field('Clave', '________________________')}
+        ${field('Clave', googlePasswordForNotes)}
       </table>
     </div>
   `;
@@ -330,7 +331,7 @@ const buildHtml = (
               ${field('Modelo', equipment.specs.model || 'N/A')}
               ${field('Serial', equipment.specs.serialNumber || 'N/A')}
               ${field('IMEI', equipment.specs.imei || 'N/A')}
-              ${field('Telefono', equipment.specs.phoneNumber || 'N/A')}
+              ${field('Teléfono', equipment.specs.phoneNumber || 'N/A')}
               ${field('CPU', equipment.specs.cpu || 'N/A')}
               ${field('RAM', equipment.specs.ram || 'N/A')}
               ${field('Storage', equipment.specs.storage || 'N/A')}

@@ -14,7 +14,7 @@ import {
   QueryConstraint
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { Ticket, TicketFilters, TicketComment, TicketStatus } from '../types';
+import { Ticket, TicketFilters, TicketComment, TicketStatus, TicketPriority, TicketCategory } from '../types';
 import { generateTicketNumber } from '../utils/helpers';
 import { deleteFile, resolveAttachmentStoragePath } from './storage';
 
@@ -40,6 +40,31 @@ const isIndexError = (error: unknown) => {
   return message.toLowerCase().includes('index') || message.includes('FAILED_PRECONDITION');
 };
 
+const isTicketPriority = (value: unknown): value is TicketPriority => (
+  typeof value === 'string' && Object.values(TicketPriority).includes(value as TicketPriority)
+);
+
+const isTicketStatus = (value: unknown): value is TicketStatus => (
+  typeof value === 'string' && Object.values(TicketStatus).includes(value as TicketStatus)
+);
+
+const isTicketCategory = (value: unknown): value is TicketCategory => (
+  typeof value === 'string' && Object.values(TicketCategory).includes(value as TicketCategory)
+);
+
+const sanitizeTicket = (ticket: Ticket): Ticket => ({
+  ...ticket,
+  priority: isTicketPriority((ticket as any).priority)
+    ? (ticket as any).priority
+    : TicketPriority.MEDIUM,
+  status: isTicketStatus((ticket as any).status)
+    ? (ticket as any).status
+    : TicketStatus.OPEN,
+  category: isTicketCategory((ticket as any).category)
+    ? (ticket as any).category
+    : TicketCategory.OTHER
+});
+
 const fetchTickets = async (constraints: QueryConstraint[], includeOrderBy: boolean) => {
   const effectiveConstraints = includeOrderBy
     ? [...constraints, orderBy('createdAt', 'desc')]
@@ -52,6 +77,8 @@ const fetchTickets = async (constraints: QueryConstraint[], includeOrderBy: bool
     id: doc.id,
     ...doc.data()
   })) as Ticket[];
+
+  tickets = tickets.map(sanitizeTicket);
 
   if (!includeOrderBy) {
     tickets.sort((a, b) => getTicketSortValue(b) - getTicketSortValue(a));
@@ -122,7 +149,7 @@ export const getTicketById = async (id: string): Promise<Ticket | null> => {
     const docSnap = await getDoc(docRef);
     
     if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() } as Ticket;
+      return sanitizeTicket({ id: docSnap.id, ...docSnap.data() } as Ticket);
     }
     return null;
   } catch (error) {

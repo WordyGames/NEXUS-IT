@@ -1,5 +1,6 @@
 import React, { Component, ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as Updates from 'expo-updates';
 
 interface AppErrorBoundaryProps {
   children: ReactNode;
@@ -8,12 +9,14 @@ interface AppErrorBoundaryProps {
 interface AppErrorBoundaryState {
   hasError: boolean;
   errorMessage: string;
+  isRetrying: boolean;
 }
 
 export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
   state: AppErrorBoundaryState = {
     hasError: false,
-    errorMessage: ''
+    errorMessage: '',
+    isRetrying: false
   };
 
   static getDerivedStateFromError(error: Error): AppErrorBoundaryState {
@@ -27,10 +30,26 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
     console.error('[MOBILE] Error fatal en render:', error, errorInfo);
   }
 
-  handleRetry = () => {
+  handleRetry = async () => {
+    this.setState({ isRetrying: true });
+
+    try {
+      if (!__DEV__ && Updates.isEnabled) {
+        const update = await Updates.checkForUpdateAsync();
+        if (update.isAvailable) {
+          await Updates.fetchUpdateAsync();
+          await Updates.reloadAsync();
+          return;
+        }
+      }
+    } catch (error) {
+      console.error('[MOBILE] Error al reintentar con OTA:', error);
+    }
+
     this.setState({
       hasError: false,
-      errorMessage: ''
+      errorMessage: '',
+      isRetrying: false
     });
   };
 
@@ -40,15 +59,21 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
         <View style={styles.container}>
           <Text style={styles.title}>La app no pudo iniciar</Text>
           <Text style={styles.subtitle}>
-            Ocurrio un error durante el arranque. Presiona reintentar.
+            Ocurrió un error durante el arranque. Presiona reintentar.
           </Text>
 
           <ScrollView style={styles.errorBox}>
             <Text style={styles.errorText}>{this.state.errorMessage}</Text>
           </ScrollView>
 
-          <TouchableOpacity style={styles.button} onPress={this.handleRetry}>
-            <Text style={styles.buttonText}>Reintentar</Text>
+          <TouchableOpacity
+            style={[styles.button, this.state.isRetrying && styles.buttonDisabled]}
+            onPress={() => { void this.handleRetry(); }}
+            disabled={this.state.isRetrying}
+          >
+            <Text style={styles.buttonText}>
+              {this.state.isRetrying ? 'Reintentando...' : 'Reintentar'}
+            </Text>
           </TouchableOpacity>
         </View>
       );
@@ -93,6 +118,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center'
+  },
+  buttonDisabled: {
+    opacity: 0.7
   },
   buttonText: {
     color: '#ffffff',

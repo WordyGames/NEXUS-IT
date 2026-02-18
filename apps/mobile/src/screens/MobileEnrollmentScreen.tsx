@@ -61,6 +61,7 @@ const buildInitialForm = (company: Company) => ({
     imei: '',
     phoneNumber: '',
     googleAccountEmail: '',
+    googleAccountPassword: '',
     os: '',
     hostname: '',
     cpu: '',
@@ -98,6 +99,22 @@ const MobileEnrollmentScreen = () => {
     void loadData();
   }, [userData?.company]);
 
+  useEffect(() => {
+    if (!form.assignedTo) return;
+
+    const assignedUser = users.find((user) => user.id === form.assignedTo);
+    const assignedPhone = assignedUser?.phone?.trim() || '';
+    if (!assignedPhone) return;
+
+    setForm((prev) => ({
+      ...prev,
+      specs: {
+        ...prev.specs,
+        phoneNumber: assignedPhone
+      }
+    }));
+  }, [form.assignedTo, users]);
+
   const activeUsers = useMemo(
     () => users.filter((user) => user.isActive),
     [users]
@@ -117,7 +134,7 @@ const MobileEnrollmentScreen = () => {
       setEquipmentList(equipmentData);
     } catch (error) {
       console.error('Error loading mobile enrollment data:', error);
-      Alert.alert('Error', 'No se pudo cargar la informacion inicial');
+      Alert.alert('Error', 'No se pudo cargar la información inicial');
     } finally {
       setLoading(false);
     }
@@ -137,10 +154,10 @@ const MobileEnrollmentScreen = () => {
           ...detected.specs
         }
       }));
-      Alert.alert('Deteccion completa', 'Se detectaron las especificaciones del celular');
+      Alert.alert('Detección completa', 'Se detectaron las especificaciones del celular');
     } catch (error) {
       console.error('Error detecting mobile device info:', error);
-      Alert.alert('Error', 'No se pudo detectar la informacion del dispositivo');
+      Alert.alert('Error', 'No se pudo detectar la información del dispositivo');
     } finally {
       setDetecting(false);
     }
@@ -165,7 +182,7 @@ const MobileEnrollmentScreen = () => {
       url: downloadURL,
       storagePath,
       uploadedBy: userData?.id || 'mobile-user',
-      uploadedByName: userData?.name || 'Usuario movil',
+      uploadedByName: userData?.name || 'Usuario móvil',
       createdAt: new Date()
     };
   };
@@ -177,7 +194,7 @@ const MobileEnrollmentScreen = () => {
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
       if (!permissionResponse.granted) {
-        Alert.alert('Permiso requerido', 'Debes permitir acceso a la camara o galeria');
+        Alert.alert('Permiso requerido', 'Debes permitir acceso a la cámara o galería');
         return;
       }
 
@@ -229,7 +246,7 @@ const MobileEnrollmentScreen = () => {
     if (includeEmployeeSignature && !employeeSignature) {
       Alert.alert(
         'Firma pendiente',
-        'Activa "Incluir firma del empleado" solo si ya se capturo la firma digital.'
+        'Activa "Incluir firma del empleado" solo si ya se capturó la firma digital.'
       );
       return;
     }
@@ -276,6 +293,7 @@ const MobileEnrollmentScreen = () => {
       imei: sanitize(form.specs.imei),
       phoneNumber: sanitize(form.specs.phoneNumber),
       googleAccountEmail: sanitize(form.specs.googleAccountEmail),
+      googleAccountPassword: sanitize(form.specs.googleAccountPassword),
       os: sanitize(form.specs.os),
       hostname: sanitize(form.specs.hostname),
       cpu: sanitize(form.specs.cpu),
@@ -291,12 +309,16 @@ const MobileEnrollmentScreen = () => {
     }
 
     if (!location) {
-      Alert.alert('Dato requerido', 'Ingresa una ubicacion');
+      Alert.alert('Dato requerido', 'Ingresa una ubicación');
       return;
     }
 
     setSaving(true);
     try {
+      const assignedUser = findUserById(form.assignedTo);
+      const assignedPhone = sanitize(assignedUser?.phone || '');
+      const resolvedPhoneNumber = specs.phoneNumber || assignedPhone;
+
       const payload = {
         id: currentEntityId,
         company: form.company as Company,
@@ -306,7 +328,10 @@ const MobileEnrollmentScreen = () => {
         status: 'active' as const,
         assignedTo: form.assignedTo || undefined,
         notes: notes || undefined,
-        specs,
+        specs: {
+          ...specs,
+          phoneNumber: resolvedPhoneNumber
+        },
         attachments: photoAttachment ? [photoAttachment] : [],
         createdBy: userData?.id || 'mobile-user'
       };
@@ -324,7 +349,7 @@ const MobileEnrollmentScreen = () => {
 
       Alert.alert(
         'Equipo registrado',
-        'Se guardo el equipo correctamente',
+        'Se guardó el equipo correctamente',
         [
           {
             text: 'Imprimir carta',
@@ -366,7 +391,7 @@ const MobileEnrollmentScreen = () => {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Alta de Equipo desde Celular</Text>
       <Text style={styles.subtitle}>
-        Detecta automaticamente este dispositivo, guardalo en inventario y genera su carta responsiva con o sin firma.
+        Detecta automáticamente este dispositivo, guárdalo en inventario y genera su carta responsiva con o sin firma.
       </Text>
 
       <TouchableOpacity
@@ -417,7 +442,7 @@ const MobileEnrollmentScreen = () => {
           placeholder="Ej: Samsung A54 / iPhone"
         />
 
-        <Text style={styles.label}>Ubicacion</Text>
+        <Text style={styles.label}>Ubicación</Text>
         <TextInput
           style={styles.input}
           value={form.location}
@@ -489,7 +514,7 @@ const MobileEnrollmentScreen = () => {
           style={styles.input}
           value={form.specs.phoneNumber}
           onChangeText={(value) => setForm((prev) => ({ ...prev, specs: { ...prev.specs, phoneNumber: value } }))}
-          placeholder="Telefono de linea / SIM (manual)"
+          placeholder="Teléfono de línea / SIM (manual)"
           keyboardType="default"
           inputMode="tel"
           autoCapitalize="none"
@@ -501,6 +526,15 @@ const MobileEnrollmentScreen = () => {
           onChangeText={(value) => setForm((prev) => ({ ...prev, specs: { ...prev.specs, googleAccountEmail: value } }))}
           placeholder="Cuenta Google (correo, manual)"
           keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <TextInput
+          style={styles.input}
+          value={form.specs.googleAccountPassword}
+          onChangeText={(value) => setForm((prev) => ({ ...prev, specs: { ...prev.specs, googleAccountPassword: value } }))}
+          placeholder="Contraseña de cuenta Google (manual)"
+          secureTextEntry
           autoCapitalize="none"
           autoCorrect={false}
         />
@@ -563,7 +597,7 @@ const MobileEnrollmentScreen = () => {
             onPress={() => { void handleSelectPhoto(false); }}
             disabled={uploading}
           >
-            <Text style={styles.secondaryButtonText}>Elegir de galeria</Text>
+            <Text style={styles.secondaryButtonText}>Elegir de galería</Text>
           </TouchableOpacity>
         </View>
         {photoAttachment && (
@@ -590,18 +624,18 @@ const MobileEnrollmentScreen = () => {
         {includeEmployeeSignature ? (
           <View style={styles.signatureContainer}>
             <Text style={styles.signatureHint}>
-              Pide al usuario que firme con el dedo. Si prefieres firma fisica, desactiva esta opcion.
+              Pide al usuario que firme con el dedo. Si prefieres firma física, desactiva esta opción.
             </Text>
             <SignaturePad onChange={setEmployeeSignature} />
             <Text style={styles.signatureMeta}>
               {employeeSignature
                 ? `Firma capturada (${employeeSignature.pointCount} trazos)`
-                : 'Aun no hay firma capturada'}
+                : 'Aún no hay firma capturada'}
             </Text>
           </View>
         ) : (
           <Text style={styles.signatureHint}>
-            La carta se genera sin firma digital para imprimir y firmar despues en papel.
+            La carta se genera sin firma digital para imprimir y firmar después en papel.
           </Text>
         )}
       </View>

@@ -36,7 +36,7 @@ const formatBytes = (bytes: number | null): string => {
 const deviceTypeLabel = (deviceType: Device.DeviceType | null): string => {
   switch (deviceType) {
     case Device.DeviceType.PHONE:
-      return 'Telefono';
+      return 'Teléfono';
     case Device.DeviceType.TABLET:
       return 'Tablet';
     case Device.DeviceType.TV:
@@ -68,7 +68,7 @@ export const detectCurrentMobileDevice = async (): Promise<DetectedMobilePayload
 
   const dynamicDeviceType = await Device.getDeviceTypeAsync().catch(() => Device.deviceType || null);
   const manufacturer = Device.manufacturer || Device.brand || '';
-  const model = Device.modelName || Device.designName || 'Dispositivo movil';
+  const model = Device.modelName || Device.designName || 'Dispositivo móvil';
   const os = [Device.osName, Device.osVersion].filter(Boolean).join(' ');
   const hostname = Device.deviceName || [manufacturer, model].filter(Boolean).join(' ');
   const cpu = Device.supportedCpuArchitectures?.join(', ') || '';
@@ -78,13 +78,13 @@ export const detectCurrentMobileDevice = async (): Promise<DetectedMobilePayload
   const storage = totalStorage
     ? `${totalStorage}${freeStorage ? ` (Libre ${freeStorage})` : ''}`
     : '';
-  const location = Device.isDevice ? 'Movil corporativo' : 'Simulador / pruebas';
+  const location = Device.isDevice ? 'Móvil corporativo' : 'Simulador / pruebas';
 
   const notesLines = [
     `Tipo de dispositivo: ${deviceTypeLabel(dynamicDeviceType)}`,
     Device.brand ? `Marca comercial: ${Device.brand}` : '',
     Device.modelId ? `Modelo interno: ${Device.modelId}` : '',
-    Device.designName ? `Diseno interno: ${Device.designName}` : '',
+    Device.designName ? `Diseño interno: ${Device.designName}` : '',
     Device.productName ? `Producto: ${Device.productName}` : '',
     Device.osBuildId ? `OS Build: ${Device.osBuildId}` : '',
     Device.osInternalBuildId ? `OS Internal Build: ${Device.osInternalBuildId}` : '',

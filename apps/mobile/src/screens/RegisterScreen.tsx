@@ -48,17 +48,22 @@ const RegisterScreen = ({ navigation }: any) => {
     }
 
     if (!/^[a-z0-9._-]+$/.test(username)) {
-      Alert.alert('Usuario invalido', 'Usa solo letras minusculas, numeros, punto, guion y guion bajo');
+      Alert.alert('Usuario inválido', 'Usa solo letras minúsculas, números, punto, guion y guion bajo');
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Dato requerido', 'La contrasena debe tener minimo 6 caracteres');
+      Alert.alert('Dato requerido', 'La contraseña debe tener mínimo 6 caracteres');
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Las contrasenas no coinciden');
+      Alert.alert('Error', 'Las contraseñas no coinciden');
+      return;
+    }
+
+    if (phone.length < 8) {
+      Alert.alert('Dato requerido', 'Captura un teléfono válido para registrar la cuenta');
       return;
     }
 
@@ -84,7 +89,7 @@ const RegisterScreen = ({ navigation }: any) => {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Crear Cuenta</Text>
-      <Text style={styles.subtitle}>Registro rapido para empleados desde celular</Text>
+      <Text style={styles.subtitle}>Registro rápido para empleados desde celular</Text>
 
       <View style={styles.form}>
         <Text style={styles.label}>Nombre completo</Text>
@@ -92,7 +97,7 @@ const RegisterScreen = ({ navigation }: any) => {
           style={styles.input}
           value={form.name}
           onChangeText={(value) => setForm((prev) => ({ ...prev, name: value }))}
-          placeholder="Ej: Oscar Perez"
+          placeholder="Ej: Óscar Pérez"
         />
 
         <Text style={styles.label}>Puesto</Text>
@@ -113,33 +118,33 @@ const RegisterScreen = ({ navigation }: any) => {
           autoCorrect={false}
         />
 
-        <Text style={styles.label}>Contrasena</Text>
+        <Text style={styles.label}>Contraseña</Text>
         <TextInput
           style={styles.input}
           value={form.password}
           onChangeText={(value) => setForm((prev) => ({ ...prev, password: value }))}
-          placeholder="Minimo 6 caracteres"
+          placeholder="Mínimo 6 caracteres"
           secureTextEntry
           autoCapitalize="none"
         />
 
-        <Text style={styles.label}>Confirmar contrasena</Text>
+        <Text style={styles.label}>Confirmar contraseña</Text>
         <TextInput
           style={styles.input}
           value={form.confirmPassword}
           onChangeText={(value) => setForm((prev) => ({ ...prev, confirmPassword: value }))}
-          placeholder="Repite la contrasena"
+          placeholder="Repite la contraseña"
           secureTextEntry
           autoCapitalize="none"
         />
 
-        <Text style={styles.label}>Telefono (opcional)</Text>
+        <Text style={styles.label}>Teléfono</Text>
         <TextInput
           style={styles.input}
           value={form.phone}
           onChangeText={(value) => setForm((prev) => ({ ...prev, phone: value }))}
           placeholder="Ej: 8112345678"
-          keyboardType="default"
+          keyboardType="phone-pad"
           inputMode="tel"
         />
 

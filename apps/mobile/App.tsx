@@ -43,7 +43,7 @@ export default function App() {
       setUpdateRequired(update.isAvailable);
     } catch (error: any) {
       console.error('[OTA] Error checking update:', error);
-      setUpdateError(error?.message || 'No se pudo verificar la actualizacion.');
+      setUpdateError(error?.message || 'No se pudo verificar la actualización.');
     } finally {
       checkingRef.current = false;
       setIsCheckingUpdate(false);
@@ -59,7 +59,7 @@ export default function App() {
       await Updates.reloadAsync();
     } catch (error: any) {
       console.error('[OTA] Error applying update:', error);
-      setUpdateError(error?.message || 'No se pudo aplicar la actualizacion.');
+      setUpdateError(error?.message || 'No se pudo aplicar la actualización.');
       setIsApplyingUpdate(false);
     }
   }, []);
@@ -113,7 +113,7 @@ export default function App() {
               <Stack.Screen
                 name="MobileEnrollment"
                 component={MobileEnrollmentScreen}
-                options={{ title: 'Alta de Equipo (Movil)' }}
+                options={{ title: 'Alta de Equipo (Móvil)' }}
               />
               <Stack.Screen 
                 name="Tickets" 
@@ -133,18 +133,18 @@ export default function App() {
             <View style={styles.modalOverlay}>
               <View style={styles.modalCard}>
                 <Text style={styles.modalTitle}>
-                  {isCheckingUpdate ? 'Verificando actualizacion' : 'Actualizacion requerida'}
+                  {isCheckingUpdate ? 'Verificando actualización' : 'Actualización requerida'}
                 </Text>
 
                 {isCheckingUpdate ? (
                   <View style={styles.centerRow}>
                     <ActivityIndicator size="small" color="#1d4ed8" />
-                    <Text style={styles.modalText}>Comprobando version mas reciente...</Text>
+                    <Text style={styles.modalText}>Comprobando versión más reciente...</Text>
                   </View>
                 ) : (
                   <>
                     <Text style={styles.modalText}>
-                      Detectamos una nueva version de la app. Debes actualizar para continuar.
+                      Detectamos una nueva versión de la app. Debes actualizar para continuar.
                     </Text>
 
                     {!!updateError && (

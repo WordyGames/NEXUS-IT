@@ -171,6 +171,39 @@ const Tickets = () => {
     [TicketStatus.CANCELLED]: 'bg-red-100 text-red-800'
   };
 
+  const normalizePriority = (value: unknown): TicketPriority => {
+    return Object.values(TicketPriority).includes(value as TicketPriority)
+      ? (value as TicketPriority)
+      : TicketPriority.MEDIUM;
+  };
+
+  const normalizeStatus = (value: unknown): TicketStatus => {
+    return Object.values(TicketStatus).includes(value as TicketStatus)
+      ? (value as TicketStatus)
+      : TicketStatus.OPEN;
+  };
+
+  const getPriorityLabel = (priority: TicketPriority): string => {
+    const labels: Record<TicketPriority, string> = {
+      [TicketPriority.LOW]: 'Baja',
+      [TicketPriority.MEDIUM]: 'Media',
+      [TicketPriority.HIGH]: 'Alta',
+      [TicketPriority.URGENT]: 'Urgente'
+    };
+    return labels[priority];
+  };
+
+  const getStatusLabel = (status: TicketStatus): string => {
+    const labels: Record<TicketStatus, string> = {
+      [TicketStatus.OPEN]: 'Abierto',
+      [TicketStatus.IN_PROGRESS]: 'En progreso',
+      [TicketStatus.RESOLVED]: 'Resuelto',
+      [TicketStatus.CLOSED]: 'Cerrado',
+      [TicketStatus.CANCELLED]: 'Cancelado'
+    };
+    return labels[status];
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -251,40 +284,45 @@ const Tickets = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {tickets.map((ticket) => (
-                  <tr 
-                    key={ticket.id} 
-                    onClick={() => handleOpenDetail(ticket)}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                      {ticket.ticketNumber}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">
-                      <div className="flex items-center gap-2">
-                        {ticket.title}
-                        {ticket.comments && ticket.comments.length > 0 && (
-                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                            {ticket.comments.length} 💬
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-medium rounded ${priorityColors[ticket.priority]}`}>
-                        {ticket.priority}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-medium rounded ${statusColors[ticket.status]}`}>
-                        {ticket.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                      {ticket.createdByName}
-                    </td>
-                  </tr>
-                ))}
+                {tickets.map((ticket) => {
+                  const safePriority = normalizePriority((ticket as { priority?: unknown }).priority);
+                  const safeStatus = normalizeStatus((ticket as { status?: unknown }).status);
+
+                  return (
+                    <tr 
+                      key={ticket.id} 
+                      onClick={() => handleOpenDetail(ticket)}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                        {ticket.ticketNumber}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">
+                        <div className="flex items-center gap-2">
+                          {ticket.title}
+                          {ticket.comments && ticket.comments.length > 0 && (
+                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                              {ticket.comments.length} 💬
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 text-xs font-medium rounded ${priorityColors[safePriority]}`}>
+                          {getPriorityLabel(safePriority)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 text-xs font-medium rounded ${statusColors[safeStatus]}`}>
+                          {getStatusLabel(safeStatus)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                        {ticket.createdByName}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

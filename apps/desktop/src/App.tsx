@@ -26,9 +26,10 @@ function App() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ctrl+K o Cmd+K abre/cierra búsqueda
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setSearchOpen(!searchOpen);
+        setSearchOpen((prev) => !prev);
+        return;
       }
       // Esc cierra búsqueda
       if (e.key === 'Escape') {
@@ -38,7 +39,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [searchOpen]);
+  }, []);
 
   return (
     <Router>

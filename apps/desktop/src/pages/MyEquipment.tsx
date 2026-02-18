@@ -7,23 +7,35 @@ const MyEquipment = () => {
   const { userData } = useAuth();
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     loadEquipment();
   }, [userData?.id]);
 
   const loadEquipment = async () => {
-    if (!userData?.id) return;
+    if (!userData?.id) {
+      setEquipment([]);
+      setLoading(false);
+      return;
+    }
     
     try {
       setLoading(true);
+      setLoadError(null);
       const data = await getEquipment({ assignedTo: userData.id });
       setEquipment(data);
     } catch (error) {
       console.error('Error loading equipment:', error);
+      setLoadError('No se pudieron cargar tus equipos. Intenta de nuevo.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const getEquipmentSerial = (eq: Equipment): string => {
+    const legacySpecs = eq.specs as Equipment['specs'] & { seria?: string };
+    return legacySpecs?.serialNumber || legacySpecs?.seria || '';
   };
 
   const getDateFromTimestamp = (dateOrTimestamp: Date | any): string => {
@@ -66,6 +78,19 @@ const MyEquipment = () => {
           Equipos asignados a {userData?.name}
         </p>
       </div>
+
+      {loadError && (
+        <div className="bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded-lg p-4 flex items-center justify-between gap-3">
+          <p className="text-red-700 dark:text-red-200 text-sm">{loadError}</p>
+          <button
+            type="button"
+            onClick={loadEquipment}
+            className="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg transition"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
 
       {equipment.length === 0 ? (
         <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg p-8 text-center">
@@ -111,11 +136,11 @@ const MyEquipment = () => {
                   </span>
                 </div>
 
-                {eq.specs?.serialNumber && (
+                {getEquipmentSerial(eq) && (
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Serie:</span>
                     <span className="font-medium text-gray-800 dark:text-white">
-                      {eq.specs.serialNumber}
+                      {getEquipmentSerial(eq)}
                     </span>
                   </div>
                 )}

@@ -61,6 +61,30 @@ const STATUS_STYLES: Record<TicketStatus, { bg: string; text: string }> = {
   [TicketStatus.CANCELLED]: { bg: '#fee2e2', text: '#991b1b' }
 };
 
+const isTicketPriority = (value: unknown): value is TicketPriority => (
+  typeof value === 'string' && Object.values(TicketPriority).includes(value as TicketPriority)
+);
+
+const isTicketStatus = (value: unknown): value is TicketStatus => (
+  typeof value === 'string' && Object.values(TicketStatus).includes(value as TicketStatus)
+);
+
+const isTicketCategory = (value: unknown): value is TicketCategory => (
+  typeof value === 'string' && Object.values(TicketCategory).includes(value as TicketCategory)
+);
+
+const normalizePriority = (value: unknown): TicketPriority => (
+  isTicketPriority(value) ? value : TicketPriority.MEDIUM
+);
+
+const normalizeStatus = (value: unknown): TicketStatus => (
+  isTicketStatus(value) ? value : TicketStatus.OPEN
+);
+
+const normalizeCategory = (value: unknown): TicketCategory => (
+  isTicketCategory(value) ? value : TicketCategory.OTHER
+);
+
 const TicketsScreen = () => {
   const { userData, isAdmin } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -136,17 +160,17 @@ const TicketsScreen = () => {
     const description = form.description.trim();
 
     if (!userData?.id) {
-      Alert.alert('Sesion requerida', 'Inicia sesion para crear tickets');
+      Alert.alert('Sesión requerida', 'Inicia sesión para crear tickets');
       return;
     }
 
     if (title.length < 5) {
-      Alert.alert('Dato requerido', 'Captura un titulo mas descriptivo');
+      Alert.alert('Dato requerido', 'Captura un título más descriptivo');
       return;
     }
 
     if (description.length < 10) {
-      Alert.alert('Dato requerido', 'Agrega mas detalle al problema');
+      Alert.alert('Dato requerido', 'Agrega más detalle al problema');
       return;
     }
 
@@ -163,7 +187,7 @@ const TicketsScreen = () => {
         createdByName: userData.name || userData.username || 'Usuario'
       });
 
-      Alert.alert('Ticket creado', 'Tu solicitud se registro correctamente');
+      Alert.alert('Ticket creado', 'Tu solicitud se registró correctamente');
       setShowForm(false);
       resetForm();
       setLoading(true);
@@ -210,7 +234,7 @@ const TicketsScreen = () => {
         <View style={styles.formCard}>
           <Text style={styles.sectionTitle}>Nuevo ticket</Text>
 
-          <Text style={styles.label}>Titulo</Text>
+          <Text style={styles.label}>Título</Text>
           <TextInput
             style={styles.input}
             value={form.title}
@@ -218,12 +242,12 @@ const TicketsScreen = () => {
             placeholder="Ej: No puedo conectarme al correo"
           />
 
-          <Text style={styles.label}>Descripcion</Text>
+          <Text style={styles.label}>Descripción</Text>
           <TextInput
             style={[styles.input, styles.textarea]}
             value={form.description}
             onChangeText={(value) => setForm((prev) => ({ ...prev, description: value }))}
-            placeholder="Describe que pasa, desde cuando y que intentaste"
+            placeholder="Describe qué pasa, desde cuándo y qué intentaste"
             multiline
           />
 
@@ -242,7 +266,7 @@ const TicketsScreen = () => {
             ))}
           </View>
 
-          <Text style={styles.label}>Categoria</Text>
+          <Text style={styles.label}>Categoría</Text>
           <View style={styles.optionsRow}>
             {Object.values(TicketCategory).map((category) => (
               <TouchableOpacity
@@ -293,30 +317,42 @@ const TicketsScreen = () => {
       ) : (
         visibleTickets.map((ticket) => (
           <View key={ticket.id} style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.ticketNumber}>{ticket.ticketNumber}</Text>
-              <View style={[styles.badge, { backgroundColor: PRIORITY_STYLES[ticket.priority].bg }]}>
-                <Text style={[styles.badgeText, { color: PRIORITY_STYLES[ticket.priority].text }]}>
-                  {PRIORITY_LABELS[ticket.priority]}
-                </Text>
-              </View>
-            </View>
+            {(() => {
+              const safePriority = normalizePriority((ticket as any).priority);
+              const safeStatus = normalizeStatus((ticket as any).status);
+              const safeCategory = normalizeCategory((ticket as any).category);
+              const priorityStyle = PRIORITY_STYLES[safePriority] || PRIORITY_STYLES[TicketPriority.MEDIUM] || { bg: '#e5e7eb', text: '#111827' };
+              const statusStyle = STATUS_STYLES[safeStatus] || STATUS_STYLES[TicketStatus.OPEN] || { bg: '#dcfce7', text: '#166534' };
 
-            <Text style={styles.title}>{ticket.title}</Text>
-            <Text style={styles.description}>{ticket.description}</Text>
+              return (
+                <>
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.ticketNumber}>{ticket.ticketNumber || 'Sin folio'}</Text>
+                    <View style={[styles.badge, { backgroundColor: priorityStyle.bg }]}>
+                      <Text style={[styles.badgeText, { color: priorityStyle.text }]}>
+                        {PRIORITY_LABELS[safePriority]}
+                      </Text>
+                    </View>
+                  </View>
 
-            <View style={styles.metaRow}>
-              <View style={[styles.badge, { backgroundColor: STATUS_STYLES[ticket.status].bg }]}>
-                <Text style={[styles.badgeText, { color: STATUS_STYLES[ticket.status].text }]}>
-                  {STATUS_LABELS[ticket.status]}
-                </Text>
-              </View>
-              <Text style={styles.metaText}>{CATEGORY_LABELS[ticket.category]}</Text>
-            </View>
+                  <Text style={styles.title}>{ticket.title}</Text>
+                  <Text style={styles.description}>{ticket.description}</Text>
 
-            <Text style={styles.footerText}>
-              {ticket.company} • {ticket.createdByName}
-            </Text>
+                  <View style={styles.metaRow}>
+                    <View style={[styles.badge, { backgroundColor: statusStyle.bg }]}>
+                      <Text style={[styles.badgeText, { color: statusStyle.text }]}>
+                        {STATUS_LABELS[safeStatus]}
+                      </Text>
+                    </View>
+                    <Text style={styles.metaText}>{CATEGORY_LABELS[safeCategory]}</Text>
+                  </View>
+
+                  <Text style={styles.footerText}>
+                    {ticket.company} • {ticket.createdByName || 'Usuario'}
+                  </Text>
+                </>
+              );
+            })()}
           </View>
         ))
       )}

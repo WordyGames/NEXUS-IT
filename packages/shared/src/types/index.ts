@@ -61,6 +61,7 @@ export interface EquipmentSpecs {
   imei?: string;
   phoneNumber?: string;
   googleAccountEmail?: string;
+  googleAccountPassword?: string;
   model?: string;
   manufacturer?: string;
   
@@ -302,6 +303,7 @@ export interface CartaResponsiva {
     imei?: string;
     phoneNumber?: string;
     googleAccountEmail?: string;
+    googleAccountPassword?: string;
   };
   notes?: string; // Notas adicionales
   generatedBy: string;

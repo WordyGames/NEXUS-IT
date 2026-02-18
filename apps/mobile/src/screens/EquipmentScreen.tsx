@@ -74,7 +74,7 @@ const EquipmentScreen = ({ navigation }: any) => {
         <Text style={styles.title}>{isAdmin ? 'Equipos' : 'Mis Equipos'}</Text>
         <Text style={styles.subtitle}>
           {isAdmin
-            ? 'Gestion global de inventario'
+            ? 'Gestión global de inventario'
             : `Equipos asignados a ${userData?.name || 'usuario'}`}
         </Text>
       </View>
@@ -84,7 +84,7 @@ const EquipmentScreen = ({ navigation }: any) => {
           style={styles.enrollButton}
           onPress={() => navigation.navigate('MobileEnrollment')}
         >
-          <Text style={styles.enrollButtonText}>Dar de alta telefono / equipo desde este celular</Text>
+          <Text style={styles.enrollButtonText}>Dar de alta teléfono / equipo desde este celular</Text>
         </TouchableOpacity>
       )}
 
