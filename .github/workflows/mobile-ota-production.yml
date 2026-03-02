@@ -43,9 +43,12 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
+      - name: Instalar EAS CLI
+        run: npm install -g eas-cli
+
       - name: Publicar OTA (production)
         working-directory: apps/mobile
         run: |
           npm run prepare:expo
           SHORT_SHA="${GITHUB_SHA::7}"
-          npx eas update --channel production --message "ci(ota): ${SHORT_SHA}" --non-interactive
+          eas update --channel production --message "ci(ota): ${SHORT_SHA}" --non-interactive
