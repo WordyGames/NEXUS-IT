@@ -84,6 +84,8 @@ const MobileEnrollmentScreen = () => {
   const [detecting, setDetecting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [showGooglePassword, setShowGooglePassword] = useState(false);
+  const [detectedEquipmentType, setDetectedEquipmentType] = useState<'phone' | 'tablet'>('phone');
   const [letterLoadingId, setLetterLoadingId] = useState<string | null>(null);
   const [includeEmployeeSignature, setIncludeEmployeeSignature] = useState(false);
   const [employeeSignature, setEmployeeSignature] = useState<SignatureData | null>(null);
@@ -154,6 +156,7 @@ const MobileEnrollmentScreen = () => {
           ...detected.specs
         }
       }));
+      setDetectedEquipmentType(detected.detectedEquipmentType || 'phone');
       Alert.alert('Detección completa', 'Se detectaron las especificaciones del celular');
     } catch (error) {
       console.error('Error detecting mobile device info:', error);
@@ -280,6 +283,8 @@ const MobileEnrollmentScreen = () => {
     setForm(buildInitialForm(company));
     setCurrentEntityId(generateEntityId());
     setPhotoAttachment(null);
+    setShowGooglePassword(false);
+    setDetectedEquipmentType('phone');
   };
 
   const handleSaveEquipment = async () => {
@@ -313,6 +318,16 @@ const MobileEnrollmentScreen = () => {
       return;
     }
 
+    if (specs.googleAccountEmail && !specs.googleAccountPassword) {
+      Alert.alert('Dato requerido', 'Ingresa la clave de la cuenta Google para este equipo');
+      return;
+    }
+
+    if (specs.googleAccountPassword && !specs.googleAccountEmail) {
+      Alert.alert('Dato requerido', 'Captura también el correo de la cuenta Google');
+      return;
+    }
+
     setSaving(true);
     try {
       const assignedUser = findUserById(form.assignedTo);
@@ -323,7 +338,7 @@ const MobileEnrollmentScreen = () => {
         id: currentEntityId,
         company: form.company as Company,
         name,
-        type: 'phone' as const,
+        type: detectedEquipmentType,
         location,
         status: 'active' as const,
         assignedTo: form.assignedTo || undefined,
@@ -406,6 +421,26 @@ const MobileEnrollmentScreen = () => {
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Datos del Equipo</Text>
+
+        <Text style={styles.label}>Tipo detectado</Text>
+        <View style={styles.typeChipRow}>
+          <TouchableOpacity
+            style={[styles.chip, detectedEquipmentType === 'phone' && styles.chipSelected]}
+            onPress={() => setDetectedEquipmentType('phone')}
+          >
+            <Text style={[styles.chipText, detectedEquipmentType === 'phone' && styles.chipTextSelected]}>
+              Teléfono
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.chip, detectedEquipmentType === 'tablet' && styles.chipSelected]}
+            onPress={() => setDetectedEquipmentType('tablet')}
+          >
+            <Text style={[styles.chipText, detectedEquipmentType === 'tablet' && styles.chipTextSelected]}>
+              Tablet
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <Text style={styles.label}>Empresa</Text>
         {isAdmin ? (
@@ -520,6 +555,7 @@ const MobileEnrollmentScreen = () => {
           autoCapitalize="none"
           autoCorrect={false}
         />
+        <Text style={styles.fieldInlineLabel}>Cuenta Google (correo)</Text>
         <TextInput
           style={styles.input}
           value={form.specs.googleAccountEmail}
@@ -529,12 +565,21 @@ const MobileEnrollmentScreen = () => {
           autoCapitalize="none"
           autoCorrect={false}
         />
+        <View style={styles.passwordHeaderRow}>
+          <Text style={styles.fieldInlineLabel}>Clave de cuenta Google (la asigna TI)</Text>
+          <TouchableOpacity
+            onPress={() => setShowGooglePassword((prev) => !prev)}
+            style={styles.passwordToggle}
+          >
+            <Text style={styles.passwordToggleText}>{showGooglePassword ? 'Ocultar' : 'Mostrar'}</Text>
+          </TouchableOpacity>
+        </View>
         <TextInput
           style={styles.input}
           value={form.specs.googleAccountPassword}
           onChangeText={(value) => setForm((prev) => ({ ...prev, specs: { ...prev.specs, googleAccountPassword: value } }))}
-          placeholder="Contraseña de cuenta Google (manual)"
-          secureTextEntry
+          placeholder="Clave que asignas al equipo"
+          secureTextEntry={!showGooglePassword}
           autoCapitalize="none"
           autoCorrect={false}
         />
@@ -741,6 +786,32 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginTop: 4
   },
+  fieldInlineLabel: {
+    fontSize: 12,
+    color: '#1f2937',
+    fontWeight: '700',
+    marginBottom: 4,
+    marginTop: 2
+  },
+  passwordHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8
+  },
+  passwordToggle: {
+    borderWidth: 1,
+    borderColor: '#1d4ed8',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: '#eff6ff'
+  },
+  passwordToggleText: {
+    fontSize: 11,
+    color: '#1d4ed8',
+    fontWeight: '700'
+  },
   input: {
     borderWidth: 1,
     borderColor: '#d1d5db',
@@ -757,6 +828,11 @@ const styles = StyleSheet.create({
   companyRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8
+  },
+  typeChipRow: {
+    flexDirection: 'row',
     gap: 8,
     marginBottom: 8
   },

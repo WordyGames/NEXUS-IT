@@ -6,6 +6,7 @@ import * as FileSystem from 'expo-file-system';
 export interface DetectedMobilePayload {
   name: string;
   location: string;
+  detectedEquipmentType: 'phone' | 'tablet';
   notes?: string;
   specs: {
     manufacturer?: string;
@@ -46,6 +47,13 @@ const deviceTypeLabel = (deviceType: Device.DeviceType | null): string => {
     default:
       return 'No identificado';
   }
+};
+
+const resolveEquipmentType = (deviceType: Device.DeviceType | null): 'phone' | 'tablet' => {
+  if (deviceType === Device.DeviceType.TABLET) {
+    return 'tablet';
+  }
+  return 'phone';
 };
 
 export const detectCurrentMobileDevice = async (): Promise<DetectedMobilePayload> => {
@@ -102,6 +110,7 @@ export const detectCurrentMobileDevice = async (): Promise<DetectedMobilePayload
   return {
     name: model,
     location,
+    detectedEquipmentType: resolveEquipmentType(dynamicDeviceType),
     notes: notesLines.join('\n'),
     specs: {
       manufacturer,

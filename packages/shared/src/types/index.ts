@@ -25,7 +25,7 @@ export interface Equipment {
   id: string;
   company: Company;
   name: string;
-  type: 'desktop' | 'laptop' | 'phone' | 'server' | 'printer' | 'router' | 'switch' | 'other';
+  type: 'desktop' | 'laptop' | 'phone' | 'tablet' | 'server' | 'printer' | 'router' | 'switch' | 'other';
   specs: EquipmentSpecs;
   location: string;
   assignedTo?: string;

@@ -299,6 +299,7 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
       case 'server':
         return [...baseFields, 'specs.manufacturer', 'specs.model', 'specs.cpu', 'specs.ram', 'specs.storage', 'specs.os', 'specs.hostname', 'specs.ipAddress', 'specs.serialNumber'];
       case 'phone':
+      case 'tablet':
         return [...baseFields, 'specs.manufacturer', 'specs.model', 'specs.os', 'specs.ram', 'specs.storage', 'specs.serialNumber', 'specs.imei', 'specs.phoneNumber', 'specs.googleAccountEmail', 'specs.googleAccountPassword'];
       case 'printer':
         return [...baseFields, 'specs.manufacturer', 'specs.model', 'specs.serialNumber', 'specs.ipAddress'];
@@ -463,6 +464,7 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
             <option value="desktop">Desktop</option>
             <option value="laptop">Laptop</option>
             <option value="phone">Teléfono</option>
+            <option value="tablet">Tablet</option>
             <option value="server">Servidor</option>
             <option value="printer">Impresora</option>
             <option value="router">Router</option>

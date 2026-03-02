@@ -54,6 +54,7 @@ const MyEquipment = () => {
       case 'laptop': return <Computer className="text-blue-500" size={40} />;
       case 'desktop': return <MonitorIcon className="text-purple-500" size={40} />;
       case 'phone': return <Smartphone className="text-green-500" size={40} />;
+      case 'tablet': return <Smartphone className="text-teal-500" size={40} />;
       case 'printer': return <Printer className="text-orange-500" size={40} />;
       case 'network': return <Network className="text-cyan-500" size={40} />;
       default: return <HardDrive className="text-gray-500" size={40} />;

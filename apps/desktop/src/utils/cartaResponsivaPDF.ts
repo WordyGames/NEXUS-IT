@@ -146,9 +146,12 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   addField('Clave', equipment.specs.googleAccountPassword || '________________________');
 
   // ===== BLOQUE DE FIRMAS =====
-  // Subimos la zona de firmas para que no quede tan abajo
-  const firmasOffset = equipment.company === Company.ESPECIAS_NATURALES ? 120 : 105;
-  yPos = Math.max(yPos + 8, pageHeight - firmasOffset);
+  // Fijamos la zona de firmas en una franja más alta y consistente.
+  // Esto evita que quede demasiado abajo, sobre todo en cartas de teléfono.
+  const firmasOffset = equipment.company === Company.ESPECIAS_NATURALES ? 135 : 125;
+  const firmaTopObjetivo = pageHeight - firmasOffset;
+  const firmaTopMinimo = firmaTopObjetivo - 5;
+  yPos = Math.min(Math.max(yPos + 8, firmaTopMinimo), firmaTopObjetivo);
 
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(10);

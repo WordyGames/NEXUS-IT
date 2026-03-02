@@ -268,6 +268,8 @@ const Equipment = () => {
               <option value="">Todos</option>
               <option value="desktop">Desktop</option>
               <option value="laptop">Laptop</option>
+              <option value="phone">Teléfono</option>
+              <option value="tablet">Tablet</option>
               <option value="server">Servidor</option>
               <option value="printer">Impresora</option>
               <option value="router">Router</option>
