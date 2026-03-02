@@ -3,7 +3,9 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+const isFileProtocol = window.location.protocol === 'file:';
+
+if (import.meta.env.PROD && !isFileProtocol && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch((error) => {
       console.error('Service worker registration failed:', error);

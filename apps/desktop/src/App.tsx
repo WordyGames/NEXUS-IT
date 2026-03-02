@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
 import { UpdaterProvider } from './contexts/UpdaterContext';
@@ -22,6 +22,8 @@ import { WarrantyReport } from './components/WarrantyReport';
 
 function App() {
   const [searchOpen, setSearchOpen] = useState(false);
+  const isFileProtocol = window.location.protocol === 'file:';
+  const RouterComponent = isFileProtocol ? HashRouter : BrowserRouter;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -42,7 +44,7 @@ function App() {
   }, []);
 
   return (
-    <Router>
+    <RouterComponent>
       <AuthProvider>
         <UpdaterProvider>
           <UiFeedbackProvider>
@@ -84,11 +86,12 @@ function App() {
                 <Route path="users" element={<Users />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </UiFeedbackProvider>
         </UpdaterProvider>
       </AuthProvider>
-    </Router>
+    </RouterComponent>
   );
 }
 
