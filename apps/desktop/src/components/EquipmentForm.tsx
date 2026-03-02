@@ -60,6 +60,8 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [detecting, setDetecting] = useState(false);
+  const [isPortableMode, setIsPortableMode] = useState(false);
+  const [autoDetectAttempted, setAutoDetectAttempted] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>(equipment?.attachments || []);
   const [pendingDeleteAttachments, setPendingDeleteAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -100,6 +102,20 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
     loadUsers();
   }, []);
 
+  useEffect(() => {
+    const loadRuntimeContext = async () => {
+      try {
+        const context = await window.electron?.getRuntimeContext?.();
+        setIsPortableMode(Boolean(context?.isPortableMode));
+      } catch (error) {
+        console.error('Error loading runtime context:', error);
+        setIsPortableMode(false);
+      }
+    };
+
+    void loadRuntimeContext();
+  }, []);
+
   const loadUsers = async () => {
     try {
       const data = await getUsers();
@@ -129,7 +145,7 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
     }
   };
 
-  const handleDetectSpecs = async () => {
+  const handleDetectSpecs = async (isAutomatic = false) => {
     setDetecting(true);
     try {
       // Verificar que estamos en Electron
@@ -150,21 +166,56 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
         }
       }));
       showToast({
-        type: 'success',
-        title: 'Especificaciones detectadas',
-        message: 'La informacion del equipo se detecto correctamente'
+        type: isAutomatic ? 'info' : 'success',
+        title: isAutomatic ? 'Modo USB detectado' : 'Especificaciones detectadas',
+        message: isAutomatic
+          ? 'Se detectaron automaticamente las especificaciones del equipo'
+          : 'La informacion del equipo se detecto correctamente'
       });
     } catch (error: any) {
       console.error('Error detectando specs:', error);
-      showToast({
-        type: 'error',
-        title: 'Error al detectar especificaciones',
-        message: error.message || 'No se pudieron detectar las especificaciones'
-      });
+      if (!isAutomatic) {
+        showToast({
+          type: 'error',
+          title: 'Error al detectar especificaciones',
+          message: error.message || 'No se pudieron detectar las especificaciones'
+        });
+      }
     } finally {
       setDetecting(false);
     }
   };
+
+  const hasDetectedSpecs = useMemo(() => {
+    const specs = formData.specs;
+    return Boolean(
+      specs.cpu ||
+      specs.gpu ||
+      specs.ram ||
+      specs.storage ||
+      specs.os ||
+      specs.hostname ||
+      specs.serialNumber ||
+      specs.model ||
+      specs.manufacturer
+    );
+  }, [formData.specs]);
+
+  useEffect(() => {
+    const canAutoDetectType = formData.type === 'desktop' || formData.type === 'laptop';
+
+    if (equipment) return;
+    if (!isPortableMode) return;
+    if (!canAutoDetectType) return;
+    if (autoDetectAttempted) return;
+    if (hasDetectedSpecs) {
+      setAutoDetectAttempted(true);
+      return;
+    }
+
+    setAutoDetectAttempted(true);
+    void handleDetectSpecs(true);
+  }, [equipment, isPortableMode, formData.type, autoDetectAttempted, hasDetectedSpecs]);
 
   const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !userData) return;
@@ -513,9 +564,14 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
         {/* Botón para detectar specs automáticamente */}
         {(formData.type === 'desktop' || formData.type === 'laptop') && window.electron?.detectSystemSpecs && (
           <div className="mb-4">
+            {isPortableMode && !equipment && (
+              <p className="text-xs text-blue-600 dark:text-blue-300 mb-2 text-center">
+                Modo USB activo: la detección se ejecuta automáticamente al crear el equipo.
+              </p>
+            )}
             <button
               type="button"
-              onClick={handleDetectSpecs}
+              onClick={() => { void handleDetectSpecs(); }}
               disabled={detecting}
               className="w-full px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
             >

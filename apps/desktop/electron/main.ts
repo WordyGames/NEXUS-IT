@@ -9,6 +9,18 @@ const execAsync = promisify(exec);
 
 let mainWindow: BrowserWindow | null = null;
 
+const getRuntimeContext = () => {
+  const portableExecutableDir = process.env.PORTABLE_EXECUTABLE_DIR;
+  const portableExecutableFile = process.env.PORTABLE_EXECUTABLE_FILE;
+
+  return {
+    isPortableMode: Boolean(portableExecutableDir || portableExecutableFile),
+    portableExecutableDir: portableExecutableDir || undefined,
+    portableExecutableFile: portableExecutableFile || undefined,
+    platform: process.platform
+  };
+};
+
 // Auto-updater configuration
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
@@ -88,6 +100,10 @@ ipcMain.on('install-update', () => {
 
 ipcMain.on('check-for-updates', () => {
   checkForUpdates();
+});
+
+ipcMain.handle('get-runtime-context', async () => {
+  return getRuntimeContext();
 });
 
 // System info detection

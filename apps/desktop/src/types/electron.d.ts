@@ -10,10 +10,18 @@ export interface SystemSpecs {
   manufacturer?: string;
 }
 
+export interface RuntimeContext {
+  isPortableMode: boolean;
+  portableExecutableDir?: string;
+  portableExecutableFile?: string;
+  platform: string;
+}
+
 declare global {
   interface Window {
     electron?: {
       detectSystemSpecs: () => Promise<SystemSpecs>;
+      getRuntimeContext: () => Promise<RuntimeContext>;
       onUpdateAvailable: (callback: (info: any) => void) => void;
       onDownloadProgress: (callback: (progress: any) => void) => void;
       onUpdateDownloaded: (callback: (info: any) => void) => void;

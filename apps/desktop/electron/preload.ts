@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('electron', {
   // System info detection
   detectSystemSpecs: () => ipcRenderer.invoke('detect-system-specs'),
+  getRuntimeContext: () => ipcRenderer.invoke('get-runtime-context'),
   
   // Auto-updater
   onUpdateAvailable: (callback: (info: any) => void) => {
