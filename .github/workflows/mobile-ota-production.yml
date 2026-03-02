@@ -1,0 +1,51 @@
+name: Mobile OTA Production
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/shared/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/mobile-ota-production.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: mobile-ota-production
+  cancel-in-progress: true
+
+jobs:
+  publish-ota:
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validar EXPO_TOKEN
+        run: |
+          if [ -z "${EXPO_TOKEN}" ]; then
+            echo "❌ Falta el secreto EXPO_TOKEN en GitHub Actions."
+            echo "Agrega EXPO_TOKEN en: Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Publicar OTA (production)
+        working-directory: apps/mobile
+        run: |
+          npm run prepare:expo
+          SHORT_SHA="${GITHUB_SHA::7}"
+          npx eas update --channel production --message "ci(ota): ${SHORT_SHA}" --non-interactive
