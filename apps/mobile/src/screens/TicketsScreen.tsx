@@ -16,8 +16,11 @@ import {
   TicketCategory,
   TicketPriority,
   TicketStatus,
+  addTicketComment,
   createTicket,
-  getTickets
+  getTickets,
+  triggerTicketStatusChange,
+  updateTicket
 } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -91,7 +94,13 @@ const TicketsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [changingTicketId, setChangingTicketId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+
+  const normalizedUsername = userData?.username?.trim().toLowerCase() || '';
+  const canManageTicketStatus = normalizedUsername === 'lsolis';
+  const canViewAllTickets = isAdmin || canManageTicketStatus;
+  const currentUserDisplayName = userData?.name || userData?.username || 'Usuario';
 
   const [form, setForm] = useState({
     title: '',
@@ -115,8 +124,8 @@ const TicketsScreen = () => {
     }
 
     try {
-      const baseData = await getTickets(isAdmin ? undefined : { company: userData.company as Company });
-      if (isAdmin) {
+      const baseData = await getTickets(canViewAllTickets ? undefined : { company: userData.company as Company });
+      if (canViewAllTickets) {
         setTickets(baseData);
         return;
       }
@@ -139,7 +148,7 @@ const TicketsScreen = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [isAdmin, userData]);
+  }, [canViewAllTickets, userData]);
 
   useEffect(() => {
     void loadTickets();
@@ -198,6 +207,70 @@ const TicketsScreen = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleChangeTicketStatus = async (ticket: Ticket, newStatus: TicketStatus) => {
+    if (!userData?.id) {
+      Alert.alert('Sesión requerida', 'Inicia sesión para actualizar tickets');
+      return;
+    }
+
+    if (!canManageTicketStatus) {
+      Alert.alert('Sin permisos', 'Solo el perfil lsolis puede cerrar o actualizar tickets desde celular.');
+      return;
+    }
+
+    const currentStatus = normalizeStatus((ticket as any).status);
+    if (currentStatus === newStatus) return;
+
+    setChangingTicketId(ticket.id);
+    try {
+      await updateTicket(ticket.id, { status: newStatus });
+
+      await addTicketComment(ticket.id, {
+        userId: userData.id,
+        userName: currentUserDisplayName,
+        text: `Estado cambiado a: ${STATUS_LABELS[newStatus]} (móvil)`
+      });
+
+      await triggerTicketStatusChange(
+        { ...ticket, status: newStatus },
+        currentStatus,
+        userData.id,
+        currentUserDisplayName
+      );
+
+      Alert.alert('Ticket actualizado', `El ticket ahora está: ${STATUS_LABELS[newStatus]}`);
+      setLoading(true);
+      await loadTickets();
+    } catch (error: any) {
+      console.error('Error updating mobile ticket status:', error);
+      Alert.alert('Error', error?.message || 'No se pudo actualizar el ticket');
+    } finally {
+      setChangingTicketId(null);
+    }
+  };
+
+  const handleCloseTicket = (ticket: Ticket) => {
+    const currentStatus = normalizeStatus((ticket as any).status);
+    if (currentStatus === TicketStatus.CLOSED || currentStatus === TicketStatus.CANCELLED) {
+      return;
+    }
+
+    Alert.alert(
+      'Cerrar ticket',
+      `¿Deseas cerrar el ticket ${ticket.ticketNumber || ''}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Cerrar',
+          style: 'destructive',
+          onPress: () => {
+            void handleChangeTicketStatus(ticket, TicketStatus.CLOSED);
+          }
+        }
+      ]
+    );
   };
 
   const onRefresh = () => {
@@ -350,6 +423,40 @@ const TicketsScreen = () => {
                   <Text style={styles.footerText}>
                     {ticket.company} • {ticket.createdByName || 'Usuario'}
                   </Text>
+
+                  {canManageTicketStatus && safeStatus !== TicketStatus.CLOSED && safeStatus !== TicketStatus.CANCELLED && (
+                    <View style={styles.actionsRow}>
+                      {safeStatus !== TicketStatus.IN_PROGRESS && (
+                        <TouchableOpacity
+                          style={[styles.actionButton, styles.progressButton, changingTicketId === ticket.id && styles.buttonDisabled]}
+                          disabled={changingTicketId === ticket.id}
+                          onPress={() => { void handleChangeTicketStatus(ticket, TicketStatus.IN_PROGRESS); }}
+                        >
+                          <Text style={styles.actionButtonText}>En progreso</Text>
+                        </TouchableOpacity>
+                      )}
+
+                      {safeStatus !== TicketStatus.RESOLVED && (
+                        <TouchableOpacity
+                          style={[styles.actionButton, styles.resolveButton, changingTicketId === ticket.id && styles.buttonDisabled]}
+                          disabled={changingTicketId === ticket.id}
+                          onPress={() => { void handleChangeTicketStatus(ticket, TicketStatus.RESOLVED); }}
+                        >
+                          <Text style={styles.actionButtonText}>Resolver</Text>
+                        </TouchableOpacity>
+                      )}
+
+                      <TouchableOpacity
+                        style={[styles.actionButton, styles.closeButton, changingTicketId === ticket.id && styles.buttonDisabled]}
+                        disabled={changingTicketId === ticket.id}
+                        onPress={() => { handleCloseTicket(ticket); }}
+                      >
+                        <Text style={styles.actionButtonText}>
+                          {changingTicketId === ticket.id ? 'Actualizando...' : 'Cerrar ticket'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </>
               );
             })()}
@@ -510,6 +617,31 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 12,
     color: '#6b7280'
+  },
+  actionsRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap'
+  },
+  actionButton: {
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10
+  },
+  actionButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  progressButton: {
+    backgroundColor: '#a16207'
+  },
+  resolveButton: {
+    backgroundColor: '#1d4ed8'
+  },
+  closeButton: {
+    backgroundColor: '#b91c1c'
   },
   badge: {
     borderRadius: 999,
