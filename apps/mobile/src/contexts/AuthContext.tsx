@@ -34,6 +34,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const MOBILE_SESSION_KEY = 'nexus-it-mobile-session-id';
+const MOBILE_LAST_PROFILE_KEY = 'nexus-it-mobile-last-profile';
 const SESSION_RESTORE_TIMEOUT_MS = 8000;
 
 type SessionWithId = UserSession & { id?: string };
@@ -105,6 +106,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (session) {
         const data = await getUserById(session.userId);
         setUserData(data);
+
+        if (data?.username) {
+          await AsyncStorage.setItem(
+            MOBILE_LAST_PROFILE_KEY,
+            JSON.stringify({
+              username: data.username,
+              name: data.name || ''
+            })
+          );
+        }
       } else {
         setUserData(null);
       }
@@ -122,7 +133,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (username: string, password: string) => {
-    const session = await signIn(username, password) as SessionWithId;
+    const normalizedUsername = username.trim().toLowerCase();
+    const session = await signIn(normalizedUsername, password) as SessionWithId;
 
     if (session.id) {
       await AsyncStorage.setItem(MOBILE_SESSION_KEY, session.id);
@@ -132,6 +144,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const data = await getUserById(session.userId);
     setUserData(data);
+
+    if (data?.username) {
+      await AsyncStorage.setItem(
+        MOBILE_LAST_PROFILE_KEY,
+        JSON.stringify({
+          username: data.username,
+          name: data.name || ''
+        })
+      );
+    }
   };
 
   const register: AuthContextType['register'] = async ({
