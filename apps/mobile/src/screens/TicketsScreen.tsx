@@ -88,7 +88,7 @@ const normalizeCategory = (value: unknown): TicketCategory => (
   isTicketCategory(value) ? value : TicketCategory.OTHER
 );
 
-const TicketsScreen = () => {
+const TicketsScreen = ({ route }: any) => {
   const { userData, isAdmin } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,6 +153,12 @@ const TicketsScreen = () => {
   useEffect(() => {
     void loadTickets();
   }, [loadTickets]);
+
+  useEffect(() => {
+    if (route?.params?.openCreate) {
+      setShowForm(true);
+    }
+  }, [route?.params?.openCreate]);
 
   const resetForm = () => {
     setForm({

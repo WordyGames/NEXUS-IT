@@ -19,6 +19,8 @@ import {
 
 const DashboardScreen = ({ navigation }: any) => {
   const { userData, logout, isAdmin } = useAuth();
+  const normalizedUsername = userData?.username?.trim().toLowerCase() || '';
+  const canSeeGlobalDashboard = isAdmin || normalizedUsername === 'lsolis';
   const [stats, setStats] = useState<any>(null);
   const [userEquipmentCount, setUserEquipmentCount] = useState(0);
   const [userTicketsCount, setUserTicketsCount] = useState(0);
@@ -27,7 +29,7 @@ const DashboardScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     void loadStats();
-  }, [isAdmin, userData?.id, userData?.username, userData?.name]);
+  }, [canSeeGlobalDashboard, userData?.id, userData?.username, userData?.name]);
 
   const getTicketSortValue = (ticket: Ticket) => {
     const createdAt: any = ticket.createdAt;
@@ -79,13 +81,16 @@ const DashboardScreen = ({ navigation }: any) => {
 
   const loadStats = async () => {
     try {
-      const [equipmentStats, ticketStats] = await Promise.all([
-        getEquipmentStats(),
-        getTicketStats()
-      ]);
-      setStats({ equipment: equipmentStats, tickets: ticketStats });
-
-      if (!isAdmin && userData?.id) {
+      if (canSeeGlobalDashboard) {
+        const [equipmentStats, ticketStats] = await Promise.all([
+          getEquipmentStats(),
+          getTicketStats()
+        ]);
+        setStats({ equipment: equipmentStats, tickets: ticketStats });
+        setUserEquipmentCount(0);
+        setUserTicketsCount(0);
+        setRecentTickets([]);
+      } else if (userData?.id) {
         const [assignedEquipment, userTickets] = await Promise.all([
           getEquipment({ assignedTo: userData.id }),
           loadUserTickets()
@@ -93,11 +98,13 @@ const DashboardScreen = ({ navigation }: any) => {
 
         setUserEquipmentCount(assignedEquipment.length);
         setUserTicketsCount(userTickets.length);
-        setRecentTickets(userTickets.slice(0, 5));
+        setRecentTickets([]);
+        setStats(null);
       } else {
         setUserEquipmentCount(0);
         setUserTicketsCount(0);
         setRecentTickets([]);
+        setStats(null);
       }
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -130,38 +137,40 @@ const DashboardScreen = ({ navigation }: any) => {
 
       <View style={styles.statsGrid}>
         <View style={[styles.statCard, { backgroundColor: '#3b82f6' }]}>
-          <Text style={styles.statLabel}>{isAdmin ? 'Equipos' : 'Mis Equipos'}</Text>
+          <Text style={styles.statLabel}>{canSeeGlobalDashboard ? 'Equipos' : 'Mis Equipos'}</Text>
           <Text style={styles.statValue}>
-            {isAdmin ? (stats?.equipment.total || 0) : userEquipmentCount}
+            {canSeeGlobalDashboard ? (stats?.equipment.total || 0) : userEquipmentCount}
           </Text>
         </View>
 
         <View style={[styles.statCard, { backgroundColor: '#10b981' }]}>
-          <Text style={styles.statLabel}>{isAdmin ? 'Tickets' : 'Mis Tickets'}</Text>
+          <Text style={styles.statLabel}>{canSeeGlobalDashboard ? 'Tickets' : 'Mis Tickets'}</Text>
           <Text style={styles.statValue}>
-            {isAdmin ? (stats?.tickets.total || 0) : userTicketsCount}
+            {canSeeGlobalDashboard ? (stats?.tickets.total || 0) : userTicketsCount}
           </Text>
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Empresas</Text>
-        {Object.values(Company).map((company) => (
-          <View key={company} style={styles.companyCard}>
-            <Text style={styles.companyName}>{company}</Text>
-            <Text style={styles.companyCount}>
-              {stats?.equipment.byCompany?.[company] || 0} equipos
-            </Text>
-          </View>
-        ))}
-      </View>
+      {canSeeGlobalDashboard && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Empresas</Text>
+          {Object.values(Company).map((company) => (
+            <View key={company} style={styles.companyCard}>
+              <Text style={styles.companyName}>{company}</Text>
+              <Text style={styles.companyCount}>
+                {stats?.equipment.byCompany?.[company] || 0} equipos
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       <View style={styles.actions}>
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => navigation.navigate('Equipment')}
         >
-          <Text style={styles.actionButtonText}>{isAdmin ? 'Ver Equipos' : 'Mis Equipos'}</Text>
+          <Text style={styles.actionButtonText}>{canSeeGlobalDashboard ? 'Ver Equipos' : 'Mis Equipos'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -170,6 +179,15 @@ const DashboardScreen = ({ navigation }: any) => {
         >
           <Text style={styles.actionButtonText}>Ver Tickets</Text>
         </TouchableOpacity>
+
+        {!canSeeGlobalDashboard && (
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('Tickets', { openCreate: true })}
+          >
+            <Text style={styles.actionButtonText}>Crear Ticket</Text>
+          </TouchableOpacity>
+        )}
 
         {isAdmin && (
           <TouchableOpacity
@@ -180,7 +198,7 @@ const DashboardScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         )}
 
-        {!isAdmin && recentTickets.length > 0 && (
+        {canSeeGlobalDashboard && !isAdmin && recentTickets.length > 0 && (
           <View style={styles.recentSection}>
             <Text style={styles.recentTitle}>Tickets Recientes</Text>
             {recentTickets.map((ticket) => (
