@@ -41,6 +41,12 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   // Ajustar márgenes según la empresa para mejor alineación
   const margin = equipment.company === Company.ESPECIAS_NATURALES ? 30 : 20;
   let yPos = margin;
+  const compactLayout = {
+    sectionTitleGap: 8,
+    fieldLineHeight: 4.2,
+    sectionGap: 2.5,
+    conditionLineHeight: 3.6
+  };
 
   // ===== AGREGAR IMAGEN DE FONDO =====
   const backgroundImage = COMPANY_BACKGROUNDS[equipment.company];
@@ -73,7 +79,7 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.3);
     doc.line(titleX, yPos + 0.8, titleX + titleWidth, yPos + 0.8);
-    yPos += 14;
+    yPos += compactLayout.sectionTitleGap;
   };
 
   const addField = (label: string, value: string) => {
@@ -81,7 +87,7 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
     doc.text(label + ':', margin + 5, yPos);
     doc.setFont('helvetica', 'normal');
     doc.text(value, margin + 40, yPos);
-    yPos += 6;
+    yPos += compactLayout.fieldLineHeight;
   };
 
   // ===== INFORMACIÓN DEL EMPLEADO =====
@@ -91,10 +97,9 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
 
   addField('Nombre', employee.name || 'N/A');
   addField('Puesto', employee.position || employee.department || 'N/A');
-  addField('Teléfono', employee.phone || 'N/A');
   addField('Empresa', equipment.company);
 
-  yPos += 5;
+  yPos += compactLayout.sectionGap;
 
   // ===== EQUIPO ASIGNADO =====
   addSectionTitle('EQUIPO ASIGNADO');
@@ -113,12 +118,12 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   addField('Storage', equipment.specs.storage || 'N/A');
   addField('Hostname', equipment.specs.hostname || 'N/A');
 
-  yPos += 5;
+  yPos += compactLayout.sectionGap;
 
   // ===== CONDICIONES Y RESPONSABILIDADES =====
   addSectionTitle('CONDICIONES Y RESPONSABILIDADES');
   doc.setTextColor(0, 0, 0);
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
 
   const conditions = [
     'El empleado se compromete a cuidar y usar adecuadamente el equipo asignado.',
@@ -133,10 +138,10 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   conditions.forEach((condition, index) => {
     const lines = doc.splitTextToSize(`${index + 1}. ${condition}`, pageWidth - 2 * margin - 10);
     doc.text(lines, margin + 5, yPos);
-    yPos += lines.length * 5;
+    yPos += lines.length * compactLayout.conditionLineHeight;
   });
 
-  yPos += 5;
+  yPos += compactLayout.sectionGap;
 
   // ===== NOTAS ADICIONALES =====
   addSectionTitle('NOTAS ADICIONALES');
@@ -146,32 +151,36 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   addField('Clave', equipment.specs.googleAccountPassword || '________________________');
 
   // ===== BLOQUE DE FIRMAS =====
-  // Fijamos la zona de firmas en una franja más alta y consistente.
-  // Esto evita que quede demasiado abajo, sobre todo en cartas de teléfono.
-  const firmasOffset = equipment.company === Company.ESPECIAS_NATURALES ? 135 : 125;
-  const firmaTopObjetivo = pageHeight - firmasOffset;
-  const firmaTopMinimo = firmaTopObjetivo - 5;
-  yPos = Math.min(Math.max(yPos + 8, firmaTopMinimo), firmaTopObjetivo);
+  // Posicionar firmas de forma dinámica para evitar solapamiento con el contenido.
+  const signatureBlockHeight = 24;
+  const signatureTopPadding = 4;
+  const footerY = pageHeight - 10;
+  const maxSignatureTop = footerY - signatureBlockHeight;
+  const desiredSignatureTop = yPos + signatureTopPadding;
+  yPos = Math.min(desiredSignatureTop, maxSignatureTop);
 
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(10);
 
   const signatureWidth = (pageWidth - 2 * margin - 20) / 2;
+  const signatureLineY = yPos + 12;
+  const signatureLabelY = yPos + 17;
+  const signatureNameY = yPos + 22;
   
   // Firma Empleado
-  doc.line(margin + 10, yPos + 15, margin + 10 + signatureWidth, yPos + 15);
+  doc.line(margin + 10, signatureLineY, margin + 10 + signatureWidth, signatureLineY);
   doc.setFont('helvetica', 'bold');
-  doc.text('Firma del Empleado', margin + 10 + signatureWidth / 2, yPos + 20, { align: 'center' });
+  doc.text('Firma del Empleado', margin + 10 + signatureWidth / 2, signatureLabelY, { align: 'center' });
   doc.setFont('helvetica', 'normal');
-  doc.text(employee.name || '', margin + 10 + signatureWidth / 2, yPos + 25, { align: 'center' });
+  doc.text(employee.name || '', margin + 10 + signatureWidth / 2, signatureNameY, { align: 'center' });
 
   // Firma RH/Sistemas
   const xPosRH = margin + 20 + signatureWidth;
-  doc.line(xPosRH, yPos + 15, xPosRH + signatureWidth, yPos + 15);
+  doc.line(xPosRH, signatureLineY, xPosRH + signatureWidth, signatureLineY);
   doc.setFont('helvetica', 'bold');
-  doc.text('RH/SISTEMAS', xPosRH + signatureWidth / 2, yPos + 20, { align: 'center' });
+  doc.text('RH/SISTEMAS', xPosRH + signatureWidth / 2, signatureLabelY, { align: 'center' });
   doc.setFont('helvetica', 'normal');
-  doc.text(generatedBy, xPosRH + signatureWidth / 2, yPos + 25, { align: 'center' });
+  doc.text(generatedBy, xPosRH + signatureWidth / 2, signatureNameY, { align: 'center' });
 
   // ===== PIE DE PÁGINA =====
   doc.setFontSize(8);
