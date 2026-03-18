@@ -124,6 +124,62 @@ export const exportEquipmentToExcel = (
       return assignedUserNamesById[eq.assignedTo] || 'Usuario no disponible';
     };
 
+    const assignedCount = sortedEquipment.filter((eq) => Boolean(eq.assignedTo)).length;
+    const unassignedCount = sortedEquipment.length - assignedCount;
+
+    const byCompany = sortedEquipment.reduce<Record<string, number>>((acc, eq) => {
+      acc[eq.company] = (acc[eq.company] || 0) + 1;
+      return acc;
+    }, {});
+
+    const byStatus = sortedEquipment.reduce<Record<string, number>>((acc, eq) => {
+      acc[eq.status] = (acc[eq.status] || 0) + 1;
+      return acc;
+    }, {});
+
+    const warrantyStatusCount = sortedEquipment.reduce<Record<string, number>>((acc, eq) => {
+      const status = getWarrantySnapshot(eq.warrantyExpiration).status;
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {});
+
+    const summaryData: Array<{ 'Sección': string; 'Métrica': string; 'Valor': string | number }> = [
+      { 'Sección': 'General', 'Métrica': 'Total de equipos', 'Valor': sortedEquipment.length },
+      { 'Sección': 'General', 'Métrica': 'Equipos asignados', 'Valor': assignedCount },
+      {
+        'Sección': 'General',
+        'Métrica': '% de asignación',
+        'Valor': sortedEquipment.length > 0
+          ? `${((assignedCount / sortedEquipment.length) * 100).toFixed(1)}%`
+          : '0.0%'
+      },
+      { 'Sección': 'General', 'Métrica': 'Equipos sin asignar', 'Valor': unassignedCount },
+      { 'Sección': 'General', 'Métrica': 'Generado el', 'Valor': new Date().toLocaleString('es-MX') },
+      { 'Sección': '', 'Métrica': '', 'Valor': '' }
+    ];
+
+    Object.entries(byCompany)
+      .sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }))
+      .forEach(([company, count]) => {
+        summaryData.push({ 'Sección': 'Por empresa', 'Métrica': company, 'Valor': count });
+      });
+
+    summaryData.push({ 'Sección': '', 'Métrica': '', 'Valor': '' });
+
+    Object.entries(byStatus)
+      .sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }))
+      .forEach(([status, count]) => {
+        summaryData.push({ 'Sección': 'Por estado', 'Métrica': status, 'Valor': count });
+      });
+
+    summaryData.push({ 'Sección': '', 'Métrica': '', 'Valor': '' });
+
+    Object.entries(warrantyStatusCount)
+      .sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }))
+      .forEach(([warrantyStatus, count]) => {
+        summaryData.push({ 'Sección': 'Garantías', 'Métrica': warrantyStatus, 'Valor': count });
+      });
+
     // Hoja 1: Inventario (vista operativa)
     const inventoryData = sortedEquipment.map((eq) => {
       const warranty = getWarrantySnapshot(eq.warrantyExpiration);
@@ -179,8 +235,15 @@ export const exportEquipmentToExcel = (
 
     // Crear workbook y worksheets
     const wb = XLSX.utils.book_new();
+    const wsSummary = XLSX.utils.json_to_sheet(summaryData);
     const wsInventory = XLSX.utils.json_to_sheet(inventoryData);
     const wsTechnicalDetail = XLSX.utils.json_to_sheet(technicalDetailData);
+
+    wsSummary['!cols'] = [
+      { wch: 18 }, // Sección
+      { wch: 36 }, // Métrica
+      { wch: 20 }  // Valor
+    ];
 
     // Anchos de columnas para mejor lectura
     wsInventory['!cols'] = [
@@ -228,9 +291,11 @@ export const exportEquipmentToExcel = (
       { wch: 44 }  // Notas
     ];
 
+    applySheetTableOptions(wsSummary, summaryData.length, Object.keys(summaryData[0] || {}).length);
     applySheetTableOptions(wsInventory, inventoryData.length, Object.keys(inventoryData[0] || {}).length);
     applySheetTableOptions(wsTechnicalDetail, technicalDetailData.length, Object.keys(technicalDetailData[0] || {}).length);
 
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen');
     XLSX.utils.book_append_sheet(wb, wsInventory, 'Inventario');
     XLSX.utils.book_append_sheet(wb, wsTechnicalDetail, 'Detalle técnico');
 
