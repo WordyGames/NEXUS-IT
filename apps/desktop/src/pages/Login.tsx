@@ -11,6 +11,15 @@ const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  const resolveInitialRoute = (user: any): string => {
+    if (hasUserPermission(user, UserPermission.DASHBOARD_ADMIN)) return '/dashboard';
+    if (hasUserPermission(user, UserPermission.EQUIPMENT_VIEW)) return '/equipment';
+    if (hasUserPermission(user, UserPermission.TICKETS_VIEW)) return '/tickets';
+    if (hasUserPermission(user, UserPermission.MAINTENANCES_VIEW)) return '/maintenances';
+    if (hasUserPermission(user, UserPermission.NOTIFICATIONS_VIEW)) return '/notifications';
+    return '/portal';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -22,9 +31,7 @@ const Login = () => {
         setError('No se pudo obtener los datos del usuario');
         return;
       }
-      navigate(
-        hasUserPermission(user, UserPermission.DASHBOARD_ADMIN) ? '/dashboard' : '/portal'
-      );
+      navigate(resolveInitialRoute(user));
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión');
     } finally {

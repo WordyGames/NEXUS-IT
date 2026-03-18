@@ -70,7 +70,7 @@ function App() {
               <Route
                 path="/"
                 element={
-                  <PrivateRoute requireAdminPanel>
+                  <PrivateRoute>
                     <Layout />
                   </PrivateRoute>
                 }

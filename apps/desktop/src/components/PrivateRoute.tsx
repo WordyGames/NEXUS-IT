@@ -12,6 +12,15 @@ interface PrivateRouteProps {
 const PrivateRoute = ({ children, requiredPermission, requireAdminPanel = false }: PrivateRouteProps) => {
   const { currentSession, loading, hasPermission } = useAuth();
 
+  const getFallbackRoute = () => {
+    if (hasPermission(UserPermission.DASHBOARD_ADMIN)) return '/dashboard';
+    if (hasPermission(UserPermission.EQUIPMENT_VIEW)) return '/equipment';
+    if (hasPermission(UserPermission.TICKETS_VIEW)) return '/tickets';
+    if (hasPermission(UserPermission.MAINTENANCES_VIEW)) return '/maintenances';
+    if (hasPermission(UserPermission.NOTIFICATIONS_VIEW)) return '/notifications';
+    return '/portal';
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -25,14 +34,11 @@ const PrivateRoute = ({ children, requiredPermission, requireAdminPanel = false 
   }
 
   if (requireAdminPanel && !hasPermission(UserPermission.DASHBOARD_ADMIN)) {
-    return <Navigate to="/portal" replace />;
+    return <Navigate to={getFallbackRoute()} replace />;
   }
 
   if (requiredPermission && !hasPermission(requiredPermission)) {
-    if (hasPermission(UserPermission.DASHBOARD_ADMIN)) {
-      return <Navigate to="/dashboard" replace />;
-    }
-    return <Navigate to="/portal" replace />;
+    return <Navigate to={getFallbackRoute()} replace />;
   }
 
   return <>{children}</>;

@@ -79,6 +79,50 @@ const permissionGroups: Array<{ title: string; permissions: UserPermission[] }> 
   }
 ];
 
+const normalizePermissionDependencies = (
+  values: Record<UserPermission, boolean>
+): Record<UserPermission, boolean> => {
+  const normalized = { ...values };
+
+  // Equipos
+  if (normalized[UserPermission.EQUIPMENT_MANAGE]) {
+    normalized[UserPermission.EQUIPMENT_VIEW] = true;
+  }
+  if (!normalized[UserPermission.EQUIPMENT_VIEW]) {
+    normalized[UserPermission.EQUIPMENT_MANAGE] = false;
+  }
+
+  // Mantenimientos
+  if (normalized[UserPermission.MAINTENANCES_MANAGE]) {
+    normalized[UserPermission.MAINTENANCES_VIEW] = true;
+  }
+  if (!normalized[UserPermission.MAINTENANCES_VIEW]) {
+    normalized[UserPermission.MAINTENANCES_MANAGE] = false;
+  }
+
+  // Tickets
+  if (
+    normalized[UserPermission.TICKETS_VIEW_ALL] ||
+    normalized[UserPermission.TICKETS_CHANGE_STATUS]
+  ) {
+    normalized[UserPermission.TICKETS_VIEW] = true;
+  }
+  if (!normalized[UserPermission.TICKETS_VIEW]) {
+    normalized[UserPermission.TICKETS_VIEW_ALL] = false;
+    normalized[UserPermission.TICKETS_CHANGE_STATUS] = false;
+  }
+
+  // Usuarios
+  if (normalized[UserPermission.USERS_MANAGE]) {
+    normalized[UserPermission.USERS_VIEW] = true;
+  }
+  if (!normalized[UserPermission.USERS_VIEW]) {
+    normalized[UserPermission.USERS_MANAGE] = false;
+  }
+
+  return normalized;
+};
+
 const Users = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -313,19 +357,25 @@ const Users = () => {
   const handleOpenPermissionsModal = (user: User) => {
     setSelectedUser(user);
     setPermissionRole(user.role);
-    setPermissionValues(resolveUserPermissions(user));
+    setPermissionValues(normalizePermissionDependencies(resolveUserPermissions(user)));
     setShowPermissionsModal(true);
   };
 
   const handlePermissionToggle = (permission: UserPermission, enabled: boolean) => {
-    setPermissionValues((prev) => ({
-      ...prev,
-      [permission]: enabled
-    }));
+    setPermissionValues((prev) => {
+      const updated = {
+        ...prev,
+        [permission]: enabled
+      };
+
+      return normalizePermissionDependencies(updated);
+    });
   };
 
   const handleApplyRoleDefaults = () => {
-    setPermissionValues(getDefaultPermissionsForRole(permissionRole));
+    setPermissionValues(
+      normalizePermissionDependencies(getDefaultPermissionsForRole(permissionRole))
+    );
   };
 
   const handleSavePermissions = async () => {
@@ -352,7 +402,8 @@ const Users = () => {
     }
 
     try {
-      const permissionOverrides = getPermissionOverrides(permissionRole, permissionValues);
+      const normalizedPermissions = normalizePermissionDependencies(permissionValues);
+      const permissionOverrides = getPermissionOverrides(permissionRole, normalizedPermissions);
 
       await updateUser(selectedUser.id, {
         role: permissionRole,
@@ -789,7 +840,9 @@ const Users = () => {
                   onChange={(e) => {
                     const nextRole = e.target.value as UserRole;
                     setPermissionRole(nextRole);
-                    setPermissionValues(getDefaultPermissionsForRole(nextRole));
+                    setPermissionValues(
+                      normalizePermissionDependencies(getDefaultPermissionsForRole(nextRole))
+                    );
                   }}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
                 >
