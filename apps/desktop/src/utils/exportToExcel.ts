@@ -1,10 +1,16 @@
 import * as XLSX from 'xlsx';
 import { Equipment, Ticket, Maintenance, MaintenanceStatus } from '@nexus-it/shared';
 
+type AssignedUserNamesById = Record<string, string>;
+
 /**
  * Exporta equipos a Excel
  */
-export const exportEquipmentToExcel = (equipment: Equipment[], filename = 'equipos') => {
+export const exportEquipmentToExcel = (
+  equipment: Equipment[],
+  filename = 'equipos',
+  assignedUserNamesById: AssignedUserNamesById = {}
+) => {
   try {
     // Preparar datos para Excel
     const data = equipment.map(eq => ({
@@ -21,7 +27,9 @@ export const exportEquipmentToExcel = (equipment: Equipment[], filename = 'equip
       'Hostname': eq.specs?.hostname || '-',
       'Serial': eq.specs?.serialNumber || '-',
       'Ubicación': eq.location,
-      'Asignado a': eq.assignedTo || 'Sin asignar',
+      'Asignado a': eq.assignedTo
+        ? assignedUserNamesById[eq.assignedTo] || 'Usuario no disponible'
+        : 'Sin asignar',
       'Notas': eq.notes || '-',
       'Fecha de Creación': eq.createdAt ? new Date(eq.createdAt as any).toLocaleDateString('es-MX') : '-',
     }));

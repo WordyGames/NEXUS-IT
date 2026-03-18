@@ -42,6 +42,13 @@ const Equipment = () => {
     }, {});
   }, [users]);
 
+  const assignedUserNamesById = useMemo(() => {
+    return users.reduce<Record<string, string>>((acc, user) => {
+      acc[user.id] = user.name;
+      return acc;
+    }, {});
+  }, [users]);
+
   const filteredEquipment = useMemo(() => {
     const searchValue = (filters.search || '').trim().toLowerCase();
     if (!searchValue) return equipment;
@@ -268,7 +275,7 @@ const Equipment = () => {
 
         <div className="flex gap-2">
           <button
-            onClick={() => exportEquipmentToExcel(filteredEquipment, 'inventario-equipos')}
+            onClick={() => exportEquipmentToExcel(filteredEquipment, 'inventario-equipos', assignedUserNamesById)}
             className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2"
             disabled={filteredEquipment.length === 0}
           >
