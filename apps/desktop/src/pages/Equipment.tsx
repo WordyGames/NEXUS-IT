@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Equipment as EquipmentType,
@@ -26,25 +26,86 @@ const Equipment = () => {
   const canManageEquipment = hasPermission(UserPermission.EQUIPMENT_MANAGE);
   const [equipment, setEquipment] = useState<EquipmentType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState<EquipmentType | null>(null);
   const [showQRModal, setShowQRModal] = useState(false);
   const [selectedEquipmentForQR, setSelectedEquipmentForQR] = useState<EquipmentType | null>(null);
   const [filters, setFilters] = useState<EquipmentFilters>({});
+  const isFirstLoadRef = useRef(true);
+
+  const usersById = useMemo(() => {
+    return users.reduce<Record<string, User>>((acc, user) => {
+      acc[user.id] = user;
+      return acc;
+    }, {});
+  }, [users]);
+
+  const filteredEquipment = useMemo(() => {
+    const searchValue = (filters.search || '').trim().toLowerCase();
+    if (!searchValue) return equipment;
+
+    return equipment.filter((eq) => {
+      const assignedUser = eq.assignedTo ? usersById[eq.assignedTo] : undefined;
+      const searchableValues = [
+        eq.name,
+        eq.location,
+        eq.type,
+        eq.company,
+        eq.specs?.hostname,
+        eq.specs?.serialNumber,
+        eq.specs?.model,
+        eq.specs?.manufacturer,
+        assignedUser?.name,
+        assignedUser?.username,
+        assignedUser?.department,
+        assignedUser?.position
+      ];
+
+      return searchableValues.some((value) =>
+        (value || '').toString().toLowerCase().includes(searchValue)
+      );
+    });
+  }, [equipment, filters.search, usersById]);
 
   useEffect(() => {
-    loadEquipment();
-  }, [filters]);
+    void loadUsers();
+  }, []);
 
-  const loadEquipment = async () => {
+  useEffect(() => {
+    void loadEquipment(isFirstLoadRef.current);
+  }, [filters.company, filters.type, filters.status, filters.assignedTo]);
+
+  const loadUsers = async () => {
     try {
-      setLoading(true);
-      const data = await getEquipment(filters);
+      const data = await getUsers();
+      setUsers(data);
+    } catch (error) {
+      console.error('Error loading users for equipment search:', error);
+    }
+  };
+
+  const loadEquipment = async (blocking = false) => {
+    try {
+      if (blocking) {
+        setLoading(true);
+      } else {
+        setIsRefreshing(true);
+      }
+
+      const { search: _search, ...dbFilters } = filters;
+      const data = await getEquipment(dbFilters);
       setEquipment(data);
     } catch (error) {
       console.error('Error loading equipment:', error);
     } finally {
-      setLoading(false);
+      if (blocking) {
+        setLoading(false);
+      } else {
+        setIsRefreshing(false);
+      }
+      isFirstLoadRef.current = false;
     }
   };
 
@@ -103,7 +164,6 @@ const Equipment = () => {
       }
 
       // Cargar información del usuario asignado
-      const users = await getUsers();
       const assignedUser = users.find(u => u.id === eq.assignedTo);
 
       if (!assignedUser) {
@@ -146,7 +206,7 @@ const Equipment = () => {
         
         setShowForm(false);
         setEditingEquipment(null);
-        await loadEquipment();
+        await loadEquipment(false);
         showToast({
           type: 'success',
           title: 'Equipo actualizado',
@@ -161,7 +221,7 @@ const Equipment = () => {
 
         setShowForm(false);
         setEditingEquipment(null);
-        await loadEquipment();
+        await loadEquipment(false);
         showToast({
           type: 'success',
           title: 'Equipo creado',
@@ -199,13 +259,18 @@ const Equipment = () => {
           <p className="text-gray-600 dark:text-gray-400">
             Gestión de equipos informáticos
           </p>
+          {isRefreshing && (
+            <p className="text-xs text-blue-500 dark:text-blue-400 mt-1">
+              Actualizando resultados...
+            </p>
+          )}
         </div>
 
         <div className="flex gap-2">
           <button
-            onClick={() => exportEquipmentToExcel(equipment, 'inventario-equipos')}
+            onClick={() => exportEquipmentToExcel(filteredEquipment, 'inventario-equipos')}
             className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2"
-            disabled={equipment.length === 0}
+            disabled={filteredEquipment.length === 0}
           >
             <Download size={18} />
             Exportar Excel
@@ -288,7 +353,7 @@ const Equipment = () => {
               type="text"
               value={filters.search || ''}
               onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              placeholder="Nombre, hostname, serial..."
+              placeholder="Nombre, hostname, serial o asignado a..."
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
             />
           </div>
@@ -296,7 +361,7 @@ const Equipment = () => {
       </div>
 
       {/* Lista de Equipos */}
-      {equipment.length === 0 ? (
+      {filteredEquipment.length === 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow text-center">
           <p className="text-gray-600 dark:text-gray-400">
             No se encontraron equipos
@@ -304,7 +369,7 @@ const Equipment = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {equipment.map((eq) => (
+          {filteredEquipment.map((eq) => (
             <EquipmentCard
               key={eq.id}
               equipment={eq}
