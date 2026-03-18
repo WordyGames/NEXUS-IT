@@ -104,6 +104,8 @@ const applySheetTableOptions = (ws: XLSX.WorkSheet, rowCount: number, columnCoun
   (ws as any)['!freeze'] = { xSplit: 0, ySplit: 1 };
 };
 
+const escapeExcelCriteria = (value: string): string => value.replace(/"/g, '""');
+
 /**
  * Exporta equipos a Excel
  */
@@ -124,61 +126,65 @@ export const exportEquipmentToExcel = (
       return assignedUserNamesById[eq.assignedTo] || 'Usuario no disponible';
     };
 
-    const assignedCount = sortedEquipment.filter((eq) => Boolean(eq.assignedTo)).length;
-    const unassignedCount = sortedEquipment.length - assignedCount;
-
     const byCompany = sortedEquipment.reduce<Record<string, number>>((acc, eq) => {
       acc[eq.company] = (acc[eq.company] || 0) + 1;
       return acc;
     }, {});
 
-    const byStatus = sortedEquipment.reduce<Record<string, number>>((acc, eq) => {
-      acc[eq.status] = (acc[eq.status] || 0) + 1;
-      return acc;
-    }, {});
+    const companyList = Object.keys(byCompany).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
 
-    const warrantyStatusCount = sortedEquipment.reduce<Record<string, number>>((acc, eq) => {
-      const status = getWarrantySnapshot(eq.warrantyExpiration).status;
-      acc[status] = (acc[status] || 0) + 1;
-      return acc;
-    }, {});
-
-    const summaryData: Array<{ 'Sección': string; 'Métrica': string; 'Valor': string | number }> = [
-      { 'Sección': 'General', 'Métrica': 'Total de equipos', 'Valor': sortedEquipment.length },
-      { 'Sección': 'General', 'Métrica': 'Equipos asignados', 'Valor': assignedCount },
-      {
-        'Sección': 'General',
-        'Métrica': '% de asignación',
-        'Valor': sortedEquipment.length > 0
-          ? `${((assignedCount / sortedEquipment.length) * 100).toFixed(1)}%`
-          : '0.0%'
-      },
-      { 'Sección': 'General', 'Métrica': 'Equipos sin asignar', 'Valor': unassignedCount },
-      { 'Sección': 'General', 'Métrica': 'Generado el', 'Valor': new Date().toLocaleString('es-MX') },
-      { 'Sección': '', 'Métrica': '', 'Valor': '' }
+    const summaryRows: Array<Array<string | number | XLSX.CellObject>> = [
+      ['Sección', 'Métrica', 'Valor'],
+      ['General', 'Total de equipos', { t: 'n', f: 'COUNTA(Inventario!A2:A1048576)' }],
+      ['General', 'Equipos asignados', { t: 'n', f: 'COUNTIFS(Inventario!E2:E1048576,"<>Sin asignar",Inventario!E2:E1048576,"<>")' }],
+      ['General', '% de asignación', { t: 'n', f: 'IFERROR(C3/C2,0)', z: '0.0%' }],
+      ['General', 'Equipos sin asignar', { t: 'n', f: 'COUNTIF(Inventario!E2:E1048576,"Sin asignar")' }],
+      ['General', 'Generado el', new Date().toLocaleString('es-MX')],
+      ['', '', '']
     ];
 
-    Object.entries(byCompany)
-      .sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }))
-      .forEach(([company, count]) => {
-        summaryData.push({ 'Sección': 'Por empresa', 'Métrica': company, 'Valor': count });
-      });
+    companyList.forEach((company) => {
+      summaryRows.push([
+        'Por empresa',
+        company,
+        { t: 'n', f: `COUNTIF(Inventario!B2:B1048576,"${escapeExcelCriteria(company)}")` }
+      ]);
+    });
 
-    summaryData.push({ 'Sección': '', 'Métrica': '', 'Valor': '' });
+    summaryRows.push(['', '', '']);
 
-    Object.entries(byStatus)
-      .sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }))
-      .forEach(([status, count]) => {
-        summaryData.push({ 'Sección': 'Por estado', 'Métrica': status, 'Valor': count });
-      });
+    const statusRows: Array<{ label: string; value: string }> = [
+      { label: 'Activo', value: 'active' },
+      { label: 'Inactivo', value: 'inactive' },
+      { label: 'Mantenimiento', value: 'maintenance' },
+      { label: 'Retirado', value: 'retired' }
+    ];
 
-    summaryData.push({ 'Sección': '', 'Métrica': '', 'Valor': '' });
+    statusRows.forEach(({ label, value }) => {
+      summaryRows.push([
+        'Por estado',
+        label,
+        { t: 'n', f: `COUNTIF(Inventario!C2:C1048576,"${value}")` }
+      ]);
+    });
 
-    Object.entries(warrantyStatusCount)
-      .sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }))
-      .forEach(([warrantyStatus, count]) => {
-        summaryData.push({ 'Sección': 'Garantías', 'Métrica': warrantyStatus, 'Valor': count });
-      });
+    summaryRows.push(['', '', '']);
+
+    const warrantyRows: Array<{ label: string }> = [
+      { label: 'Vencida' },
+      { label: 'Crítica (<30 días)' },
+      { label: 'Próxima (30-90 días)' },
+      { label: 'Vigente (>90 días)' },
+      { label: 'Sin datos' }
+    ];
+
+    warrantyRows.forEach(({ label }) => {
+      summaryRows.push([
+        'Garantías',
+        label,
+        { t: 'n', f: `COUNTIF(Inventario!M2:M1048576,"${escapeExcelCriteria(label)}")` }
+      ]);
+    });
 
     // Hoja 1: Inventario (vista operativa)
     const inventoryData = sortedEquipment.map((eq) => {
@@ -235,7 +241,7 @@ export const exportEquipmentToExcel = (
 
     // Crear workbook y worksheets
     const wb = XLSX.utils.book_new();
-    const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+    const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
     const wsInventory = XLSX.utils.json_to_sheet(inventoryData);
     const wsTechnicalDetail = XLSX.utils.json_to_sheet(technicalDetailData);
 
@@ -291,7 +297,7 @@ export const exportEquipmentToExcel = (
       { wch: 44 }  // Notas
     ];
 
-    applySheetTableOptions(wsSummary, summaryData.length, Object.keys(summaryData[0] || {}).length);
+    applySheetTableOptions(wsSummary, summaryRows.length - 1, 3);
     applySheetTableOptions(wsInventory, inventoryData.length, Object.keys(inventoryData[0] || {}).length);
     applySheetTableOptions(wsTechnicalDetail, technicalDetailData.length, Object.keys(technicalDetailData[0] || {}).length);
 
