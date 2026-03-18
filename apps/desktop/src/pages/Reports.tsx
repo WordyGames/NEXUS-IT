@@ -486,11 +486,12 @@ const Reports: React.FC = () => {
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                    <div
+                    <progress
                       aria-label={`Tasa de resolución: ${stat.resolutionRate}%`}
                       title={`${stat.resolutionRate}% de resolución`}
-                      className={styles.resolutionFill}
-                      style={{ '--resolution-percent': `${stat.resolutionRate}%` } as React.CSSProperties}
+                      className={styles.resolutionProgress}
+                      value={Math.max(0, Math.min(100, stat.resolutionRate))}
+                      max={100}
                     />
                   </div>
                 </div>

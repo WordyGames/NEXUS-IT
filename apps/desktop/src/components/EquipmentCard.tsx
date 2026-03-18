@@ -1,7 +1,15 @@
 import React from 'react';
-import { Equipment, getCompanyColor } from '@nexus-it/shared';
+import { Equipment } from '@nexus-it/shared';
 import { QrCode, FileText } from 'lucide-react';
 import styles from './EquipmentCard.module.css';
+
+const getCompanyTagVariant = (company: string) => {
+  const normalized = company.toUpperCase();
+  if (normalized.includes('ESPECIAS')) return styles.companyEspecias;
+  if (normalized.includes('AMEX')) return styles.companyAmex;
+  if (normalized.includes('OSENAL')) return styles.companyOsenal;
+  return styles.companyDefault;
+};
 
 interface EquipmentCardProps {
   equipment: Equipment;
@@ -58,8 +66,7 @@ const EquipmentCard = ({ equipment, onEdit, onDelete, onShowQR, onGenerateCarta,
           <div
             aria-label={`Empresa: ${equipment.company}`}
             title={equipment.company}
-            className={styles.companyTag}
-            style={{ '--company-color': getCompanyColor(equipment.company) } as React.CSSProperties}
+            className={`${styles.companyTag} ${getCompanyTagVariant(equipment.company)}`}
           >
             {equipment.company}
           </div>

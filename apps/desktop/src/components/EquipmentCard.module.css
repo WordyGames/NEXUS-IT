@@ -5,8 +5,23 @@
   font-size: 0.75rem;
   font-weight: 500;
   color: white;
-  background-color: var(--company-color, #3b82f6);
   transition: background-color 0.2s ease;
+}
+
+.companyEspecias {
+  background-color: #10b981;
+}
+
+.companyAmex {
+  background-color: #3b82f6;
+}
+
+.companyOsenal {
+  background-color: #8b5cf6;
+}
+
+.companyDefault {
+  background-color: #6b7280;
 }
 
 .companyTag:hover {

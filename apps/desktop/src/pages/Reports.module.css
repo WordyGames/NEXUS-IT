@@ -17,3 +17,27 @@
   transition: width 0.3s ease;
   width: var(--resolution-percent, 0%);
 }
+
+.resolutionProgress {
+  width: 100%;
+  height: 0.5rem;
+  border: none;
+  border-radius: 9999px;
+  overflow: hidden;
+  background-color: #e5e7eb;
+}
+
+.resolutionProgress::-webkit-progress-bar {
+  background-color: #e5e7eb;
+  border-radius: 9999px;
+}
+
+.resolutionProgress::-webkit-progress-value {
+  background-color: #2563eb;
+  border-radius: 9999px;
+}
+
+.resolutionProgress::-moz-progress-bar {
+  background-color: #2563eb;
+  border-radius: 9999px;
+}

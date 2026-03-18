@@ -38,14 +38,13 @@ const UpdateNotification: React.FC = () => {
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
             Descargando Actualización
           </h3>
-          <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mb-2">
-            <div
-              aria-label={`Descarga en progreso: ${Math.round(downloadProgress.percent)}%`}
-              title="Barra de progreso de descarga"
-              className={styles.progressFill}
-              style={{ '--progress-percent': `${downloadProgress.percent}%` } as React.CSSProperties}
-            ></div>
-          </div>
+          <progress
+            aria-label={`Descarga en progreso: ${Math.round(downloadProgress.percent)}%`}
+            title="Barra de progreso de descarga"
+            className={styles.progressElement}
+            value={Math.max(0, Math.min(100, downloadProgress.percent))}
+            max={100}
+          />
           <p className="text-sm text-gray-600 dark:text-gray-300">
             {Math.round(downloadProgress.percent)}% completado
           </p>

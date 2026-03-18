@@ -1,8 +1,15 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getCompanyColor } from '@nexus-it/shared';
 import { NotificationBell } from './NotificationBell';
 import styles from './Navbar.module.css';
+
+const getCompanyBadgeVariant = (company: string) => {
+  const normalized = company.toUpperCase();
+  if (normalized.includes('ESPECIAS')) return styles.companyEspecias;
+  if (normalized.includes('AMEX')) return styles.companyAmex;
+  if (normalized.includes('OSENAL')) return styles.companyOsenal;
+  return styles.companyDefault;
+};
 
 const Navbar = () => {
   const { userData, logout } = useAuth();
@@ -33,8 +40,7 @@ const Navbar = () => {
             <div
               aria-label={`Empresa: ${userData.company}`}
               title={userData.company}
-              className={styles.companyBadge}
-              style={{ '--company-color': getCompanyColor(userData.company) } as React.CSSProperties}
+              className={`${styles.companyBadge} ${getCompanyBadgeVariant(userData.company)}`}
             >
               {userData.company}
             </div>
