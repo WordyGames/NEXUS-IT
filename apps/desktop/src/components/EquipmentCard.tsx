@@ -13,6 +13,7 @@ const getCompanyTagVariant = (company: string) => {
 
 interface EquipmentCardProps {
   equipment: Equipment;
+  assignedToLabel?: string;
   onEdit: () => void;
   onDelete: () => void;
   onShowQR: () => void;
@@ -20,7 +21,15 @@ interface EquipmentCardProps {
   canEdit: boolean;
 }
 
-const EquipmentCard = ({ equipment, onEdit, onDelete, onShowQR, onGenerateCarta, canEdit }: EquipmentCardProps) => {
+const EquipmentCard = ({
+  equipment,
+  assignedToLabel,
+  onEdit,
+  onDelete,
+  onShowQR,
+  onGenerateCarta,
+  canEdit
+}: EquipmentCardProps) => {
   const statusColors: Record<string, string> = {
     active: 'bg-green-100 text-green-800',
     inactive: 'bg-gray-100 text-gray-800',
@@ -118,6 +127,10 @@ const EquipmentCard = ({ equipment, onEdit, onDelete, onShowQR, onGenerateCarta,
             <span className="text-gray-800 dark:text-white">{equipment.location}</span>
           </div>
         )}
+        <div className="flex items-center text-sm">
+          <span className="text-gray-500 dark:text-gray-400 w-24">Asignado:</span>
+          <span className="text-gray-800 dark:text-white">{assignedToLabel || 'Sin asignar'}</span>
+        </div>
       </div>
 
       {/* Warranty Info */}

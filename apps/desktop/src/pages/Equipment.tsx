@@ -76,6 +76,11 @@ const Equipment = () => {
     });
   }, [equipment, filters.search, usersById]);
 
+  const getAssignedUserLabel = (eq: EquipmentType): string => {
+    if (!eq.assignedTo) return 'Sin asignar';
+    return usersById[eq.assignedTo]?.name || 'Usuario no disponible';
+  };
+
   useEffect(() => {
     void loadUsers();
   }, []);
@@ -380,6 +385,7 @@ const Equipment = () => {
             <EquipmentCard
               key={eq.id}
               equipment={eq}
+              assignedToLabel={getAssignedUserLabel(eq)}
               onEdit={() => handleEdit(eq)}
               onDelete={() => handleDelete(eq.id)}
               onShowQR={() => handleShowQR(eq)}
