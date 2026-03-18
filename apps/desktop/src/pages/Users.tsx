@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { 
   User, 
   UserRole, 
+  UserPermission,
   Company,
+  getDefaultPermissionsForRole,
+  resolveUserPermissions,
+  getPermissionOverrides,
   getUsers,
   createUser,
   updateUser,
@@ -13,24 +17,79 @@ import { useAuth } from '../contexts/AuthContext';
 import { useUiFeedback } from '../contexts/UiFeedbackContext';
 import { 
   UserPlus, 
-  Edit2, 
+  Settings2,
   Lock, 
   UserCheck, 
   UserX,
   Trash2,
-  Building2,
-  Shield,
   User as UserIcon
 } from 'lucide-react';
+
+const permissionLabels: Record<UserPermission, string> = {
+  [UserPermission.DASHBOARD_ADMIN]: 'Acceso a panel admin',
+  [UserPermission.EQUIPMENT_VIEW]: 'Ver equipos',
+  [UserPermission.EQUIPMENT_MANAGE]: 'Crear/editar/eliminar equipos',
+  [UserPermission.MAINTENANCES_VIEW]: 'Ver mantenimientos',
+  [UserPermission.MAINTENANCES_MANAGE]: 'Crear/editar/eliminar mantenimientos',
+  [UserPermission.REPORTS_VIEW]: 'Ver reportes',
+  [UserPermission.WARRANTY_VIEW]: 'Ver reporte de garantías',
+  [UserPermission.USERS_VIEW]: 'Ver módulo de usuarios',
+  [UserPermission.USERS_MANAGE]: 'Administrar usuarios y permisos',
+  [UserPermission.SETTINGS_VIEW]: 'Ver configuración',
+  [UserPermission.TICKETS_VIEW]: 'Ver tickets',
+  [UserPermission.TICKETS_VIEW_ALL]: 'Ver tickets de todos',
+  [UserPermission.TICKETS_CHANGE_STATUS]: 'Cambiar estado de tickets',
+  [UserPermission.NOTIFICATIONS_VIEW]: 'Ver notificaciones'
+};
+
+const permissionGroups: Array<{ title: string; permissions: UserPermission[] }> = [
+  {
+    title: 'Acceso general',
+    permissions: [
+      UserPermission.DASHBOARD_ADMIN,
+      UserPermission.SETTINGS_VIEW,
+      UserPermission.NOTIFICATIONS_VIEW
+    ]
+  },
+  {
+    title: 'Equipos y mantenimientos',
+    permissions: [
+      UserPermission.EQUIPMENT_VIEW,
+      UserPermission.EQUIPMENT_MANAGE,
+      UserPermission.MAINTENANCES_VIEW,
+      UserPermission.MAINTENANCES_MANAGE,
+      UserPermission.WARRANTY_VIEW
+    ]
+  },
+  {
+    title: 'Tickets',
+    permissions: [
+      UserPermission.TICKETS_VIEW,
+      UserPermission.TICKETS_VIEW_ALL,
+      UserPermission.TICKETS_CHANGE_STATUS
+    ]
+  },
+  {
+    title: 'Administración',
+    permissions: [
+      UserPermission.REPORTS_VIEW,
+      UserPermission.USERS_VIEW,
+      UserPermission.USERS_MANAGE
+    ]
+  }
+];
 
 const Users = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const { isAdmin, userData } = useAuth();
+  const { userData, hasPermission, refreshUser } = useAuth();
   const { showToast, confirm } = useUiFeedback();
+  const canViewUsers = hasPermission(UserPermission.USERS_VIEW);
+  const canManageUsers = hasPermission(UserPermission.USERS_MANAGE);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -44,11 +103,15 @@ const Users = () => {
   });
 
   const [newPassword, setNewPassword] = useState('');
+  const [permissionRole, setPermissionRole] = useState<UserRole>(UserRole.USER);
+  const [permissionValues, setPermissionValues] = useState<Record<UserPermission, boolean>>(
+    getDefaultPermissionsForRole(UserRole.USER)
+  );
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!canViewUsers) return;
     loadUsers();
-  }, [isAdmin]);
+  }, [canViewUsers]);
 
   const loadUsers = async () => {
     try {
@@ -145,6 +208,8 @@ const Users = () => {
   };
 
   const handleToggleActive = async (user: User) => {
+    if (!canManageUsers) return;
+
     try {
       await updateUser(user.id, { isActive: !user.isActive });
       await loadUsers();
@@ -164,6 +229,7 @@ const Users = () => {
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageUsers) return;
     
     if (!selectedUser) return;
     if (newPassword.trim().length < 6) {
@@ -195,6 +261,8 @@ const Users = () => {
   };
 
   const handleDeleteUser = async (user: User) => {
+    if (!canManageUsers) return;
+
     if (userData?.id === user.id) {
       showToast({
         type: 'warning',
@@ -242,6 +310,78 @@ const Users = () => {
     });
   };
 
+  const handleOpenPermissionsModal = (user: User) => {
+    setSelectedUser(user);
+    setPermissionRole(user.role);
+    setPermissionValues(resolveUserPermissions(user));
+    setShowPermissionsModal(true);
+  };
+
+  const handlePermissionToggle = (permission: UserPermission, enabled: boolean) => {
+    setPermissionValues((prev) => ({
+      ...prev,
+      [permission]: enabled
+    }));
+  };
+
+  const handleApplyRoleDefaults = () => {
+    setPermissionValues(getDefaultPermissionsForRole(permissionRole));
+  };
+
+  const handleSavePermissions = async () => {
+    if (!selectedUser) return;
+
+    if (selectedUser.id === userData?.id) {
+      if (!permissionValues[UserPermission.USERS_MANAGE]) {
+        showToast({
+          type: 'warning',
+          title: 'Operacion no permitida',
+          message: 'No puedes quitarte el permiso para administrar usuarios'
+        });
+        return;
+      }
+
+      if (!permissionValues[UserPermission.DASHBOARD_ADMIN]) {
+        showToast({
+          type: 'warning',
+          title: 'Operacion no permitida',
+          message: 'No puedes quitarte el acceso al panel admin mientras editas tu propio perfil'
+        });
+        return;
+      }
+    }
+
+    try {
+      const permissionOverrides = getPermissionOverrides(permissionRole, permissionValues);
+
+      await updateUser(selectedUser.id, {
+        role: permissionRole,
+        permissions: permissionOverrides
+      });
+
+      await loadUsers();
+
+      if (selectedUser.id === userData?.id) {
+        await refreshUser();
+      }
+
+      setShowPermissionsModal(false);
+      setSelectedUser(null);
+
+      showToast({
+        type: 'success',
+        title: 'Permisos actualizados',
+        message: 'Los permisos del usuario se guardaron correctamente'
+      });
+    } catch (error: any) {
+      showToast({
+        type: 'error',
+        title: 'Error al guardar permisos',
+        message: error.message || 'No se pudieron guardar los permisos'
+      });
+    }
+  };
+
   const getRoleBadge = (role: UserRole) => {
     const colors = {
       [UserRole.ADMIN]: 'bg-purple-100 text-purple-800',
@@ -280,7 +420,7 @@ const Users = () => {
     );
   };
 
-  if (!isAdmin) {
+  if (!canViewUsers) {
     return (
       <div className="p-8">
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
@@ -299,16 +439,18 @@ const Users = () => {
             Gestión de Usuarios
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Administra los usuarios del sistema
+            Administra usuarios, roles y permisos por perfil
           </p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-        >
-          <UserPlus size={20} />
-          Crear Usuario
-        </button>
+        {canManageUsers && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+          >
+            <UserPlus size={20} />
+            Crear Usuario
+          </button>
+        )}
       </div>
 
       {/* Users Table */}
@@ -336,9 +478,11 @@ const Users = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Estado
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Acciones
-                </th>
+                {canManageUsers && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Acciones
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -381,43 +525,52 @@ const Users = () => {
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setShowPasswordModal(true);
-                        }}
-                        className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                        title="Cambiar contraseña"
-                      >
-                        <Lock size={18} />
-                      </button>
-                      <button
-                        onClick={() => handleToggleActive(user)}
-                        className={`${
-                          user.isActive
-                            ? 'text-red-600 hover:text-red-900'
-                            : 'text-green-600 hover:text-green-900'
-                        }`}
-                        title={user.isActive ? 'Desactivar' : 'Activar'}
-                      >
-                        {user.isActive ? <UserX size={18} /> : <UserCheck size={18} />}
-                      </button>
-                      <button
-                        onClick={() => handleDeleteUser(user)}
-                        className={`${
-                          userData?.id === user.id
-                            ? 'text-gray-300 cursor-not-allowed'
-                            : 'text-red-600 hover:text-red-900'
-                        }`}
-                        title={userData?.id === user.id ? 'No puedes eliminar tu usuario' : 'Eliminar usuario'}
-                        disabled={userData?.id === user.id}
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  </td>
+                  {canManageUsers && (
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleOpenPermissionsModal(user)}
+                          className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
+                          title="Editar permisos"
+                        >
+                          <Settings2 size={18} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setShowPasswordModal(true);
+                          }}
+                          className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                          title="Cambiar contraseña"
+                        >
+                          <Lock size={18} />
+                        </button>
+                        <button
+                          onClick={() => handleToggleActive(user)}
+                          className={`${
+                            user.isActive
+                              ? 'text-red-600 hover:text-red-900'
+                              : 'text-green-600 hover:text-green-900'
+                          }`}
+                          title={user.isActive ? 'Desactivar' : 'Activar'}
+                        >
+                          {user.isActive ? <UserX size={18} /> : <UserCheck size={18} />}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(user)}
+                          className={`${
+                            userData?.id === user.id
+                              ? 'text-gray-300 cursor-not-allowed'
+                              : 'text-red-600 hover:text-red-900'
+                          }`}
+                          title={userData?.id === user.id ? 'No puedes eliminar tu usuario' : 'Eliminar usuario'}
+                          disabled={userData?.id === user.id}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -610,6 +763,94 @@ const Users = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Permissions Modal */}
+      {showPermissionsModal && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-2">
+              Permisos de perfil
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Usuario: <strong>{selectedUser.name}</strong> (@{selectedUser.username})
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Rol base
+                </label>
+                <select
+                  aria-label="Rol base de permisos"
+                  value={permissionRole}
+                  onChange={(e) => {
+                    const nextRole = e.target.value as UserRole;
+                    setPermissionRole(nextRole);
+                    setPermissionValues(getDefaultPermissionsForRole(nextRole));
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                >
+                  <option value={UserRole.USER}>Usuario</option>
+                  <option value={UserRole.ADMIN}>Administrador</option>
+                </select>
+              </div>
+              <div className="md:col-span-2 flex items-end">
+                <button
+                  type="button"
+                  onClick={handleApplyRoleDefaults}
+                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors"
+                >
+                  Restablecer permisos por rol
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-5">
+              {permissionGroups.map((group) => (
+                <div key={group.title} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                  <h3 className="font-semibold text-gray-800 dark:text-white mb-3">{group.title}</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {group.permissions.map((permission) => (
+                      <label
+                        key={permission}
+                        className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={Boolean(permissionValues[permission])}
+                          onChange={(e) => handlePermissionToggle(permission, e.target.checked)}
+                          className="rounded"
+                        />
+                        {permissionLabels[permission]}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-2 pt-6">
+              <button
+                type="button"
+                onClick={handleSavePermissions}
+                className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+              >
+                Guardar permisos
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPermissionsModal(false);
+                  setSelectedUser(null);
+                }}
+                className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { UserRole } from '@nexus-it/shared';
+import { UserPermission, hasUserPermission } from '@nexus-it/shared';
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -22,7 +22,9 @@ const Login = () => {
         setError('No se pudo obtener los datos del usuario');
         return;
       }
-      navigate(user.role === UserRole.ADMIN ? '/dashboard' : '/portal');
+      navigate(
+        hasUserPermission(user, UserPermission.DASHBOARD_ADMIN) ? '/dashboard' : '/portal'
+      );
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión');
     } finally {

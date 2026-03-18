@@ -2,7 +2,6 @@ import {
   collection,
   query,
   where,
-  orderBy,
   limit,
   getDocs,
   addDoc,
@@ -27,6 +26,19 @@ import {
  * Gestiona alertas de garantía, mantenimiento y cambios de tickets
  */
 
+const toDate = (value: any): Date => {
+  if (!value) return new Date(0);
+  if (value instanceof Date) return value;
+  if (typeof value === 'object' && typeof value.toDate === 'function') {
+    return value.toDate();
+  }
+  if (typeof value === 'object' && typeof value.seconds === 'number') {
+    return new Date(value.seconds * 1000);
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date(0) : parsed;
+};
+
 // Obtener notificaciones del usuario
 export async function getUserNotifications(userId: string): Promise<Notification[]> {
   try {
@@ -44,8 +56,8 @@ export async function getUserNotifications(userId: string): Promise<Notification
     
     // Ordenar en memoria en lugar de en Firestore
     return notifications.sort((a, b) => {
-      const dateA = new Date(a.createdAt as any).getTime();
-      const dateB = new Date(b.createdAt as any).getTime();
+      const dateA = toDate(a.createdAt as any).getTime();
+      const dateB = toDate(b.createdAt as any).getTime();
       return dateB - dateA; // desc
     });
   } catch (error) {

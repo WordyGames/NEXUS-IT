@@ -16,6 +16,19 @@ const typeEmojis = {
   [NotificationType.MAINTENANCE_COMPLETED]: '✅'
 };
 
+const toDate = (value: any): Date => {
+  if (!value) return new Date(0);
+  if (value instanceof Date) return value;
+  if (typeof value === 'object' && typeof value.toDate === 'function') {
+    return value.toDate();
+  }
+  if (typeof value === 'object' && typeof value.seconds === 'number') {
+    return new Date(value.seconds * 1000);
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date(0) : parsed;
+};
+
 export const NotificationBell: React.FC = () => {
   const { userData } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -116,7 +129,7 @@ export const NotificationBell: React.FC = () => {
                         {notif.message}
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
-                        {new Date(notif.createdAt as any).toLocaleTimeString()}
+                        {toDate(notif.createdAt as any).toLocaleTimeString()}
                       </p>
                     </div>
                     {!notif.read && (

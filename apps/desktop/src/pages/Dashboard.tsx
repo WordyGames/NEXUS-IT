@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { 
   Company, 
+  UserPermission,
   getEquipmentStats, 
   getTicketStats, 
   getEquipment,
@@ -28,8 +29,9 @@ interface WarrantyAlert {
 }
 
 const Dashboard = () => {
-  const { userData, isAdmin } = useAuth();
+  const { userData, hasPermission } = useAuth();
   const navigate = useNavigate();
+  const canViewAdminDashboard = hasPermission(UserPermission.DASHBOARD_ADMIN);
   const [stats, setStats] = useState<Stats | null>(null);
   const [userEquipment, setUserEquipment] = useState<any[]>([]);
   const [userTicketsCount, setUserTicketsCount] = useState(0);
@@ -117,7 +119,7 @@ const Dashboard = () => {
         });
 
         // Cargar equipos asignados al usuario actual
-        if (!isAdmin && userData?.id) {
+        if (!canViewAdminDashboard && userData?.id) {
           const allEquipment = await getEquipment({ assignedTo: userData.id });
           setUserEquipment(allEquipment);
           
@@ -131,7 +133,7 @@ const Dashboard = () => {
         }
 
         // Cargar alertas de mantenimiento y garantías para admin
-        if (isAdmin) {
+        if (canViewAdminDashboard) {
           const [upcoming, overdue] = await Promise.all([
             getUpcomingMaintenances(),
             getOverdueMaintenances()
@@ -175,7 +177,7 @@ const Dashboard = () => {
     };
 
     loadData();
-  }, [isAdmin, userData]);
+  }, [canViewAdminDashboard, userData]);
 
   if (loading) {
     return (
@@ -186,7 +188,7 @@ const Dashboard = () => {
   }
 
   // Dashboard para usuarios normales (solo Tickets)
-  if (!isAdmin) {
+  if (!canViewAdminDashboard) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -494,7 +496,7 @@ const Dashboard = () => {
       </div>
 
       {/* Gráficas */}
-      {isAdmin && (
+      {canViewAdminDashboard && (
         <div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
             Análisis y Tendencias
@@ -637,7 +639,7 @@ const Dashboard = () => {
       )}
 
       {/* Solo para Admin: Estado de Equipos */}
-      {isAdmin && (
+      {canViewAdminDashboard && (
         <div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
             Estado de Equipos

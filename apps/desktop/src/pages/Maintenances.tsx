@@ -4,6 +4,7 @@ import {
   Maintenance,
   MaintenanceStatus,
   MaintenanceType,
+  UserPermission,
   getMaintenances,
   createMaintenance,
   updateMaintenance,
@@ -20,8 +21,9 @@ import MaintenanceStatusEditor from '../components/MaintenanceStatusEditor';
 import { exportMaintenancesToExcel } from '../utils/exportToExcel';
 
 const Maintenances = () => {
-  const { isAdmin } = useAuth();
+  const { hasPermission } = useAuth();
   const { showToast, confirm } = useUiFeedback();
+  const canManageMaintenances = hasPermission(UserPermission.MAINTENANCES_MANAGE);
   const [maintenances, setMaintenances] = useState<Maintenance[]>([]);
   const [upcomingMaintenances, setUpcomingMaintenances] = useState<Maintenance[]>([]);
   const [overdueMaintenances, setOverdueMaintenances] = useState<Maintenance[]>([]);
@@ -216,7 +218,7 @@ const Maintenances = () => {
             <Download size={18} />
             Exportar Excel
           </button>
-          {isAdmin && (
+          {canManageMaintenances && (
             <button
               onClick={() => setShowForm(true)}
               className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
@@ -343,7 +345,7 @@ const Maintenances = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                   Asignado
                 </th>
-                {isAdmin && (
+                {canManageMaintenances && (
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                     Acciones
                   </th>
@@ -353,7 +355,7 @@ const Maintenances = () => {
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {maintenances.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdmin ? 7 : 6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={canManageMaintenances ? 7 : 6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                     No hay mantenimientos programados
                   </td>
                 </tr>
@@ -403,7 +405,7 @@ const Maintenances = () => {
                     <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
                       {maintenance.assignedToName || 'Sin asignar'}
                     </td>
-                    {isAdmin && (
+                    {canManageMaintenances && (
                       <td className="px-6 py-4 text-sm">
                         <button
                           onClick={() => handleEdit(maintenance)}

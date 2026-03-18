@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { UserPermission } from '@nexus-it/shared';
 import { AuthProvider } from './contexts/AuthContext';
 import { UpdaterProvider } from './contexts/UpdaterContext';
 import { UiFeedbackProvider } from './contexts/UiFeedbackContext';
@@ -69,22 +70,92 @@ function App() {
               <Route
                 path="/"
                 element={
-                  <PrivateRoute>
+                  <PrivateRoute requireAdminPanel>
                     <Layout />
                   </PrivateRoute>
                 }
               >
                 <Route index element={<Navigate to="/dashboard" replace />} />
-                <Route path="dashboard" element={<Dashboard />} />
-                <Route path="equipment" element={<Equipment />} />
-                <Route path="tickets" element={<Tickets />} />
-                <Route path="tickets/:id" element={<Tickets />} />
-                <Route path="maintenances" element={<Maintenances />} />
-                <Route path="reports" element={<Reports />} />
-                <Route path="warranty-report" element={<WarrantyReport />} />
-                <Route path="notifications" element={<NotificationsPage />} />
-                <Route path="users" element={<Users />} />
-                <Route path="settings" element={<Settings />} />
+                <Route
+                  path="dashboard"
+                  element={
+                    <PrivateRoute requiredPermission={UserPermission.DASHBOARD_ADMIN}>
+                      <Dashboard />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="equipment"
+                  element={
+                    <PrivateRoute requiredPermission={UserPermission.EQUIPMENT_VIEW}>
+                      <Equipment />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="tickets"
+                  element={
+                    <PrivateRoute requiredPermission={UserPermission.TICKETS_VIEW}>
+                      <Tickets />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="tickets/:id"
+                  element={
+                    <PrivateRoute requiredPermission={UserPermission.TICKETS_VIEW}>
+                      <Tickets />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="maintenances"
+                  element={
+                    <PrivateRoute requiredPermission={UserPermission.MAINTENANCES_VIEW}>
+                      <Maintenances />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="reports"
+                  element={
+                    <PrivateRoute requiredPermission={UserPermission.REPORTS_VIEW}>
+                      <Reports />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="warranty-report"
+                  element={
+                    <PrivateRoute requiredPermission={UserPermission.WARRANTY_VIEW}>
+                      <WarrantyReport />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="notifications"
+                  element={
+                    <PrivateRoute requiredPermission={UserPermission.NOTIFICATIONS_VIEW}>
+                      <NotificationsPage />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="users"
+                  element={
+                    <PrivateRoute requiredPermission={UserPermission.USERS_VIEW}>
+                      <Users />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="settings"
+                  element={
+                    <PrivateRoute requiredPermission={UserPermission.SETTINGS_VIEW}>
+                      <Settings />
+                    </PrivateRoute>
+                  }
+                />
               </Route>
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>

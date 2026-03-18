@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   Equipment as EquipmentType,
   Company,
+  UserPermission,
   getEquipment,
   createEquipment,
   updateEquipment,
@@ -20,8 +21,9 @@ import { generateCartaResponsivaPDF } from '../utils/cartaResponsivaPDF';
 import { useUiFeedback } from '../contexts/UiFeedbackContext';
 
 const Equipment = () => {
-  const { userData, isAdmin } = useAuth();
+  const { userData, hasPermission } = useAuth();
   const { showToast, confirm } = useUiFeedback();
+  const canManageEquipment = hasPermission(UserPermission.EQUIPMENT_MANAGE);
   const [equipment, setEquipment] = useState<EquipmentType[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -208,7 +210,7 @@ const Equipment = () => {
             <Download size={18} />
             Exportar Excel
           </button>
-          {isAdmin && (
+          {canManageEquipment && (
             <button
               onClick={handleCreate}
               className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
@@ -310,7 +312,7 @@ const Equipment = () => {
               onDelete={() => handleDelete(eq.id)}
               onShowQR={() => handleShowQR(eq)}
               onGenerateCarta={() => handleGenerateCarta(eq)}
-              canEdit={isAdmin}
+              canEdit={canManageEquipment}
             />
           ))}
         </div>

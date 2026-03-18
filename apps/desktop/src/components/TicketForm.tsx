@@ -3,6 +3,7 @@ import {
   Ticket, 
   TicketPriority, 
   Company, 
+  UserPermission,
   Attachment,
   deleteFile,
   resolveAttachmentStoragePath
@@ -31,8 +32,9 @@ const getAttachmentKey = (attachment: Attachment): string => {
 };
 
 const TicketForm = ({ ticket, onSubmit, onCancel, userName }: TicketFormProps) => {
-  const { userData, isAdmin } = useAuth();
+  const { userData, hasPermission } = useAuth();
   const { showToast } = useUiFeedback();
+  const canViewAllTickets = hasPermission(UserPermission.TICKETS_VIEW_ALL);
   const [loading, setLoading] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>(ticket?.attachments || []);
   const [pendingDeleteAttachments, setPendingDeleteAttachments] = useState<Attachment[]>([]);
@@ -47,13 +49,13 @@ const TicketForm = ({ ticket, onSubmit, onCancel, userName }: TicketFormProps) =
     company: ticket?.company || userData?.company || Company.GRUPO_AMEX,
     priority: ticket?.priority || TicketPriority.MEDIUM
   });
-  const isCompanyLocked = !!userData?.company && !isAdmin;
+  const isCompanyLocked = !!userData?.company && !canViewAllTickets;
 
   useEffect(() => {
-    if (!ticket && userData?.company && !isAdmin) {
+    if (!ticket && userData?.company && !canViewAllTickets) {
       setFormData((prev) => ({ ...prev, company: userData.company as Company }));
     }
-  }, [ticket, userData?.company, isAdmin]);
+  }, [ticket, userData?.company, canViewAllTickets]);
 
   const isInitialAttachment = (attachment: Attachment): boolean => {
     return initialAttachmentKeys.has(getAttachmentKey(attachment));

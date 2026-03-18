@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { User, UserRole, Company, UserSession } from '../types';
+import { getDefaultPermissionsForRole } from '../utils/permissions';
 
 // Helper para localStorage compatible con Node/Browser
 const getStorage = () => {
@@ -142,6 +143,7 @@ export const createUser = async (
       password: passwordHash,
       name,
       role,
+      permissions: getDefaultPermissionsForRole(role),
       company,
       department: department || '',
       position: position || department || '',

@@ -6,6 +6,7 @@ import {
   TicketPriority,
   TicketStatus,
   Company,
+  UserPermission,
   getTickets,
   createTicket,
   updateTicket
@@ -17,8 +18,10 @@ import { exportTicketsToExcel } from '../utils/exportToExcel';
 import { useUiFeedback } from '../contexts/UiFeedbackContext';
 
 const Tickets = () => {
-  const { userData, isAdmin } = useAuth();
+  const { userData, hasPermission } = useAuth();
   const { showToast } = useUiFeedback();
+  const canViewAllTickets = hasPermission(UserPermission.TICKETS_VIEW_ALL);
+  const canChangeTicketStatus = hasPermission(UserPermission.TICKETS_CHANGE_STATUS);
   const { id: ticketIdFromUrl } = useParams<{ id: string }>();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +32,7 @@ const Tickets = () => {
 
   useEffect(() => {
     loadTickets();
-  }, [companyFilter, isAdmin, userData?.id, userData?.username, userData?.name]);
+  }, [companyFilter, canViewAllTickets, userData?.id, userData?.username, userData?.name]);
 
   useEffect(() => {
     // Si viene un ID de ticket en la URL, abrirlo automáticamente
@@ -100,7 +103,7 @@ const Tickets = () => {
     try {
       setLoading(true);
 
-      if (!isAdmin) {
+      if (!canViewAllTickets) {
         const userTickets = await loadUserTickets();
         setTickets(userTickets);
         return;
@@ -224,7 +227,7 @@ const Tickets = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          {isAdmin && (
+          {canViewAllTickets && (
             <select
               aria-label="Filtrar por empresa"
               value={companyFilter}
@@ -350,7 +353,7 @@ const Tickets = () => {
           onUpdate={loadTickets}
           currentUserId={userData?.id || ''}
           currentUserName={userData?.name || 'Usuario'}
-          isAdmin={isAdmin}
+          canChangeStatus={canChangeTicketStatus}
         />
       )}
     </div>

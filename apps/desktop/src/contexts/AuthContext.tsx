@@ -2,11 +2,14 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { 
   User, 
   UserRole, 
+  UserPermission,
   UserSession,
   signIn, 
   signOut, 
   getCurrentSession,
-  getUserById 
+  getUserById,
+  resolveUserPermissions,
+  hasUserPermission
 } from '@nexus-it/shared';
 
 interface AuthContextType {
@@ -16,6 +19,8 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<User | null>;
   logout: () => Promise<void>;
   isAdmin: boolean;
+  resolvedPermissions: Record<UserPermission, boolean>;
+  hasPermission: (permission: UserPermission) => boolean;
   refreshUser: () => Promise<void>;
 }
 
@@ -77,6 +82,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await loadUserData();
   };
 
+  const resolvedPermissions = resolveUserPermissions(userData);
+
+  const hasPermission = (permission: UserPermission) => {
+    return hasUserPermission(userData, permission);
+  };
+
   const value: AuthContextType = {
     currentSession,
     userData,
@@ -84,6 +95,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     login,
     logout,
     isAdmin: userData?.role === UserRole.ADMIN,
+    resolvedPermissions,
+    hasPermission,
     refreshUser
   };
 

@@ -198,12 +198,32 @@ export enum UserRole {
   USER = 'user'
 }
 
+export enum UserPermission {
+  DASHBOARD_ADMIN = 'dashboard.admin',
+  EQUIPMENT_VIEW = 'equipment.view',
+  EQUIPMENT_MANAGE = 'equipment.manage',
+  MAINTENANCES_VIEW = 'maintenances.view',
+  MAINTENANCES_MANAGE = 'maintenances.manage',
+  REPORTS_VIEW = 'reports.view',
+  WARRANTY_VIEW = 'warranty.view',
+  USERS_VIEW = 'users.view',
+  USERS_MANAGE = 'users.manage',
+  SETTINGS_VIEW = 'settings.view',
+  TICKETS_VIEW = 'tickets.view',
+  TICKETS_VIEW_ALL = 'tickets.view_all',
+  TICKETS_CHANGE_STATUS = 'tickets.change_status',
+  NOTIFICATIONS_VIEW = 'notifications.view'
+}
+
+export type UserPermissions = Partial<Record<UserPermission, boolean>>;
+
 export interface User {
   id: string; // ID único generado
   username: string; // Usuario único para login
   password: string; // Hash de contraseña
   name: string;
   role: UserRole;
+  permissions?: UserPermissions;
   company: Company;
   department?: string;
   position?: string; // Puesto/cargo del empleado

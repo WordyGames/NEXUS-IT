@@ -9,10 +9,10 @@ interface TicketDetailProps {
   onUpdate: () => void;
   currentUserId: string;
   currentUserName: string;
-  isAdmin: boolean;
+  canChangeStatus: boolean;
 }
 
-const TicketDetail = ({ ticket, onClose, onUpdate, currentUserId, currentUserName, isAdmin }: TicketDetailProps) => {
+const TicketDetail = ({ ticket, onClose, onUpdate, currentUserId, currentUserName, canChangeStatus }: TicketDetailProps) => {
   const { showToast } = useUiFeedback();
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
@@ -188,6 +188,8 @@ const TicketDetail = ({ ticket, onClose, onUpdate, currentUserId, currentUserNam
             </div>
             <button
               onClick={onClose}
+              aria-label="Cerrar detalle de ticket"
+              title="Cerrar"
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
             >
               <X size={24} className="text-gray-600 dark:text-gray-400" />
@@ -206,7 +208,7 @@ const TicketDetail = ({ ticket, onClose, onUpdate, currentUserId, currentUserNam
           </div>
 
           {/* Cambiar Estado (Solo admin) */}
-          {isAdmin && (
+          {canChangeStatus && (
             <div>
               <h4 className="font-semibold text-gray-800 dark:text-white mb-2">Cambiar Estado</h4>
               <div className="flex gap-2 flex-wrap">

@@ -43,6 +43,19 @@ const typeBgColors = {
 
 type FilterType = 'all' | NotificationType;
 
+const toDate = (value: any): Date => {
+  if (!value) return new Date(0);
+  if (value instanceof Date) return value;
+  if (typeof value === 'object' && typeof value.toDate === 'function') {
+    return value.toDate();
+  }
+  if (typeof value === 'object' && typeof value.seconds === 'number') {
+    return new Date(value.seconds * 1000);
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date(0) : parsed;
+};
+
 export const NotificationsPage: React.FC = () => {
   const { userData } = useAuth();
   const navigate = useNavigate();
@@ -127,7 +140,11 @@ export const NotificationsPage: React.FC = () => {
     await loadNotifications();
   };
 
-  const handleNotificationClick = (notif: Notification) => {
+  const handleNotificationClick = async (notif: Notification) => {
+    if (!notif.read) {
+      await markNotificationAsRead(notif.id);
+    }
+
     if (notif.references.ticketId) {
       navigate(`/tickets/${notif.references.ticketId}`);
     } else if (notif.references.equipmentId) {
@@ -135,6 +152,8 @@ export const NotificationsPage: React.FC = () => {
     } else if (notif.references.maintenanceId) {
       navigate(`/maintenances/${notif.references.maintenanceId}`);
     }
+
+    await loadNotifications();
   };
 
   // Filtrar notificaciones
@@ -232,7 +251,9 @@ export const NotificationsPage: React.FC = () => {
             {filteredNotifications.map(notif => (
               <div
                 key={notif.id}
-                onClick={() => handleNotificationClick(notif)}
+                onClick={() => {
+                  void handleNotificationClick(notif);
+                }}
                 className={`p-6 rounded-lg border-l-4 cursor-pointer transition-all bg-gray-800 border-gray-700 hover:bg-gray-750 ${
                   notif.read ? 'opacity-60' : 'font-semibold'
                 }`}
@@ -263,7 +284,7 @@ export const NotificationsPage: React.FC = () => {
 
                 <div className="flex justify-between items-center text-sm text-gray-400 mt-3">
                   <span>
-                    {new Date(notif.createdAt as any).toLocaleString()}
+                    {toDate(notif.createdAt as any).toLocaleString()}
                   </span>
                   <div className="flex gap-2">
                     {!notif.read && (
@@ -280,7 +301,7 @@ export const NotificationsPage: React.FC = () => {
                     <button
                       onClick={e => {
                         e.stopPropagation();
-                        handleNotificationClick(notif);
+                        void handleNotificationClick(notif);
                       }}
                       className="text-blue-400 hover:text-blue-300 font-medium ml-2"
                     >

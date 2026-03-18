@@ -1,34 +1,70 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { UserPermission } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
 
 const Sidebar: React.FC = () => {
   const location = useLocation();
-  const { isAdmin, userData } = useAuth();
+  const { hasPermission } = useAuth();
 
   const isActive = (path: string) => location.pathname === path;
 
-  // Menú para usuarios admin
-  const adminNavItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: '📊', admin: false },
-    { path: '/equipment', label: 'Equipos', icon: '💻', admin: true },
-    { path: '/tickets', label: 'Tickets', icon: '🎫', admin: false },
-    { path: '/maintenances', label: 'Mantenimientos', icon: '🔧', admin: true },
-    { path: '/reports', label: 'Reportes', icon: '📈', admin: true },
-    { path: '/warranty-report', label: 'Garantías', icon: '📅', admin: true },
-    { path: '/notifications', label: 'Notificaciones', icon: '🔔', admin: false },
-    { path: '/users', label: 'Usuarios', icon: '👥', admin: true },
-    { path: '/settings', label: 'Configuración', icon: '⚙️', admin: true }
-  ];
-
-  // Menú para usuarios normales
-  const userNavItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: '📊', admin: false },
-    { path: '/tickets', label: 'Mis Tickets', icon: '🎫', admin: false },
-    { path: '/notifications', label: 'Notificaciones', icon: '🔔', admin: false }
-  ];
-
-  const navItems = isAdmin ? adminNavItems : userNavItems;
+  const navItems = [
+    {
+      path: '/dashboard',
+      label: 'Dashboard',
+      icon: '📊',
+      permission: UserPermission.DASHBOARD_ADMIN
+    },
+    {
+      path: '/equipment',
+      label: 'Equipos',
+      icon: '💻',
+      permission: UserPermission.EQUIPMENT_VIEW
+    },
+    {
+      path: '/tickets',
+      label: 'Tickets',
+      icon: '🎫',
+      permission: UserPermission.TICKETS_VIEW
+    },
+    {
+      path: '/maintenances',
+      label: 'Mantenimientos',
+      icon: '🔧',
+      permission: UserPermission.MAINTENANCES_VIEW
+    },
+    {
+      path: '/reports',
+      label: 'Reportes',
+      icon: '📈',
+      permission: UserPermission.REPORTS_VIEW
+    },
+    {
+      path: '/warranty-report',
+      label: 'Garantías',
+      icon: '📅',
+      permission: UserPermission.WARRANTY_VIEW
+    },
+    {
+      path: '/notifications',
+      label: 'Notificaciones',
+      icon: '🔔',
+      permission: UserPermission.NOTIFICATIONS_VIEW
+    },
+    {
+      path: '/users',
+      label: 'Usuarios',
+      icon: '👥',
+      permission: UserPermission.USERS_VIEW
+    },
+    {
+      path: '/settings',
+      label: 'Configuración',
+      icon: '⚙️',
+      permission: UserPermission.SETTINGS_VIEW
+    }
+  ].filter((item) => hasPermission(item.permission));
 
   return (
     <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
@@ -46,9 +82,6 @@ const Sidebar: React.FC = () => {
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-2">
           {navItems.map((item) => {
-            // Solo mostrar items de admin si el usuario es admin
-            if (item.admin && !isAdmin) return null;
-
             return (
               <Link
                 key={item.path}
