@@ -3,6 +3,107 @@ import { Equipment, Ticket, Maintenance, MaintenanceStatus } from '@nexus-it/sha
 
 type AssignedUserNamesById = Record<string, string>;
 
+const toDateSafe = (value: any): Date | undefined => {
+  if (!value) return undefined;
+  if (value instanceof Date) return value;
+  if (typeof value === 'number') {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? undefined : date;
+  }
+  if (typeof value === 'string') {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? undefined : date;
+  }
+  if (typeof value === 'object') {
+    if (typeof value.toDate === 'function') {
+      const date = value.toDate();
+      return date instanceof Date && !Number.isNaN(date.getTime()) ? date : undefined;
+    }
+    if (typeof value.seconds === 'number') {
+      const date = new Date(value.seconds * 1000);
+      return Number.isNaN(date.getTime()) ? undefined : date;
+    }
+  }
+  return undefined;
+};
+
+const formatDateMx = (value: any): string => {
+  const date = toDateSafe(value);
+  if (!date) return '-';
+  return date.toLocaleDateString('es-MX', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit'
+  });
+};
+
+const getWarrantySnapshot = (warrantyExpiration: any): {
+  expirationDate: string;
+  daysLeft: number | '-';
+  semaphore: string;
+  status: string;
+} => {
+  const warrantyDate = toDateSafe(warrantyExpiration);
+  if (!warrantyDate) {
+    return {
+      expirationDate: '-',
+      daysLeft: '-',
+      semaphore: '⚪',
+      status: 'Sin datos'
+    };
+  }
+
+  const now = new Date();
+  const daysLeft = Math.ceil((warrantyDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (daysLeft < 0) {
+    return {
+      expirationDate: formatDateMx(warrantyDate),
+      daysLeft,
+      semaphore: '🔴',
+      status: 'Vencida'
+    };
+  }
+
+  if (daysLeft < 30) {
+    return {
+      expirationDate: formatDateMx(warrantyDate),
+      daysLeft,
+      semaphore: '🔴',
+      status: 'Crítica (<30 días)'
+    };
+  }
+
+  if (daysLeft <= 90) {
+    return {
+      expirationDate: formatDateMx(warrantyDate),
+      daysLeft,
+      semaphore: '🟡',
+      status: 'Próxima (30-90 días)'
+    };
+  }
+
+  return {
+    expirationDate: formatDateMx(warrantyDate),
+    daysLeft,
+    semaphore: '🟢',
+    status: 'Vigente (>90 días)'
+  };
+};
+
+const applySheetTableOptions = (ws: XLSX.WorkSheet, rowCount: number, columnCount: number) => {
+  if (rowCount > 0 && columnCount > 0) {
+    ws['!autofilter'] = {
+      ref: XLSX.utils.encode_range({
+        s: { r: 0, c: 0 },
+        e: { r: rowCount, c: columnCount - 1 }
+      })
+    };
+  }
+
+  (ws as any)['!freeze'] = { xSplit: 0, ySplit: 1 };
+};
+
 /**
  * Exporta equipos a Excel
  */
@@ -12,55 +113,126 @@ export const exportEquipmentToExcel = (
   assignedUserNamesById: AssignedUserNamesById = {}
 ) => {
   try {
-    // Preparar datos para Excel
-    const data = equipment.map(eq => ({
-      'ID': eq.id,
-      'Nombre': eq.name,
-      'Compañía': eq.company,
-      'Tipo': eq.type,
-      'Estado': eq.status,
-      'CPU': eq.specs?.cpu || '-',
-      'RAM': eq.specs?.ram || '-',
-      'Almacenamiento': eq.specs?.storage || '-',
-      'GPU': eq.specs?.gpu || '-',
-      'Sistema Operativo': eq.specs?.os || '-',
-      'Hostname': eq.specs?.hostname || '-',
-      'Serial': eq.specs?.serialNumber || '-',
-      'Ubicación': eq.location,
-      'Asignado a': eq.assignedTo
-        ? assignedUserNamesById[eq.assignedTo] || 'Usuario no disponible'
-        : 'Sin asignar',
-      'Notas': eq.notes || '-',
-      'Fecha de Creación': eq.createdAt ? new Date(eq.createdAt as any).toLocaleDateString('es-MX') : '-',
-    }));
+    const sortedEquipment = [...equipment].sort((a, b) => {
+      const byCompany = a.company.localeCompare(b.company, 'es', { sensitivity: 'base' });
+      if (byCompany !== 0) return byCompany;
+      return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+    });
 
-    // Crear workbook y worksheet
+    const getAssignedLabel = (eq: Equipment): string => {
+      if (!eq.assignedTo) return 'Sin asignar';
+      return assignedUserNamesById[eq.assignedTo] || 'Usuario no disponible';
+    };
+
+    // Hoja 1: Inventario (vista operativa)
+    const inventoryData = sortedEquipment.map((eq) => {
+      const warranty = getWarrantySnapshot(eq.warrantyExpiration);
+      return {
+        'Nombre': eq.name,
+        'Compañía': eq.company,
+        'Estado': eq.status,
+        'Tipo': eq.type,
+        'Asignado a': getAssignedLabel(eq),
+        'Ubicación': eq.location || '-',
+        'Hostname': eq.specs?.hostname || '-',
+        'Serial': eq.specs?.serialNumber || '-',
+        'Compra': formatDateMx(eq.purchaseDate),
+        'Garantía (vence)': warranty.expirationDate,
+        'Días garantía': warranty.daysLeft,
+        'Semáforo garantía': warranty.semaphore,
+        'Estatus garantía': warranty.status
+      };
+    });
+
+    // Hoja 2: Detalle técnico (información completa)
+    const technicalDetailData = sortedEquipment.map((eq) => {
+      const warranty = getWarrantySnapshot(eq.warrantyExpiration);
+      return {
+        'ID': eq.id,
+        'Nombre': eq.name,
+        'Compañía': eq.company,
+        'Estado': eq.status,
+        'Tipo': eq.type,
+        'Asignado a': getAssignedLabel(eq),
+        'Ubicación': eq.location || '-',
+        'CPU': eq.specs?.cpu || '-',
+        'RAM': eq.specs?.ram || '-',
+        'Almacenamiento': eq.specs?.storage || '-',
+        'GPU': eq.specs?.gpu || '-',
+        'Sistema Operativo': eq.specs?.os || '-',
+        'Versión OS': eq.specs?.osVersion || '-',
+        'Hostname': eq.specs?.hostname || '-',
+        'Serial': eq.specs?.serialNumber || '-',
+        'Modelo': eq.specs?.model || '-',
+        'Fabricante': eq.specs?.manufacturer || '-',
+        'IP': eq.specs?.ipAddress || '-',
+        'MAC': eq.specs?.macAddress || '-',
+        'Compra': formatDateMx(eq.purchaseDate),
+        'Garantía (vence)': warranty.expirationDate,
+        'Días garantía': warranty.daysLeft,
+        'Semáforo garantía': warranty.semaphore,
+        'Estatus garantía': warranty.status,
+        'Fecha de creación': formatDateMx(eq.createdAt),
+        'Notas': eq.notes || '-'
+      };
+    });
+
+    // Crear workbook y worksheets
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(data);
+    const wsInventory = XLSX.utils.json_to_sheet(inventoryData);
+    const wsTechnicalDetail = XLSX.utils.json_to_sheet(technicalDetailData);
 
-    // Ajustar ancho de columnas
-    const colWidths = [
-      { wch: 25 }, // ID
-      { wch: 30 }, // Nombre
-      { wch: 35 }, // Compañía
-      { wch: 15 }, // Tipo
+    // Anchos de columnas para mejor lectura
+    wsInventory['!cols'] = [
+      { wch: 28 }, // Nombre
+      { wch: 34 }, // Compañía
       { wch: 12 }, // Estado
-      { wch: 35 }, // CPU
-      { wch: 15 }, // RAM
-      { wch: 20 }, // Almacenamiento
-      { wch: 25 }, // GPU
-      { wch: 25 }, // SO
-      { wch: 20 }, // Hostname
-      { wch: 25 }, // Serial
-      { wch: 25 }, // Ubicación
-      { wch: 20 }, // Asignado a
-      { wch: 40 }, // Notas
-      { wch: 18 }, // Fecha
+      { wch: 14 }, // Tipo
+      { wch: 26 }, // Asignado a
+      { wch: 24 }, // Ubicación
+      { wch: 22 }, // Hostname
+      { wch: 24 }, // Serial
+      { wch: 16 }, // Compra
+      { wch: 18 }, // Garantía (vence)
+      { wch: 14 }, // Días garantía
+      { wch: 18 }, // Semáforo
+      { wch: 24 }  // Estatus garantía
     ];
-    ws['!cols'] = colWidths;
 
-    // Agregar worksheet al workbook
-    XLSX.utils.book_append_sheet(wb, ws, 'Equipos');
+    wsTechnicalDetail['!cols'] = [
+      { wch: 25 }, // ID
+      { wch: 28 }, // Nombre
+      { wch: 34 }, // Compañía
+      { wch: 12 }, // Estado
+      { wch: 14 }, // Tipo
+      { wch: 26 }, // Asignado a
+      { wch: 24 }, // Ubicación
+      { wch: 36 }, // CPU
+      { wch: 16 }, // RAM
+      { wch: 20 }, // Almacenamiento
+      { wch: 22 }, // GPU
+      { wch: 28 }, // Sistema Operativo
+      { wch: 20 }, // Versión OS
+      { wch: 22 }, // Hostname
+      { wch: 24 }, // Serial
+      { wch: 24 }, // Modelo
+      { wch: 22 }, // Fabricante
+      { wch: 18 }, // IP
+      { wch: 20 }, // MAC
+      { wch: 16 }, // Compra
+      { wch: 18 }, // Garantía (vence)
+      { wch: 14 }, // Días garantía
+      { wch: 18 }, // Semáforo
+      { wch: 24 }, // Estatus garantía
+      { wch: 18 }, // Fecha creación
+      { wch: 44 }  // Notas
+    ];
+
+    applySheetTableOptions(wsInventory, inventoryData.length, Object.keys(inventoryData[0] || {}).length);
+    applySheetTableOptions(wsTechnicalDetail, technicalDetailData.length, Object.keys(technicalDetailData[0] || {}).length);
+
+    XLSX.utils.book_append_sheet(wb, wsInventory, 'Inventario');
+    XLSX.utils.book_append_sheet(wb, wsTechnicalDetail, 'Detalle técnico');
 
     // Descargar archivo
     const timestamp = new Date().toISOString().split('T')[0];
