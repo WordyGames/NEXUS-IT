@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
+  deleteNotification,
   getUnreadNotifications,
   getUserNotifications,
+  markNotificationAsRead,
   NotificationType,
   Notification
 } from '@nexus-it/shared';
@@ -31,10 +34,12 @@ const toDate = (value: any): Date => {
 
 export const NotificationBell: React.FC = () => {
   const { userData } = useAuth();
+  const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
+  const [actioningId, setActioningId] = useState<string | null>(null);
 
   const loadNotifications = async () => {
     if (!userData?.id) return;
@@ -59,6 +64,43 @@ export const NotificationBell: React.FC = () => {
     const interval = setInterval(loadNotifications, 30000); // Refresh cada 30s
     return () => clearInterval(interval);
   }, [userData?.id, isOpen]);
+
+  const resolveNotificationRoute = (notif: Notification) => {
+    if (notif.references?.ticketId) return `/tickets/${notif.references.ticketId}`;
+    if (notif.references?.equipmentId) return `/equipment/${notif.references.equipmentId}`;
+    if (notif.references?.maintenanceId) return `/maintenances/${notif.references.maintenanceId}`;
+    return '/notifications';
+  };
+
+  const handleOpenNotification = async (notif: Notification) => {
+    try {
+      if (!notif.read) {
+        await markNotificationAsRead(notif.id);
+      }
+
+      setIsOpen(false);
+      navigate(resolveNotificationRoute(notif));
+      await loadNotifications();
+    } catch (error) {
+      console.error('Error opening notification:', error);
+    }
+  };
+
+  const handleDeleteNotification = async (
+    event: React.MouseEvent<HTMLButtonElement>,
+    notifId: string
+  ) => {
+    event.stopPropagation();
+    try {
+      setActioningId(notifId);
+      await deleteNotification(notifId);
+      await loadNotifications();
+    } catch (error) {
+      console.error('Error deleting notification from bell:', error);
+    } finally {
+      setActioningId(null);
+    }
+  };
 
   return (
     <div className="relative">
@@ -115,6 +157,9 @@ export const NotificationBell: React.FC = () => {
               notifications.map(notif => (
                 <div
                   key={notif.id}
+                  onClick={() => {
+                    void handleOpenNotification(notif);
+                  }}
                   className="p-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition"
                 >
                   <div className="flex gap-2">
@@ -132,9 +177,22 @@ export const NotificationBell: React.FC = () => {
                         {toDate(notif.createdAt as any).toLocaleTimeString()}
                       </p>
                     </div>
-                    {!notif.read && (
-                      <div className="flex-shrink-0 w-2 h-2 bg-blue-600 rounded-full mt-1" />
-                    )}
+                    <div className="flex flex-col items-end gap-2">
+                      {!notif.read && (
+                        <div className="flex-shrink-0 w-2 h-2 bg-blue-600 rounded-full mt-1" />
+                      )}
+
+                      <button
+                        onClick={(event) => {
+                          void handleDeleteNotification(event, notif.id);
+                        }}
+                        disabled={actioningId === notif.id}
+                        className="text-[11px] text-gray-400 hover:text-red-500 disabled:opacity-50"
+                        title="Eliminar notificación"
+                      >
+                        {actioningId === notif.id ? '...' : '✕'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))
