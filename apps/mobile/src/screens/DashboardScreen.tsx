@@ -14,7 +14,9 @@ import {
   getEquipment,
   getEquipmentStats,
   getTicketStats,
-  getTickets
+  getTickets,
+  subscribeSupportChatThread,
+  subscribeSupportChatThreads
 } from '@nexus-it/shared';
 
 const DashboardScreen = ({ navigation }: any) => {
@@ -25,11 +27,33 @@ const DashboardScreen = ({ navigation }: any) => {
   const [userEquipmentCount, setUserEquipmentCount] = useState(0);
   const [userTicketsCount, setUserTicketsCount] = useState(0);
   const [recentTickets, setRecentTickets] = useState<Ticket[]>([]);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     void loadStats();
   }, [canSeeGlobalDashboard, userData?.id, userData?.username, userData?.name]);
+
+  useEffect(() => {
+    if (!userData?.id) {
+      setChatUnreadCount(0);
+      return;
+    }
+
+    if (isAdmin) {
+      const unsubscribe = subscribeSupportChatThreads((rows) => {
+        setChatUnreadCount(rows.filter((thread) => thread.hasUnreadForAdmin).length);
+      });
+
+      return () => unsubscribe();
+    }
+
+    const unsubscribe = subscribeSupportChatThread(userData.id, (thread) => {
+      setChatUnreadCount(thread?.hasUnreadForUser ? 1 : 0);
+    });
+
+    return () => unsubscribe();
+  }, [isAdmin, userData?.id]);
 
   const getTicketSortValue = (ticket: Ticket) => {
     const createdAt: any = ticket.createdAt;
@@ -178,6 +202,15 @@ const DashboardScreen = ({ navigation }: any) => {
           onPress={() => navigation.navigate('Tickets')}
         >
           <Text style={styles.actionButtonText}>Ver Tickets</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => navigation.navigate('Chat')}
+        >
+          <Text style={styles.actionButtonText}>
+            Chat de Soporte{chatUnreadCount > 0 ? ` (${chatUnreadCount})` : ''}
+          </Text>
         </TouchableOpacity>
 
         {!canSeeGlobalDashboard && (

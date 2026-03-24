@@ -10,6 +10,7 @@ import RegisterScreen from './src/screens/RegisterScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
 import EquipmentScreen from './src/screens/EquipmentScreen';
 import TicketsScreen from './src/screens/TicketsScreen';
+import ChatScreen from './src/screens/ChatScreen';
 import MobileEnrollmentScreen from './src/screens/MobileEnrollmentScreen';
 import { AppErrorBoundary } from './src/components/AppErrorBoundary';
 
@@ -119,6 +120,11 @@ export default function App() {
                 name="Tickets" 
                 component={TicketsScreen}
                 options={{ title: 'Tickets' }}
+              />
+              <Stack.Screen
+                name="Chat"
+                component={ChatScreen}
+                options={{ title: 'Chat de Soporte' }}
               />
             </Stack.Navigator>
           </NavigationContainer>

@@ -304,6 +304,37 @@ export interface Notification {
   expiresAt?: Date | Timestamp; // Para no mostrar notificaciones antiguas
 }
 
+// Chat de soporte individual por usuario
+export enum SupportChatSender {
+  USER = 'user',
+  AGENT = 'agent'
+}
+
+export interface SupportChatMessage {
+  id: string;
+  userId: string;
+  userName: string;
+  sender: SupportChatSender;
+  senderName?: string;
+  text: string;
+  createdAt: Date | Timestamp;
+}
+
+export interface SupportChatThread {
+  id: string; // Igual al userId
+  userId: string;
+  userName: string;
+  lastMessage?: string;
+  lastSender?: SupportChatSender;
+  hasUnreadForUser?: boolean;
+  hasUnreadForAdmin?: boolean;
+  userLastReadAt?: Date | Timestamp;
+  adminLastReadAt?: Date | Timestamp;
+  lastMessageAt?: Date | Timestamp;
+  createdAt: Date | Timestamp;
+  updatedAt: Date | Timestamp;
+}
+
 // Carta Responsiva
 export interface CartaResponsiva {
   id: string;

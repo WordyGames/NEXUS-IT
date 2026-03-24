@@ -10,3 +10,4 @@ export * from './services/search';
 export * from './services/storage';
 export * from './services/notifications';
 export * from './services/notificationsIntegration';
+export * from './services/supportChat';

@@ -17,6 +17,7 @@ import Reports from './pages/Reports';
 import { NotificationsPage } from './pages/Notifications';
 import Settings from './pages/Settings';
 import Users from './pages/Users';
+import Chat from './pages/Chat';
 import Layout from './components/Layout';
 import PortalLayout from './components/PortalLayout';
 import { WarrantyReport } from './components/WarrantyReport';
@@ -66,6 +67,7 @@ function App() {
                 <Route index element={<Dashboard />} />
                 <Route path="equipment" element={<MyEquipment />} />
                 <Route path="tickets" element={<Tickets />} />
+                <Route path="chat" element={<Chat />} />
               </Route>
               <Route
                 path="/"
@@ -156,6 +158,7 @@ function App() {
                     </PrivateRoute>
                   }
                 />
+                <Route path="chat" element={<Chat />} />
               </Route>
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>

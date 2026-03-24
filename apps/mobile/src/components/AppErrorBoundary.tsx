@@ -22,7 +22,8 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   static getDerivedStateFromError(error: Error): AppErrorBoundaryState {
     return {
       hasError: true,
-      errorMessage: error?.message || 'Error desconocido'
+      errorMessage: error?.message || 'Error desconocido',
+      isRetrying: false
     };
   }
 
