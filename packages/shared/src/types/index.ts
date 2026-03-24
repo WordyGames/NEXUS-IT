@@ -295,6 +295,7 @@ export interface Notification {
   title: string;
   message: string;
   read: boolean;
+  dedupeKey?: string;
   references: {
     equipmentId?: string;
     ticketId?: string;

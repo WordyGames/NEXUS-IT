@@ -39,6 +39,40 @@ const toDate = (value: any): Date => {
   return Number.isNaN(parsed.getTime()) ? new Date(0) : parsed;
 };
 
+const WARRANTY_NOTIFICATION_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24h
+const MAINTENANCE_NOTIFICATION_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24h
+const STATUS_NOTIFICATION_COOLDOWN_MS = 10 * 60 * 1000; // 10m
+const COMMENT_NOTIFICATION_COOLDOWN_MS = 2 * 60 * 1000; // 2m
+
+const hasRecentDuplicateNotification = async (params: {
+  userId: string;
+  type: NotificationType;
+  dedupeKey: string;
+  cooldownMs: number;
+}): Promise<boolean> => {
+  const { userId, type, dedupeKey, cooldownMs } = params;
+
+  const q = query(
+    collection(db, 'notifications'),
+    where('userId', '==', userId),
+    where('type', '==', type),
+    limit(200)
+  );
+
+  const snapshot = await getDocs(q);
+  const nowMs = Date.now();
+
+  return snapshot.docs.some((snapshotDoc) => {
+    const data = snapshotDoc.data() as Notification;
+    if ((data as any).dedupeKey !== dedupeKey) return false;
+
+    const createdAtMs = toDate(data.createdAt as any).getTime();
+    if (createdAtMs <= 0) return false;
+
+    return nowMs - createdAtMs < cooldownMs;
+  });
+};
+
 // Obtener notificaciones del usuario
 export async function getUserNotifications(userId: string): Promise<Notification[]> {
   try {
@@ -136,20 +170,22 @@ export async function createWarrantyExpiringNotification(
     );
 
     if (daysUntilExpiration <= 30 && daysUntilExpiration > 0) {
-      // Verificar si ya existe notificación similar reciente
-      const existingQ = query(
-        collection(db, 'notifications'),
-        where('userId', '==', userId),
-        where('type', '==', NotificationType.WARRANTY_EXPIRING),
-        where('references.equipmentId', '==', equipment.id)
-      );
-      
-      const existing = await getDocs(existingQ);
-      if (existing.size > 0) return; // Ya existe notificación
+      const equipmentKey = equipment.id || `${equipment.company}:${equipment.name}`;
+      const warrantyKey = warrantyDate.toISOString().slice(0, 10);
+      const dedupeKey = `warranty:${equipmentKey}:${warrantyKey}`;
+
+      const isDuplicate = await hasRecentDuplicateNotification({
+        userId,
+        type: NotificationType.WARRANTY_EXPIRING,
+        dedupeKey,
+        cooldownMs: WARRANTY_NOTIFICATION_COOLDOWN_MS
+      });
+      if (isDuplicate) return;
 
       await addDoc(collection(db, 'notifications'), {
         userId,
         type: NotificationType.WARRANTY_EXPIRING,
+        dedupeKey,
         title: `⚠️ Garantía próxima a vencer`,
         message: `El equipo "${equipment.name}" vence garantía en ${daysUntilExpiration} días (${warrantyDate.toLocaleDateString()})`,
         read: false,
@@ -180,21 +216,22 @@ export async function createMaintenanceUpcomingNotification(
 
     // Notificar si es en los próximos 7 días
     if (daysUntilMaintenance <= 7 && daysUntilMaintenance >= 0) {
+      const maintenanceDateKey = scheduledDate.toISOString().slice(0, 10);
       for (const userId of users) {
-        // Verificar si ya existe
-        const existingQ = query(
-          collection(db, 'notifications'),
-          where('userId', '==', userId),
-          where('type', '==', NotificationType.MAINTENANCE_UPCOMING),
-          where('references.maintenanceId', '==', maintenance.id)
-        );
-        
-        const existing = await getDocs(existingQ);
-        if (existing.size > 0) continue;
+        const dedupeKey = `maintenance:${maintenance.id}:${maintenanceDateKey}`;
+
+        const isDuplicate = await hasRecentDuplicateNotification({
+          userId,
+          type: NotificationType.MAINTENANCE_UPCOMING,
+          dedupeKey,
+          cooldownMs: MAINTENANCE_NOTIFICATION_COOLDOWN_MS
+        });
+        if (isDuplicate) continue;
 
         await addDoc(collection(db, 'notifications'), {
           userId,
           type: NotificationType.MAINTENANCE_UPCOMING,
+          dedupeKey,
           title: `🔧 Mantenimiento próximo`,
           message: `Mantenimiento programado en ${daysUntilMaintenance} días (${scheduledDate.toLocaleDateString()})`,
           read: false,
@@ -229,9 +266,20 @@ export async function createTicketStatusChangeNotification(
     affectedUsers.delete(changedBy);
 
     for (const userId of affectedUsers) {
+      const dedupeKey = `ticket-status:${ticket.id}:${previousStatus}->${ticket.status}:${changedBy}`;
+
+      const isDuplicate = await hasRecentDuplicateNotification({
+        userId,
+        type: NotificationType.TICKET_STATUS_CHANGED,
+        dedupeKey,
+        cooldownMs: STATUS_NOTIFICATION_COOLDOWN_MS
+      });
+      if (isDuplicate) continue;
+
       await addDoc(collection(db, 'notifications'), {
         userId,
         type: NotificationType.TICKET_STATUS_CHANGED,
+        dedupeKey,
         title: `📌 Cambio de estado en ticket`,
         message: `Ticket #${ticket.ticketNumber} cambió de "${previousStatus}" a "${ticket.status}" por ${changedByName}`,
         read: false,
@@ -262,9 +310,21 @@ export async function createTicketCommentNotification(
     affectedUsers.delete(commentedBy);
 
     for (const userId of affectedUsers) {
+      const normalizedExcerpt = excerpt.trim().toLowerCase().slice(0, 40);
+      const dedupeKey = `ticket-comment:${ticket.id}:${commentedBy}:${normalizedExcerpt}`;
+
+      const isDuplicate = await hasRecentDuplicateNotification({
+        userId,
+        type: NotificationType.TICKET_COMMENTED,
+        dedupeKey,
+        cooldownMs: COMMENT_NOTIFICATION_COOLDOWN_MS
+      });
+      if (isDuplicate) continue;
+
       await addDoc(collection(db, 'notifications'), {
         userId,
         type: NotificationType.TICKET_COMMENTED,
+        dedupeKey,
         title: `💬 Nuevo comentario en ticket`,
         message: `${commentedByName} comentó en #${ticket.ticketNumber}: "${excerpt.substring(0, 50)}..."`,
         read: false,

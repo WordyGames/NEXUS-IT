@@ -11,6 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   Company,
   Ticket,
+  getUnreadNotifications,
   getEquipment,
   getEquipmentStats,
   getTicketStats,
@@ -28,6 +29,7 @@ const DashboardScreen = ({ navigation }: any) => {
   const [userTicketsCount, setUserTicketsCount] = useState(0);
   const [recentTickets, setRecentTickets] = useState<Ticket[]>([]);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -54,6 +56,33 @@ const DashboardScreen = ({ navigation }: any) => {
 
     return () => unsubscribe();
   }, [isAdmin, userData?.id]);
+
+  const loadNotificationBadge = async () => {
+    if (!userData?.id) {
+      setNotificationUnreadCount(0);
+      return;
+    }
+
+    try {
+      const unread = await getUnreadNotifications(userData.id);
+      setNotificationUnreadCount(unread);
+    } catch (error) {
+      console.error('Error loading mobile notification badge:', error);
+      setNotificationUnreadCount(0);
+    }
+  };
+
+  useEffect(() => {
+    void loadNotificationBadge();
+  }, [userData?.id]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      void loadNotificationBadge();
+    });
+
+    return unsubscribe;
+  }, [navigation, userData?.id]);
 
   const getTicketSortValue = (ticket: Ticket) => {
     const createdAt: any = ticket.createdAt;
@@ -202,6 +231,15 @@ const DashboardScreen = ({ navigation }: any) => {
           onPress={() => navigation.navigate('Tickets')}
         >
           <Text style={styles.actionButtonText}>Ver Tickets</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => navigation.navigate('Notifications')}
+        >
+          <Text style={styles.actionButtonText}>
+            Notificaciones{notificationUnreadCount > 0 ? ` (${notificationUnreadCount})` : ''}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity

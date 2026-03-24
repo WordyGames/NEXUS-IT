@@ -11,6 +11,7 @@ import DashboardScreen from './src/screens/DashboardScreen';
 import EquipmentScreen from './src/screens/EquipmentScreen';
 import TicketsScreen from './src/screens/TicketsScreen';
 import ChatScreen from './src/screens/ChatScreen';
+import NotificationsScreen from './src/screens/NotificationsScreen';
 import MobileEnrollmentScreen from './src/screens/MobileEnrollmentScreen';
 import { AppErrorBoundary } from './src/components/AppErrorBoundary';
 
@@ -125,6 +126,11 @@ export default function App() {
                 name="Chat"
                 component={ChatScreen}
                 options={{ title: 'Chat de Soporte' }}
+              />
+              <Stack.Screen
+                name="Notifications"
+                component={NotificationsScreen}
+                options={{ title: 'Notificaciones' }}
               />
             </Stack.Navigator>
           </NavigationContainer>
