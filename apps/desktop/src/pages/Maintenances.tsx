@@ -18,6 +18,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useUiFeedback } from '../contexts/UiFeedbackContext';
 import MaintenanceForm from '../components/MaintenanceForm';
 import MaintenanceStatusEditor from '../components/MaintenanceStatusEditor';
+import MaintenanceDetail from '../components/MaintenanceDetail';
 import { exportMaintenancesToExcel } from '../utils/exportToExcel';
 import { sendMaintenanceSavedEmail } from '../utils/maintenanceEmail';
 
@@ -39,6 +40,7 @@ const Maintenances = () => {
   const [showForm, setShowForm] = useState(false);
   const [selectedMaintenance, setSelectedMaintenance] = useState<Maintenance | undefined>();
   const [showStatusEditor, setShowStatusEditor] = useState(false);
+  const [showDetailView, setShowDetailView] = useState(false);
   const [justCreatedMaintenance, setJustCreatedMaintenance] = useState<Maintenance | undefined>();
   
   // Filtros
@@ -181,6 +183,11 @@ const Maintenances = () => {
   const handleEdit = (maintenance: Maintenance) => {
     setSelectedMaintenance(maintenance);
     setShowStatusEditor(true);
+  };
+
+  const handleViewDetail = (maintenance: Maintenance) => {
+    setSelectedMaintenance(maintenance);
+    setShowDetailView(true);
   };
 
   const handleCloseForm = () => {
@@ -435,6 +442,12 @@ const Maintenances = () => {
                     {canManageMaintenances && (
                       <td className="px-6 py-4 text-sm">
                         <button
+                          onClick={() => handleViewDetail(maintenance)}
+                          className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 mr-3"
+                        >
+                          Ver
+                        </button>
+                        <button
                           onClick={() => handleEdit(maintenance)}
                           className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 mr-3"
                         >
@@ -475,6 +488,17 @@ const Maintenances = () => {
             setSelectedMaintenance(undefined);
           }}
           onUpdate={loadMaintenances}
+        />
+      )}
+
+      {/* Modal de detalles */}
+      {showDetailView && selectedMaintenance && (
+        <MaintenanceDetail
+          maintenance={selectedMaintenance}
+          onClose={() => {
+            setShowDetailView(false);
+            setSelectedMaintenance(undefined);
+          }}
         />
       )}
     </div>
