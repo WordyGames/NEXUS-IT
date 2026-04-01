@@ -13,6 +13,20 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
   onClose,
 }) => {
   const contentRef = useRef<HTMLDivElement>(null);
+
+  const sanitizePdfText = (value: string) => {
+    if (!value) return '';
+
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // quita acentos combinados
+      .replace(/[\u2018\u2019]/g, "'") // comillas curvas
+      .replace(/[\u201C\u201D]/g, '"')
+      .replace(/[\u2013\u2014]/g, '-') // guiones largos
+      .replace(/[\u2026]/g, '...')
+      .replace(/[^\x20-\x7E\xA0-\xFF\n\r\t]/g, ''); // elimina símbolos no soportados
+  };
+
   const formatDate = (date: any) => {
     if (!date) return '-';
     const d = date.toDate ? date.toDate() : new Date(date);
@@ -22,6 +36,16 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
+    });
+  };
+
+  const formatDateOnly = (date: any) => {
+    if (!date) return '-';
+    const d = date.toDate ? date.toDate() : new Date(date);
+    return d.toLocaleDateString('es-MX', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     });
   };
 
@@ -60,7 +84,7 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
         pdf.setTextColor(255, 255, 255);
         pdf.setFontSize(11);
         pdf.setFont(undefined, 'bold');
-        pdf.text(title, 15, yPosition + 6);
+        pdf.text(sanitizePdfText(title), 15, yPosition + 6);
         yPosition += 12;
       };
 
@@ -68,10 +92,10 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
         pdf.setTextColor(...darkGray);
         pdf.setFontSize(9);
         pdf.setFont(undefined, 'bold');
-        pdf.text(label, 15, yPosition);
+        pdf.text(sanitizePdfText(label), 15, yPosition);
         pdf.setFont(undefined, 'normal');
         const valueWidth = pageWidth - 80;
-        const wrappedValue = pdf.splitTextToSize(value, valueWidth);
+        const wrappedValue = pdf.splitTextToSize(sanitizePdfText(value), valueWidth);
         pdf.text(wrappedValue, 50, yPosition);
         yPosition += Math.max(6, wrappedValue.length * 5);
       };
@@ -96,12 +120,12 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
 
       // Sección: Fechas
       addSection('FECHAS Y FRECUENCIA');
-      addField('Fecha Programada:', formatDate(maintenance.scheduledDate));
+      addField('Fecha Programada:', formatDateOnly(maintenance.scheduledDate));
       if (maintenance.frequency) {
         addField('Frecuencia:', maintenance.frequency);
       }
       if (maintenance.nextMaintenanceDate) {
-        addField('Próximo Mantenimiento:', formatDate(maintenance.nextMaintenanceDate));
+        addField('Próximo Mantenimiento:', formatDateOnly(maintenance.nextMaintenanceDate));
       }
       yPosition += 5;
 
@@ -120,15 +144,16 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
         pdf.setTextColor(...darkGray);
         pdf.setFontSize(8);
         maintenance.tasks.forEach((task) => {
-          const symbol = task.completed ? '☑' : '☐';
+          const symbol = task.completed ? '[x]' : '[ ]';
           pdf.setFont(undefined, 'normal');
-          const taskLines = pdf.splitTextToSize(`${symbol} ${task.description}`, pageWidth - 30);
+          const taskText = sanitizePdfText(`${symbol} ${task.description}`);
+          const taskLines = pdf.splitTextToSize(taskText, pageWidth - 30);
           pdf.text(taskLines, 15, yPosition);
           yPosition += taskLines.length * 4;
           if (task.completed && task.completedBy) {
             pdf.setTextColor(120, 120, 120);
             pdf.setFont(undefined, 'italic');
-            pdf.text(`    ✓ Completada por ${task.completedBy}`, 15, yPosition);
+            pdf.text(sanitizePdfText(`    Completada por ${task.completedBy}`), 15, yPosition);
             yPosition += 4;
             pdf.setTextColor(...darkGray);
           }
@@ -142,7 +167,7 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
         pdf.setTextColor(...darkGray);
         pdf.setFontSize(8);
         pdf.setFont(undefined, 'normal');
-        const noteLines = pdf.splitTextToSize(maintenance.notes, pageWidth - 30);
+        const noteLines = pdf.splitTextToSize(sanitizePdfText(maintenance.notes), pageWidth - 30);
         pdf.text(noteLines, 15, yPosition);
         yPosition += noteLines.length * 4 + 5;
       }
@@ -161,8 +186,8 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
       pdf.setTextColor(150, 150, 150);
       pdf.setFontSize(7);
       pdf.setFont(undefined, 'normal');
-      pdf.text('Este documento fue generado automáticamente por NEXUS IT', pageWidth / 2, pageHeight - 10, { align: 'center' });
-      pdf.text(`Generado: ${formatDate(new Date())}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
+      pdf.text(sanitizePdfText('Este documento fue generado automaticamente por NEXUS IT'), pageWidth / 2, pageHeight - 10, { align: 'center' });
+      pdf.text(sanitizePdfText(`Generado: ${formatDate(new Date())}`), pageWidth / 2, pageHeight - 5, { align: 'center' });
 
       // Descargar
       const fileName = `mantenimiento-${maintenance.id}-${Date.now()}.pdf`;
