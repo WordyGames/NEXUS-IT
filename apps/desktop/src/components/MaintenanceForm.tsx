@@ -96,6 +96,15 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
     }
   };
 
+  const getAssignedEquipmentLabel = (equipment: Equipment): string => {
+    if (!equipment.assignedTo) {
+      return 'Sin asignar';
+    }
+
+    const assignedUser = usersList.find((user) => user.id === equipment.assignedTo);
+    return assignedUser ? assignedUser.name : 'Usuario no disponible';
+  };
+
   const isInitialAttachment = (attachment: Attachment): boolean => {
     return initialAttachmentKeys.has(getAttachmentKey(attachment));
   };
@@ -299,7 +308,7 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
                 <option value="">Seleccionar equipo...</option>
                 {equipmentList.map((eq) => (
                   <option key={eq.id} value={eq.id}>
-                    {eq.name} - {eq.company}
+                    {eq.name} - {eq.company} | Asignado a: {getAssignedEquipmentLabel(eq)}
                   </option>
                 ))}
               </select>
