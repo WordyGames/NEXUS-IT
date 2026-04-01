@@ -268,25 +268,27 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
 
       await triggerMaintenanceNotifications(maintenanceForNotification);
 
-      try {
-        const recipientEmail = notificationEmail.trim() || selectedUser?.email?.trim() || userData?.email?.trim();
-        if (recipientEmail) {
-          await sendMaintenanceSavedEmail({
-            recipientEmail,
-            recipientName: selectedUser?.name || userData?.name || '',
-            maintenanceId: persistedId,
-            equipmentName: maintenanceForNotification.equipmentName,
-            company: maintenanceForNotification.company,
-            title: maintenanceForNotification.title,
-            scheduledDate: toDate(maintenanceForNotification.scheduledDate).toISOString(),
-            assignedToName: maintenanceForNotification.assignedToName,
-            createdByName: maintenanceForNotification.createdByName
-          });
-        } else {
-          console.warn('No se encontró correo para enviar la notificación del mantenimiento');
+      if (!initialData) {
+        try {
+          const recipientEmail = notificationEmail.trim() || selectedUser?.email?.trim() || userData?.email?.trim();
+          if (recipientEmail) {
+            await sendMaintenanceSavedEmail({
+              recipientEmail,
+              recipientName: selectedUser?.name || userData?.name || '',
+              maintenanceId: persistedId,
+              equipmentName: maintenanceForNotification.equipmentName,
+              company: maintenanceForNotification.company,
+              title: maintenanceForNotification.title,
+              scheduledDate: toDate(maintenanceForNotification.scheduledDate).toISOString(),
+              assignedToName: maintenanceForNotification.assignedToName,
+              createdByName: maintenanceForNotification.createdByName
+            });
+          } else {
+            console.warn('No se encontró correo para enviar la notificación del mantenimiento');
+          }
+        } catch (emailError) {
+          console.error('Error sending maintenance email notification:', emailError);
         }
-      } catch (emailError) {
-        console.error('Error sending maintenance email notification:', emailError);
       }
 
       onClose();
