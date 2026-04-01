@@ -235,6 +235,13 @@ const DashboardScreen = ({ navigation }: any) => {
 
         <TouchableOpacity
           style={styles.actionButton}
+          onPress={() => navigation.navigate('MaintenanceConfirmation')}
+        >
+          <Text style={styles.actionButtonText}>📅 Confirmación de Horas</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionButton}
           onPress={() => navigation.navigate('Notifications')}
         >
           <Text style={styles.actionButtonText}>

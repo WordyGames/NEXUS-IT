@@ -13,6 +13,7 @@ import TicketsScreen from './src/screens/TicketsScreen';
 import ChatScreen from './src/screens/ChatScreen';
 import NotificationsScreen from './src/screens/NotificationsScreen';
 import MobileEnrollmentScreen from './src/screens/MobileEnrollmentScreen';
+import MaintenanceConfirmationScreen from './src/screens/MaintenanceConfirmationScreen';
 import { AppErrorBoundary } from './src/components/AppErrorBoundary';
 
 const Stack = createNativeStackNavigator();
@@ -131,6 +132,11 @@ export default function App() {
                 name="Notifications"
                 component={NotificationsScreen}
                 options={{ title: 'Notificaciones' }}
+              />
+              <Stack.Screen
+                name="MaintenanceConfirmation"
+                component={MaintenanceConfirmationScreen}
+                options={{ title: 'Confirmación de Horas' }}
               />
             </Stack.Navigator>
           </NavigationContainer>

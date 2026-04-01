@@ -19,6 +19,7 @@ import { useUiFeedback } from '../contexts/UiFeedbackContext';
 import MaintenanceForm from '../components/MaintenanceForm';
 import MaintenanceStatusEditor from '../components/MaintenanceStatusEditor';
 import MaintenanceDetail from '../components/MaintenanceDetail';
+import MaintenanceConfirmationSchedule from '../components/MaintenanceConfirmationSchedule';
 import { exportMaintenancesToExcel } from '../utils/exportToExcel';
 import { sendMaintenanceSavedEmail } from '../utils/maintenanceEmail';
 
@@ -42,6 +43,7 @@ const Maintenances = () => {
   const [showStatusEditor, setShowStatusEditor] = useState(false);
   const [showDetailView, setShowDetailView] = useState(false);
   const [justCreatedMaintenance, setJustCreatedMaintenance] = useState<Maintenance | undefined>();
+  const [viewMode, setViewMode] = useState<'list' | 'confirmations'>('list');
   
   // Filtros
   const [companyFilter, setCompanyFilter] = useState<Company | ''>('');
@@ -244,6 +246,29 @@ const Maintenances = () => {
           </p>
         </div>
         <div className="flex gap-2">
+          <div className="flex gap-1 bg-gray-200 dark:bg-gray-700 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`px-4 py-2 rounded transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-transparent text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+              }`}
+            >
+              📋 Lista
+            </button>
+            <button
+              onClick={() => setViewMode('confirmations')}
+              className={`px-4 py-2 rounded transition-colors ${
+                viewMode === 'confirmations'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-transparent text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+              }`}
+            >
+              📅 Confirmaciones
+            </button>
+          </div>
+
           <button
             onClick={() => exportMaintenancesToExcel(maintenances, 'mantenimientos')}
             className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2"
@@ -265,7 +290,7 @@ const Maintenances = () => {
       </div>
 
       {/* Alertas */}
-      {(upcomingMaintenances.length > 0 || overdueMaintenances.length > 0) && (
+      {(upcomingMaintenances.length > 0 || overdueMaintenances.length > 0) && viewMode === 'list' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Próximos */}
           {upcomingMaintenances.length > 0 && (
@@ -299,6 +324,11 @@ const Maintenances = () => {
         </div>
       )}
 
+      {/* Vista de Confirmaciones de Hora */}
+      {viewMode === 'confirmations' ? (
+        <MaintenanceConfirmationSchedule />
+      ) : (
+        <>
       {/* Filtros */}
       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
         <div className="flex items-center gap-2 mb-4">
@@ -468,6 +498,8 @@ const Maintenances = () => {
           </table>
         </div>
       </div>
+      </>
+      )}
 
       {/* Modal de formulario */}
       {showForm && (

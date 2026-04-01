@@ -431,3 +431,97 @@ export const getMaintenanceStats = async () => {
     throw error;
   }
 };
+
+/**
+ * Obtiene mantenimientos programados pendientes de confirmar hora
+ */
+export const getPendingTimeConfirmationMaintenances = async (
+  assignedToId?: string
+): Promise<Maintenance[]> => {
+  try {
+    const constraints: QueryConstraint[] = [
+      where('status', '==', MaintenanceStatus.PROGRAMADO),
+      where('timeConfirmationStatus', '==', 'pending'),
+    ];
+
+    if (assignedToId) {
+      constraints.push(where('assignedTo', '==', assignedToId));
+    }
+
+    const q = query(collection(db, COLLECTION_NAME), ...constraints);
+    const querySnapshot = await getDocs(q);
+
+    const maintenances = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Maintenance[];
+
+    // Ordenar por fecha
+    maintenances.sort((a, b) => {
+      const aTime =
+        a.scheduledDate instanceof Timestamp
+          ? a.scheduledDate.toMillis()
+          : new Date(a.scheduledDate).getTime();
+      const bTime =
+        b.scheduledDate instanceof Timestamp
+          ? b.scheduledDate.toMillis()
+          : new Date(b.scheduledDate).getTime();
+      return aTime - bTime;
+    });
+
+    return maintenances;
+  } catch (error) {
+    console.error('Error getting pending time confirmation maintenances:', error);
+    throw error;
+  }
+};
+
+/**
+ * Confirma la hora de un mantenimiento
+ */
+export const confirmMaintenanceTime = async (
+  maintenanceId: string,
+  scheduledTime: string, // HH:mm
+  confirmedBy: string,
+  confirmedByName: string
+): Promise<void> => {
+  try {
+    const maintenanceRef = doc(db, COLLECTION_NAME, maintenanceId);
+
+    await updateDoc(maintenanceRef, {
+      scheduledTime,
+      timeConfirmationStatus: 'confirmed',
+      timeConfirmedBy: confirmedBy,
+      timeConfirmedByName: confirmedByName,
+      timeConfirmedAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error('Error confirming maintenance time:', error);
+    throw error;
+  }
+};
+
+/**
+ * Obtiene mantenimientos por rango de fecha y hora (para ver calendario de disponibilidad)
+ */
+export const getMaintenancesByDateRange = async (
+  startDate: Date,
+  endDate: Date
+): Promise<Maintenance[]> => {
+  try {
+    // En cliente: obtener todos y filtrar
+    const allMaintenances = await getMaintenances();
+
+    return allMaintenances.filter((m) => {
+      const mDate =
+        m.scheduledDate instanceof Timestamp
+          ? m.scheduledDate.toDate()
+          : new Date(m.scheduledDate);
+      return mDate >= startDate && mDate <= endDate && m.timeConfirmationStatus === 'confirmed';
+    });
+  } catch (error) {
+    console.error('Error getting maintenances by date range:', error);
+    throw error;
+  }
+};

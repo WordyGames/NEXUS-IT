@@ -167,11 +167,16 @@ export interface Maintenance {
   description: string;
   notificationEmail?: string;
   scheduledDate: Date | Timestamp;
+  scheduledTime?: string; // HH:mm (ej: "14:30") confirmado por el responsable
   completedDate?: Date | Timestamp;
   nextMaintenanceDate?: Date | Timestamp; // Para mantenimientos recurrentes
   frequency?: 'weekly' | 'monthly' | 'quarterly' | 'semiannual' | 'annual'; // Frecuencia de repetición
   assignedTo?: string; // Técnico asignado
   assignedToName?: string;
+  timeConfirmationStatus?: 'pending' | 'confirmed'; // Estado de confirmación de hora
+  timeConfirmedBy?: string; // ID de quien confirmó la hora
+  timeConfirmedByName?: string; // Nombre de quien confirmó
+  timeConfirmedAt?: Date | Timestamp; // Cuándo se confirmó la hora
   tasks: MaintenanceTask[]; // Checklist de tareas
   notes?: string;
   attachments?: Attachment[]; // Fotos, reportes, etc.
