@@ -49,6 +49,20 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
     });
   };
 
+  const getFrequencyLabel = (frequency?: string) => {
+    if (!frequency) return '-';
+
+    const map: Record<string, string> = {
+      weekly: 'Semanal',
+      monthly: 'Mensual',
+      quarterly: 'Trimestral',
+      semiannual: 'Semestral',
+      annual: 'Anual'
+    };
+
+    return map[frequency] || frequency;
+  };
+
   const handleDownloadPDF = async () => {
     try {
       const pdf = new jsPDF({
@@ -122,7 +136,7 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
       addSection('FECHAS Y FRECUENCIA');
       addField('Fecha Programada:', formatDateOnly(maintenance.scheduledDate));
       if (maintenance.frequency) {
-        addField('Frecuencia:', maintenance.frequency);
+        addField('Frecuencia:', getFrequencyLabel(maintenance.frequency));
       }
       if (maintenance.nextMaintenanceDate) {
         addField('Próximo Mantenimiento:', formatDateOnly(maintenance.nextMaintenanceDate));
@@ -301,7 +315,7 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
                 <Clock className="text-purple-600 mt-1 flex-shrink-0" size={20} />
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Frecuencia</label>
-                  <p className="mt-1 text-gray-900 dark:text-white font-medium capitalize">{maintenance.frequency}</p>
+                  <p className="mt-1 text-gray-900 dark:text-white font-medium">{getFrequencyLabel(maintenance.frequency)}</p>
                 </div>
               </div>
             )}
