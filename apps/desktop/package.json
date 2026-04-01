@@ -58,6 +58,7 @@
     "firebase": "^10.7.2",
     "jspdf": "^4.1.0",
     "lucide-react": "^0.563.0",
+    "nodemailer": "^6.9.16",
     "qrcode": "^1.5.4",
     "react": "18.2.0",
     "react-dom": "18.2.0",
