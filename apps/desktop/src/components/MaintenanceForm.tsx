@@ -17,7 +17,6 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useUiFeedback } from '../contexts/UiFeedbackContext';
 import FileUpload from './FileUpload';
-import { sendMaintenanceSavedEmail } from '../utils/maintenanceEmail';
 
 interface MaintenanceFormProps {
   onClose: () => void;
@@ -267,29 +266,6 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
       };
 
       await triggerMaintenanceNotifications(maintenanceForNotification);
-
-      if (!initialData) {
-        try {
-          const recipientEmail = notificationEmail.trim() || selectedUser?.email?.trim() || userData?.email?.trim();
-          if (recipientEmail) {
-            await sendMaintenanceSavedEmail({
-              recipientEmail,
-              recipientName: selectedUser?.name || userData?.name || '',
-              maintenanceId: persistedId,
-              equipmentName: maintenanceForNotification.equipmentName,
-              company: maintenanceForNotification.company,
-              title: maintenanceForNotification.title,
-              scheduledDate: toDate(maintenanceForNotification.scheduledDate).toISOString(),
-              assignedToName: maintenanceForNotification.assignedToName,
-              createdByName: maintenanceForNotification.createdByName
-            });
-          } else {
-            console.warn('No se encontró correo para enviar la notificación del mantenimiento');
-          }
-        } catch (emailError) {
-          console.error('Error sending maintenance email notification:', emailError);
-        }
-      }
 
       onClose();
     } catch (error) {

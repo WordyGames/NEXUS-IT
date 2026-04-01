@@ -19,6 +19,14 @@ import { useUiFeedback } from '../contexts/UiFeedbackContext';
 import MaintenanceForm from '../components/MaintenanceForm';
 import MaintenanceStatusEditor from '../components/MaintenanceStatusEditor';
 import { exportMaintenancesToExcel } from '../utils/exportToExcel';
+import { sendMaintenanceSavedEmail } from '../utils/maintenanceEmail';
+
+const toDate = (value: any): Date => {
+  if (!value) return new Date();
+  if (value.toDate) return value.toDate();
+  if (value instanceof Date) return value;
+  return new Date(value);
+};
 
 const Maintenances = () => {
   const { hasPermission } = useAuth();
@@ -71,6 +79,25 @@ const Maintenances = () => {
   const handleCreateMaintenance = async (data: Omit<Maintenance, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
     try {
       const createdId = await createMaintenance(data as any);
+
+      try {
+        const recipientEmail = data.notificationEmail?.trim();
+        if (recipientEmail) {
+          await sendMaintenanceSavedEmail({
+            recipientEmail,
+            maintenanceId: createdId,
+            equipmentName: data.equipmentName,
+            company: data.company,
+            title: data.title,
+            scheduledDate: toDate(data.scheduledDate).toISOString(),
+            assignedToName: data.assignedToName,
+            createdByName: data.createdByName
+          });
+        }
+      } catch (emailError) {
+        console.error('Error sending maintenance email notification:', emailError);
+      }
+
       await loadMaintenances();
       setShowForm(false);
 
