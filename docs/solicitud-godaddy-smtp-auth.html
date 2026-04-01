@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Solicitud soporte SMTP AUTH - GRUPO AMEX</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; color:#111; margin:40px; line-height:1.45; }
+    h1 { font-size:22px; margin:0 0 10px; }
+    h2 { font-size:16px; margin:24px 0 8px; }
+    .meta { color:#444; font-size:13px; margin-bottom:20px; }
+    .box { border:1px solid #ddd; border-radius:8px; padding:12px; background:#fafafa; }
+    ul { margin-top:6px; }
+    code { background:#f1f1f1; padding:2px 6px; border-radius:4px; }
+    .footer { margin-top:30px; font-size:13px; color:#333; }
+  </style>
+</head>
+<body>
+  <h1>Solicitud de habilitación SMTP AUTH</h1>
+  <div class="meta">
+    Empresa: <strong>GRUPO AMEX</strong><br/>
+    Cuenta de envío: <strong>soporte@grupoamex.com.mx</strong><br/>
+    Fecha: <strong>01/04/2026</strong>
+  </div>
+
+  <h2>Mensaje para Soporte GoDaddy / Microsoft 365</h2>
+  <div class="box">
+    <p>Hola equipo de soporte,</p>
+    <p>
+      Necesitamos enviar correos automáticos desde nuestra aplicación usando la cuenta
+      <strong>soporte@grupoamex.com.mx</strong> por SMTP (Outlook / Microsoft 365),
+      pero actualmente el envío falla con este error:
+    </p>
+    <p><code>535 5.7.139 Authentication unsuccessful, SmtpClientAuthentication is disabled for the Tenant</code></p>
+
+    <p>Solicitamos su apoyo para habilitar:</p>
+    <ul>
+      <li><strong>Authenticated SMTP</strong> a nivel tenant (organización)</li>
+      <li><strong>Authenticated SMTP</strong> en el buzón <strong>soporte@grupoamex.com.mx</strong></li>
+    </ul>
+
+    <p>Configuración SMTP usada por nuestra aplicación:</p>
+    <ul>
+      <li>Host: <code>smtp.office365.com</code></li>
+      <li>Puerto: <code>587</code></li>
+      <li>Secure: <code>false</code> (STARTTLS)</li>
+      <li>Usuario: <code>soporte@grupoamex.com.mx</code></li>
+      <li>Autenticación: usuario + contraseña/app password</li>
+    </ul>
+
+    <p>
+      En caso de tener MFA habilitado, por favor confírmenos si debemos usar
+      <strong>App Password</strong> para SMTP AUTH en esta cuenta.
+    </p>
+
+    <p>Muchas gracias por su apoyo.</p>
+  </div>
+
+  <h2>Notas técnicas (opcional)</h2>
+  <ul>
+    <li>Endpoint probado: <code>/api/notifications/maintenance-saved-email</code></li>
+    <li>Error de autenticación confirmado en servidor de Microsoft 365</li>
+    <li>Requerimos habilitación para envío transaccional (notificaciones de mantenimiento)</li>
+  </ul>
+
+  <div class="footer">
+    Atentamente,<br/>
+    Equipo de TI - GRUPO AMEX
+  </div>
+</body>
+</html>

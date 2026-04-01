@@ -1,0 +1,25 @@
+ASUNTO: Solicitud de habilitación SMTP AUTH para soporte@grupoamex.com.mx
+
+Hola equipo de soporte,
+
+Necesitamos enviar correos automáticos desde nuestra aplicación usando la cuenta soporte@grupoamex.com.mx por SMTP (Outlook / Microsoft 365), pero actualmente el envío falla con este error:
+
+535 5.7.139 Authentication unsuccessful, SmtpClientAuthentication is disabled for the Tenant
+
+Solicitamos su apoyo para habilitar:
+1) Authenticated SMTP a nivel tenant (organización)
+2) Authenticated SMTP en el buzón soporte@grupoamex.com.mx
+
+Configuración SMTP usada por nuestra aplicación:
+- Host: smtp.office365.com
+- Puerto: 587
+- Secure: false (STARTTLS)
+- Usuario: soporte@grupoamex.com.mx
+- Autenticación: usuario + contraseña/app password
+
+En caso de tener MFA habilitado, por favor confírmenos si debemos usar App Password para SMTP AUTH en esta cuenta.
+
+Muchas gracias por su apoyo.
+
+Atentamente,
+Equipo de TI - GRUPO AMEX
