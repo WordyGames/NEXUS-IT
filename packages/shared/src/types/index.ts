@@ -228,6 +228,7 @@ export interface User {
   department?: string;
   position?: string; // Puesto/cargo del empleado
   phone?: string;
+  email?: string;
   photoURL?: string;
   createdAt: Date | Timestamp;
   updatedAt: Date | Timestamp;

@@ -125,7 +125,8 @@ export const createUser = async (
   role: UserRole = UserRole.USER,
   department?: string,
   phone?: string,
-  position?: string
+  position?: string,
+  email?: string
 ): Promise<string> => {
   try {
     // Verificar que el username no exista
@@ -148,6 +149,7 @@ export const createUser = async (
       department: department || '',
       position: position || department || '',
       phone: phone || '',
+      email: email || '',
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
       isActive: true

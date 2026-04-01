@@ -143,7 +143,8 @@ const Users = () => {
     company: Company.ESPECIAS_NATURALES,
     role: UserRole.USER,
     department: '',
-    phone: ''
+    phone: '',
+    email: ''
   });
 
   const [newPassword, setNewPassword] = useState('');
@@ -176,6 +177,7 @@ const Users = () => {
     const normalizedName = formData.name.trim();
     const normalizedDepartment = formData.department.trim();
     const normalizedPhone = formData.phone.trim();
+    const normalizedEmail = formData.email.trim();
 
     if (normalizedUsername.length < 3) {
       showToast({
@@ -221,6 +223,15 @@ const Users = () => {
       });
       return;
     }
+
+    if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      showToast({
+        type: 'warning',
+        title: 'Correo invalido',
+        message: 'Captura un correo valido o deja el campo vacío'
+      });
+      return;
+    }
     
     try {
       await createUser(
@@ -231,7 +242,8 @@ const Users = () => {
         formData.role,
         normalizedDepartment,
         normalizedPhone,
-        normalizedDepartment
+        normalizedDepartment,
+        normalizedEmail
       );
       
       setShowCreateModal(false);
@@ -350,7 +362,8 @@ const Users = () => {
       company: Company.ESPECIAS_NATURALES,
       role: UserRole.USER,
       department: '',
-      phone: ''
+      phone: '',
+      email: ''
     });
   };
 
@@ -741,6 +754,20 @@ const Users = () => {
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
                   required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Correo electrónico
+                </label>
+                <input
+                  type="email"
+                  placeholder="correo@empresa.com"
+                  aria-label="Correo electrónico"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
                 />
               </div>
 
