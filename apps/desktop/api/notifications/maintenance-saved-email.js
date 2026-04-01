@@ -1,27 +1,4 @@
-import * as nodemailer from 'nodemailer';
-
-interface MaintenanceEmailRequestBody {
-  recipientEmail?: string;
-  recipientName?: string;
-  maintenanceId?: string;
-  equipmentName?: string;
-  company?: string;
-  title?: string;
-  scheduledDate?: string;
-  assignedToName?: string;
-  createdByName?: string;
-}
-
-type VercelRequest = {
-  method?: string;
-  body?: MaintenanceEmailRequestBody;
-};
-
-type VercelResponse = {
-  status: (code: number) => VercelResponse;
-  json: (payload: unknown) => void;
-  setHeader: (name: string, value: string | string[]) => void;
-};
+const nodemailer = require('nodemailer');
 
 const SMTP_HOST = process.env.SMTP_HOST || 'smtp.office365.com';
 const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
@@ -30,7 +7,7 @@ const SMTP_USER = process.env.SMTP_USER || 'soporte@grupoamex.com.mx';
 const SMTP_PASS = process.env.SMTP_PASS || '';
 const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER;
 
-const toReadableDate = (value?: string): string => {
+const toReadableDate = (value) => {
   if (!value) return 'No especificada';
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
@@ -43,9 +20,9 @@ const toReadableDate = (value?: string): string => {
   });
 };
 
-const sanitize = (value?: string): string => (value || '').trim();
+const sanitize = (value) => (value || '').trim();
 
-export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -61,9 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   if (!SMTP_PASS) {
-    res.status(500).json({
-      error: 'SMTP_PASS no está configurado en variables de entorno'
-    });
+    res.status(500).json({ error: 'SMTP_PASS no está configurado en variables de entorno' });
     return;
   }
 
@@ -102,9 +77,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.5;">
         <h2 style="margin: 0 0 12px; color: #0f3d5e;">Mantenimiento programado</h2>
         <p>Hola${recipientName ? ` <strong>${recipientName}</strong>` : ''},</p>
-        <p>
-          Se programó un mantenimiento para tu equipo.
-        </p>
+        <p>Se programó un mantenimiento para tu equipo.</p>
         <ul>
           <li><strong>Equipo:</strong> ${equipmentName || 'N/A'}</li>
           <li><strong>Empresa:</strong> ${company || 'N/A'}</li>
@@ -113,13 +86,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           ${assignedToName ? `<li><strong>Asignado a:</strong> ${assignedToName}</li>` : ''}
           ${maintenanceId ? `<li><strong>ID de mantenimiento:</strong> ${maintenanceId}</li>` : ''}
         </ul>
-        <p>
-          Por favor, confírmanos a qué hora tienes disponible tu equipo para poder realizar el mantenimiento sin afectar tus actividades.
-        </p>
-        <p style="margin-top: 20px;">
-          Gracias,<br />
-          ${createdByName || 'Soporte TI'}
-        </p>
+        <p>Por favor, confírmanos a qué hora tienes disponible tu equipo para poder realizar el mantenimiento sin afectar tus actividades.</p>
+        <p style="margin-top: 20px;">Gracias,<br />${createdByName || 'Soporte TI'}</p>
       </div>
     `;
 
@@ -138,9 +106,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       'Por favor, confírmanos a qué hora tienes disponible tu equipo para poder realizar el mantenimiento sin afectar tus actividades.',
       '',
       `Gracias, ${createdByName || 'Soporte TI'}`
-    ]
-      .filter(Boolean)
-      .join('\n');
+    ].filter(Boolean).join('\n');
 
     await transporter.sendMail({
       from: SMTP_FROM,
@@ -153,6 +119,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     res.status(200).json({ ok: true });
   } catch (error) {
     console.error('Error sending maintenance email:', error);
-    res.status(500).json({ error: 'No se pudo enviar el correo' });
+    res.status(500).json({ error: error?.message || 'No se pudo enviar el correo' });
   }
-}
+};
