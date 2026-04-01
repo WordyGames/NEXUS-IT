@@ -1,6 +1,7 @@
-import React from 'react';
-import { X, Calendar, AlertTriangle, CheckCircle2, User, FileText, DollarSign, Paperclip, Clock } from 'lucide-react';
+import React, { useRef } from 'react';
+import { X, Calendar, AlertTriangle, CheckCircle2, User, FileText, DollarSign, Paperclip, Clock, Download } from 'lucide-react';
 import { Maintenance, MaintenanceStatus } from '@nexus-it/shared';
+import jsPDF from 'jspdf';
 
 interface MaintenanceDetailProps {
   maintenance: Maintenance;
@@ -11,6 +12,7 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
   maintenance,
   onClose,
 }) => {
+  const contentRef = useRef<HTMLDivElement>(null);
   const formatDate = (date: any) => {
     if (!date) return '-';
     const d = date.toDate ? date.toDate() : new Date(date);
@@ -21,6 +23,154 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const handleDownloadPDF = async () => {
+    try {
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      let yPosition = 15;
+
+      const darkGray = [50, 50, 50];
+      const primaryColor = [30, 120, 200];
+
+      // Header
+      pdf.setTextColor(...darkGray);
+      pdf.setFontSize(18);
+      pdf.setFont(undefined, 'bold');
+      pdf.text('REPORTE DE MANTENIMIENTO', pageWidth / 2, yPosition, { align: 'center' });
+
+      yPosition += 8;
+      pdf.setFontSize(10);
+      pdf.setFont(undefined, 'normal');
+      pdf.text(`ID: ${maintenance.id}`, pageWidth / 2, yPosition, { align: 'center' });
+
+      yPosition += 15;
+
+      // Función auxiliar para secciones
+      const addSection = (title: string) => {
+        pdf.setFillColor(...primaryColor);
+        pdf.rect(10, yPosition, pageWidth - 20, 8, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFontSize(11);
+        pdf.setFont(undefined, 'bold');
+        pdf.text(title, 15, yPosition + 6);
+        yPosition += 12;
+      };
+
+      const addField = (label: string, value: string) => {
+        pdf.setTextColor(...darkGray);
+        pdf.setFontSize(9);
+        pdf.setFont(undefined, 'bold');
+        pdf.text(label, 15, yPosition);
+        pdf.setFont(undefined, 'normal');
+        const valueWidth = pageWidth - 80;
+        const wrappedValue = pdf.splitTextToSize(value, valueWidth);
+        pdf.text(wrappedValue, 50, yPosition);
+        yPosition += Math.max(6, wrappedValue.length * 5);
+      };
+
+      // Sección: Información General
+      addSection('INFORMACIÓN GENERAL');
+      addField('Título:', maintenance.title);
+      addField('Tipo:', maintenance.type.toUpperCase());
+      addField('Estado:', maintenance.status);
+      addField('Empresa:', maintenance.company);
+      addField('Equipo:', maintenance.equipmentName);
+      yPosition += 5;
+
+      // Sección: Descripción
+      addSection('DESCRIPCIÓN');
+      pdf.setTextColor(...darkGray);
+      pdf.setFontSize(8);
+      pdf.setFont(undefined, 'normal');
+      const descLines = pdf.splitTextToSize(maintenance.description || 'Sin descripción', pageWidth - 30);
+      pdf.text(descLines, 15, yPosition);
+      yPosition += descLines.length * 4 + 10;
+
+      // Sección: Fechas
+      addSection('FECHAS Y FRECUENCIA');
+      addField('Fecha Programada:', formatDate(maintenance.scheduledDate));
+      if (maintenance.frequency) {
+        addField('Frecuencia:', maintenance.frequency);
+      }
+      if (maintenance.nextMaintenanceDate) {
+        addField('Próximo Mantenimiento:', formatDate(maintenance.nextMaintenanceDate));
+      }
+      yPosition += 5;
+
+      // Sección: Personal
+      addSection('ASIGNACIÓN');
+      addField('Asignado a:', maintenance.assignedToName || 'Sin asignar');
+      addField('Creado por:', maintenance.createdByName);
+      if (maintenance.notificationEmail) {
+        addField('Email de Notificación:', maintenance.notificationEmail);
+      }
+      yPosition += 5;
+
+      // Sección: Tareas
+      if (maintenance.tasks && maintenance.tasks.length > 0) {
+        addSection('TAREAS A REALIZAR');
+        pdf.setTextColor(...darkGray);
+        pdf.setFontSize(8);
+        maintenance.tasks.forEach((task) => {
+          const symbol = task.completed ? '☑' : '☐';
+          pdf.setFont(undefined, 'normal');
+          const taskLines = pdf.splitTextToSize(`${symbol} ${task.description}`, pageWidth - 30);
+          pdf.text(taskLines, 15, yPosition);
+          yPosition += taskLines.length * 4;
+          if (task.completed && task.completedBy) {
+            pdf.setTextColor(120, 120, 120);
+            pdf.setFont(undefined, 'italic');
+            pdf.text(`    ✓ Completada por ${task.completedBy}`, 15, yPosition);
+            yPosition += 4;
+            pdf.setTextColor(...darkGray);
+          }
+        });
+        yPosition += 5;
+      }
+
+      // Sección: Notas
+      if (maintenance.notes) {
+        addSection('NOTAS ADICIONALES');
+        pdf.setTextColor(...darkGray);
+        pdf.setFontSize(8);
+        pdf.setFont(undefined, 'normal');
+        const noteLines = pdf.splitTextToSize(maintenance.notes, pageWidth - 30);
+        pdf.text(noteLines, 15, yPosition);
+        yPosition += noteLines.length * 4 + 5;
+      }
+
+      // Sección: Costo
+      if (maintenance.cost !== undefined && maintenance.cost !== null && maintenance.cost > 0) {
+        addSection('COSTO');
+        pdf.setTextColor(...darkGray);
+        pdf.setFontSize(11);
+        pdf.setFont(undefined, 'bold');
+        pdf.text(`$${maintenance.cost.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`, 15, yPosition);
+        yPosition += 10;
+      }
+
+      // Footer
+      pdf.setTextColor(150, 150, 150);
+      pdf.setFontSize(7);
+      pdf.setFont(undefined, 'normal');
+      pdf.text('Este documento fue generado automáticamente por NEXUS IT', pageWidth / 2, pageHeight - 10, { align: 'center' });
+      pdf.text(`Generado: ${formatDate(new Date())}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
+
+      // Descargar
+      const fileName = `mantenimiento-${maintenance.id}-${Date.now()}.pdf`;
+      pdf.save(fileName);
+    } catch (error) {
+      console.error('Error generando PDF:', error);
+      alert('Error al generar PDF');
+    }
   };
 
   const getStatusColor = (status: MaintenanceStatus) => {
@@ -69,7 +219,7 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div ref={contentRef} className="p-6 space-y-6">
           {/* Estado y Tipo */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div>
@@ -272,6 +422,13 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
 
         {/* Footer */}
         <div className="flex justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/20">
+          <button
+            onClick={handleDownloadPDF}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-lg transition-colors font-medium"
+          >
+            <Download size={18} />
+            Descargar PDF
+          </button>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-gray-300 hover:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white rounded-lg transition-colors font-medium"
