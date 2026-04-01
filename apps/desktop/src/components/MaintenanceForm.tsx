@@ -73,6 +73,7 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
     initialData?.scheduledDate ? toDate(initialData.scheduledDate).toISOString().split('T')[0] : ''
   );
   const [assignedTo, setAssignedTo] = useState(initialData?.assignedTo || '');
+  const [notificationEmail, setNotificationEmail] = useState(initialData?.notificationEmail || '');
   const [frequency, setFrequency] = useState<Maintenance['frequency'] | ''>(initialData?.frequency || '');
   const [cost, setCost] = useState(initialData?.cost?.toString() || '');
   const [notes, setNotes] = useState(initialData?.notes || '');
@@ -230,6 +231,9 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
           maintenanceData.assignedToName = selectedUser.name;
         }
       }
+      if (notificationEmail.trim()) {
+        maintenanceData.notificationEmail = notificationEmail.trim();
+      }
       if (frequency) {
         maintenanceData.frequency = frequency;
       }
@@ -265,7 +269,7 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
       await triggerMaintenanceNotifications(maintenanceForNotification);
 
       try {
-        const recipientEmail = selectedUser?.email?.trim() || userData?.email?.trim();
+        const recipientEmail = notificationEmail.trim() || selectedUser?.email?.trim() || userData?.email?.trim();
         if (recipientEmail) {
           await sendMaintenanceSavedEmail({
             recipientEmail,
@@ -436,6 +440,19 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
                 <option value="annual">Anual</option>
               </select>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Correo de notificación
+            </label>
+            <input
+              type="email"
+              value={notificationEmail}
+              onChange={(e) => setNotificationEmail(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              placeholder="correo@empresa.com"
+            />
           </div>
 
           <div>

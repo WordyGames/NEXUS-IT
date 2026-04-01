@@ -165,6 +165,7 @@ export interface Maintenance {
   status: MaintenanceStatus;
   title: string;
   description: string;
+  notificationEmail?: string;
   scheduledDate: Date | Timestamp;
   completedDate?: Date | Timestamp;
   nextMaintenanceDate?: Date | Timestamp; // Para mantenimientos recurrentes

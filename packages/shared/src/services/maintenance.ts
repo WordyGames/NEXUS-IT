@@ -187,6 +187,7 @@ export const createMaintenance = async (
     };
     
     // Solo agregar campos opcionales si tienen valor
+    if (maintenanceData.notificationEmail) cleanData.notificationEmail = maintenanceData.notificationEmail;
     if (maintenanceData.assignedTo) cleanData.assignedTo = maintenanceData.assignedTo;
     if (maintenanceData.assignedToName) cleanData.assignedToName = maintenanceData.assignedToName;
     if (maintenanceData.frequency) cleanData.frequency = maintenanceData.frequency;
