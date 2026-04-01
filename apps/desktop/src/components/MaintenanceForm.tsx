@@ -50,6 +50,42 @@ const toDate = (date: any): Date => {
   return new Date(date);
 };
 
+const MAINTENANCE_TASK_PROFILES = {
+  Preventivo: [
+    'Solicitar al usuario guardar trabajo y cerrar sesión',
+    'Apagado seguro y desconexión',
+    'Limpieza física interna y externa',
+    'Eliminación de temporales y vaciado de papelera',
+    'Escaneo rápido antimalware',
+    'Verificación de temperaturas',
+    'Encendido de prueba y entrega'
+  ],
+  Correctivo: [
+    'Diagnóstico de la falla reportada',
+    'Identificación de piezas dañadas o software corrupto',
+    'Solicitud de autorización/cotización (si aplica)',
+    'Reemplazo de componente o reinstalación',
+    'Pruebas de estrés y validación',
+    'Confirmación de operatividad'
+  ],
+  Actualizacion: [
+    'Respaldo (Backup) de información del usuario',
+    'Instalación de nuevo componente o software',
+    'Actualización de controladores/BIOS',
+    'Verificación de reconocimiento en sistema',
+    'Restauración de información',
+    'Entrega y demostración'
+  ],
+  Inspeccion: [
+    'Verificación de número de serie e inventario',
+    'Revisión visual del estado físico',
+    'Auditoría de software y licencias',
+    'Comprobación de conectividad y políticas de red',
+    'Actualización de datos en el sistema',
+    'Firma de responsiva'
+  ]
+} as const;
+
 const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProps) => {
   const { userData } = useAuth();
   const { showToast } = useUiFeedback();
@@ -172,6 +208,27 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
 
   const handleTaskChange = (id: string, taskDescription: string) => {
     setTasks(tasks.map((t) => (t.id === id ? { ...t, description: taskDescription } : t)));
+  };
+
+  const handleMaintenanceTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedType = e.target.value as MaintenanceType;
+    setType(selectedType);
+
+    const profileKeyByType: Record<MaintenanceType, keyof typeof MAINTENANCE_TASK_PROFILES> = {
+      [MaintenanceType.PREVENTIVO]: 'Preventivo',
+      [MaintenanceType.CORRECTIVO]: 'Correctivo',
+      [MaintenanceType.ACTUALIZACION]: 'Actualizacion',
+      [MaintenanceType.INSPECCION]: 'Inspeccion'
+    };
+
+    const selectedProfileKey = profileKeyByType[selectedType];
+    const selectedTaskProfile = MAINTENANCE_TASK_PROFILES[selectedProfileKey];
+
+    setTasks(selectedTaskProfile.map((taskDescription) => ({
+      id: generateTaskId(),
+      description: taskDescription,
+      completed: false
+    })));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -326,7 +383,7 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
               <select
                 aria-label="Seleccionar tipo de mantenimiento"
                 value={type}
-                onChange={(e) => setType(e.target.value as MaintenanceType)}
+                onChange={handleMaintenanceTypeChange}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                 required
               >
