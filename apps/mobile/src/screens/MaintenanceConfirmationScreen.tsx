@@ -7,13 +7,13 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Modal,
-  Platform,
+  Alert,
+  TextInput,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   Maintenance, 
-  getPendingTimeConfirmationMaintenances,
+  getPendingTimeConfirmationMaintenancesForUser,
   confirmMaintenanceTime 
 } from '@nexus-it/shared';
 
@@ -23,8 +23,7 @@ const MaintenanceConfirmationScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(true);
   const [selectedMaintenance, setSelectedMaintenance] = useState<Maintenance | null>(null);
   const [showTimeModal, setShowTimeModal] = useState(false);
-  const [selectedTime, setSelectedTime] = useState(new Date());
-  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [selectedTimeText, setSelectedTimeText] = useState('09:00');
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -34,21 +33,12 @@ const MaintenanceConfirmationScreen = ({ navigation }: any) => {
   const loadPendingMaintenances = async () => {
     try {
       setLoading(true);
-      const data = await getPendingTimeConfirmationMaintenances(userData?.id);
+      const data = await getPendingTimeConfirmationMaintenancesForUser(userData?.id, false);
       setMaintenances(data);
     } catch (error) {
       console.error('Error loading maintenances:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleTimeChange = (event: any, time: Date | undefined) => {
-    if (Platform.OS === 'android') {
-      setShowTimePicker(false);
-    }
-    if (time) {
-      setSelectedTime(time);
     }
   };
 
@@ -58,9 +48,13 @@ const MaintenanceConfirmationScreen = ({ navigation }: any) => {
     try {
       setConfirmingId(selectedMaintenance.id);
       
-      const hours = String(selectedTime.getHours()).padStart(2, '0');
-      const minutes = String(selectedTime.getMinutes()).padStart(2, '0');
-      const timeString = `${hours}:${minutes}`;
+      const timeString = selectedTimeText.trim();
+      const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+      if (!timePattern.test(timeString)) {
+        Alert.alert('Hora inválida', 'Usa el formato HH:MM, por ejemplo 14:30.');
+        return;
+      }
 
       await confirmMaintenanceTime(
         selectedMaintenance.id,
@@ -100,10 +94,10 @@ const MaintenanceConfirmationScreen = ({ navigation }: any) => {
       setSelectedMaintenance(null);
       
       // Mostrar confirmación
-      alert('✅ Hora confirmada correctamente');
+      Alert.alert('✅ Confirmado', 'La hora se guardó correctamente.');
     } catch (error) {
       console.error('Error confirming time:', error);
-      alert('Error al confirmar la hora');
+      Alert.alert('Error', 'No se pudo confirmar la hora.');
     } finally {
       setConfirmingId(null);
     }
@@ -151,7 +145,7 @@ const MaintenanceConfirmationScreen = ({ navigation }: any) => {
                 style={styles.maintenanceCard}
                 onPress={() => {
                   setSelectedMaintenance(maintenance);
-                  setSelectedTime(new Date());
+                  setSelectedTimeText(maintenance.scheduledTime || '09:00');
                   setShowTimeModal(true);
                 }}
               >
@@ -202,26 +196,21 @@ const MaintenanceConfirmationScreen = ({ navigation }: any) => {
 
                 <View style={styles.timePickerContainer}>
                   <Text style={styles.timeLabel}>Selecciona la hora:</Text>
-                  
-                  <TouchableOpacity
-                    style={styles.timeDisplay}
-                    onPress={() => setShowTimePicker(true)}
-                  >
-                    <Text style={styles.timeDisplayText}>
-                      🕐 {String(selectedTime.getHours()).padStart(2, '0')}:
-                      {String(selectedTime.getMinutes()).padStart(2, '0')}
-                    </Text>
-                  </TouchableOpacity>
+                  <Text style={styles.timeHelpText}>
+                    Escribe la hora en formato 24 horas, por ejemplo 14:30.
+                  </Text>
 
-                  {showTimePicker && (
-                    <DateTimePicker
-                      value={selectedTime}
-                      mode="time"
-                      is24Hour={true}
-                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                      onChange={handleTimeChange}
-                    />
-                  )}
+                  <TextInput
+                    value={selectedTimeText}
+                    onChangeText={setSelectedTimeText}
+                    placeholder="HH:MM"
+                    placeholderTextColor="#9ca3af"
+                    keyboardType="numbers-and-punctuation"
+                    style={styles.timeInput}
+                    maxLength={5}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
                 </View>
 
                 <View style={styles.modalButtons}>
@@ -401,7 +390,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 12,
+    marginBottom: 6,
+  },
+  timeHelpText: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 10,
+  },
+  timeInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    letterSpacing: 2,
   },
   timeDisplay: {
     backgroundColor: '#EFF6FF',

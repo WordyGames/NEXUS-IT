@@ -16,6 +16,7 @@ import {
   getEquipmentStats,
   getTicketStats,
   getTickets,
+  getPendingTimeConfirmationMaintenancesForUser,
   subscribeSupportChatThread,
   subscribeSupportChatThreads
 } from '@nexus-it/shared';
@@ -30,6 +31,7 @@ const DashboardScreen = ({ navigation }: any) => {
   const [recentTickets, setRecentTickets] = useState<Ticket[]>([]);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
+  const [pendingMaintenanceCount, setPendingMaintenanceCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -60,21 +62,26 @@ const DashboardScreen = ({ navigation }: any) => {
   const loadNotificationBadge = async () => {
     if (!userData?.id) {
       setNotificationUnreadCount(0);
+      setPendingMaintenanceCount(0);
       return;
     }
 
     try {
       const unread = await getUnreadNotifications(userData.id);
       setNotificationUnreadCount(unread);
+
+      const pendingMaintenances = await getPendingTimeConfirmationMaintenancesForUser(userData.id, isAdmin);
+      setPendingMaintenanceCount(pendingMaintenances.length);
     } catch (error) {
       console.error('Error loading mobile notification badge:', error);
       setNotificationUnreadCount(0);
+      setPendingMaintenanceCount(0);
     }
   };
 
   useEffect(() => {
     void loadNotificationBadge();
-  }, [userData?.id]);
+  }, [userData?.id, isAdmin]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -82,7 +89,7 @@ const DashboardScreen = ({ navigation }: any) => {
     });
 
     return unsubscribe;
-  }, [navigation, userData?.id]);
+  }, [navigation, userData?.id, isAdmin]);
 
   const getTicketSortValue = (ticket: Ticket) => {
     const createdAt: any = ticket.createdAt;
@@ -203,6 +210,21 @@ const DashboardScreen = ({ navigation }: any) => {
           </Text>
         </View>
       </View>
+
+      <TouchableOpacity
+        style={styles.confirmationBanner}
+        onPress={() => navigation.navigate('MaintenanceConfirmation')}
+      >
+        <View style={styles.confirmationBannerLeft}>
+          <Text style={styles.confirmationBannerTitle}>📅 Confirmar hora de mantenimiento</Text>
+          <Text style={styles.confirmationBannerText}>
+            {pendingMaintenanceCount > 0
+              ? `Tienes ${pendingMaintenanceCount} mantenimiento(s) pendiente(s) de confirmar.`
+              : 'Aquí puedes revisar y confirmar la hora cuando tengas un mantenimiento programado.'}
+          </Text>
+        </View>
+        <Text style={styles.confirmationBannerArrow}>›</Text>
+      </TouchableOpacity>
 
       {canSeeGlobalDashboard && (
         <View style={styles.section}>
@@ -385,6 +407,39 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  confirmationBanner: {
+    marginHorizontal: 20,
+    marginTop: 14,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 12,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  confirmationBannerLeft: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  confirmationBannerTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1d4ed8',
+    marginBottom: 4,
+  },
+  confirmationBannerText: {
+    fontSize: 13,
+    color: '#1e3a8a',
+    lineHeight: 18,
+  },
+  confirmationBannerArrow: {
+    fontSize: 28,
+    color: '#1d4ed8',
+    fontWeight: '700',
+    marginLeft: 8,
   },
   recentSection: {
     marginTop: 8,

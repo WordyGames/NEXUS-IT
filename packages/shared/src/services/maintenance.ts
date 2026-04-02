@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Maintenance, MaintenanceFilters, MaintenanceStatus, MaintenanceTask } from '../types';
+import { getEquipment } from './equipment';
 import { deleteFile, resolveAttachmentStoragePath } from './storage';
 
 const COLLECTION_NAME = 'maintenances';
@@ -472,6 +473,36 @@ export const getPendingTimeConfirmationMaintenances = async (
     return maintenances;
   } catch (error) {
     console.error('Error getting pending time confirmation maintenances:', error);
+    throw error;
+  }
+};
+
+/**
+ * Obtiene mantenimientos pendientes de confirmar para el usuario actual.
+ * Si el usuario es administrador, devuelve todos los pendientes.
+ * Si no, filtra por equipos asignados al usuario y también por mantenimiento asignado directamente.
+ */
+export const getPendingTimeConfirmationMaintenancesForUser = async (
+  userId?: string,
+  isAdmin = false
+): Promise<Maintenance[]> => {
+  try {
+    const allPending = await getPendingTimeConfirmationMaintenances(isAdmin ? undefined : userId);
+
+    if (!userId || isAdmin) {
+      return allPending;
+    }
+
+    const userEquipment = await getEquipment({ assignedTo: userId });
+    const userEquipmentIds = new Set(userEquipment.map((eq) => eq.id));
+
+    const filtered = allPending.filter((maintenance) => {
+      return maintenance.assignedTo === userId || userEquipmentIds.has(maintenance.equipmentId);
+    });
+
+    return filtered;
+  } catch (error) {
+    console.error('Error getting pending time confirmation maintenances for user:', error);
     throw error;
   }
 };
