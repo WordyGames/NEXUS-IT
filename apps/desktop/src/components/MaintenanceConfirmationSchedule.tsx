@@ -51,6 +51,12 @@ const formatTime12h = (time24?: string) => {
   return `${parts.hour}:${parts.minute} ${parts.period}`;
 };
 
+const getTimeSortValue = (time24?: string) => {
+  if (!time24 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time24)) return 9999;
+  const [h, m] = time24.split(':').map(Number);
+  return h * 60 + m;
+};
+
 const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleProps> = () => {
   const { userData, isAdmin } = useAuth();
   const [confirmations, setConfirmations] = useState<Maintenance[]>([]);
@@ -123,23 +129,45 @@ const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleP
     return grouped;
   };
 
-  const groupByTime = (maintenances: Maintenance[]) => {
-    const grouped: Record<string, Maintenance[]> = {};
-    maintenances.forEach((m) => {
-      const time = m.scheduledTime || 'Sin confirmar';
-      if (!grouped[time]) {
-        grouped[time] = [];
-      }
-      grouped[time].push(m);
-    });
-    return grouped;
-  };
+  const getTimeConflicts = (maintenances: Maintenance[]) => {
+    const grouped = new Map<string, { dateLabel: string; time: string; items: Maintenance[] }>();
 
-  const getTimeConflicts = () => {
-    const timeGroups = groupByTime(confirmations);
-    return Object.entries(timeGroups)
-      .filter(([time, items]) => items.length > 1 && time !== 'Sin confirmar')
-      .map(([time, items]) => ({ time, count: items.length }));
+    maintenances.forEach((m) => {
+      if (!m.scheduledTime) return;
+      const date = toJSDate(m.scheduledDate);
+      if (!date) return;
+
+      const dateKey = date.toISOString().split('T')[0];
+      const dateLabel = date.toLocaleDateString('es-MX', {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+      });
+      const key = `${dateKey}|${m.scheduledTime}`;
+
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          dateLabel,
+          time: m.scheduledTime,
+          items: [],
+        });
+      }
+
+      grouped.get(key)!.items.push(m);
+    });
+
+    return Array.from(grouped.values())
+      .filter((group) => group.items.length > 1)
+      .sort((a, b) => {
+        if (a.dateLabel === b.dateLabel) {
+          return getTimeSortValue(a.time) - getTimeSortValue(b.time);
+        }
+        return a.dateLabel.localeCompare(b.dateLabel);
+      })
+      .map((group) => ({
+        ...group,
+        count: group.items.length,
+      }));
   };
 
   const formatDate = (date: any) => {
@@ -183,7 +211,13 @@ const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleP
   };
 
   const groupedByDate = groupByDate(confirmations);
-  const conflicts = getTimeConflicts();
+  const conflicts = getTimeConflicts(confirmations);
+  const sortedConfirmations = [...confirmations].sort((a, b) => {
+    const aDate = toJSDate(a.scheduledDate)?.getTime() || 0;
+    const bDate = toJSDate(b.scheduledDate)?.getTime() || 0;
+    if (aDate !== bDate) return aDate - bDate;
+    return getTimeSortValue(a.scheduledTime) - getTimeSortValue(b.scheduledTime);
+  });
 
   return (
     <div className="space-y-6">
@@ -366,11 +400,16 @@ const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleP
 
       {/* Alertas de conflictos */}
       {conflicts.length > 0 && (
-        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
           <h3 className="font-semibold text-yellow-900 mb-2">⚠️ Conflictos de Horario</h3>
+          <p className="text-sm text-red-800 mb-3">
+            Hay mantenimientos confirmados en la misma fecha y hora. Te recomendamos ajustar disponibilidad.
+          </p>
           {conflicts.map((conflict) => (
-            <div key={conflict.time} className="text-sm text-yellow-800">
-              {conflict.time}: {conflict.count} mantenimientos programados a la misma hora
+            <div key={`${conflict.dateLabel}-${conflict.time}`} className="text-sm text-red-900 mb-2">
+              <span className="font-semibold">{conflict.dateLabel} • {formatTime12h(conflict.time)}</span>
+              <span className="ml-2">({conflict.count} equipos): </span>
+              {conflict.items.map((item) => item.equipmentName).join(', ')}
             </div>
           ))}
         </div>
@@ -385,6 +424,42 @@ const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleP
       ) : confirmations.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-gray-500 text-lg">No hay mantenimientos confirmados en este período</p>
+        </div>
+      ) : isAdmin ? (
+        <div className="space-y-4">
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h3 className="font-semibold text-blue-900">🗓️ Agenda Confirmada</h3>
+            <p className="text-sm text-blue-800 mt-1">
+              Vista operativa para liberar equipos por hora confirmada.
+            </p>
+          </div>
+
+          <div className="overflow-x-auto border border-gray-200 rounded-lg">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Fecha</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Hora</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Equipo</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Usuario</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Técnico</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Empresa</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedConfirmations.map((m, index) => (
+                  <tr key={m.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="px-4 py-3 text-gray-700">{formatDate(m.scheduledDate)}</td>
+                    <td className="px-4 py-3 font-semibold text-gray-900">{formatTime12h(m.scheduledTime)}</td>
+                    <td className="px-4 py-3 text-gray-900">{m.equipmentName}</td>
+                    <td className="px-4 py-3 text-green-700 font-medium">{m.timeConfirmedByName || '—'}</td>
+                    <td className="px-4 py-3 text-gray-700">{m.assignedToName || '—'}</td>
+                    <td className="px-4 py-3 text-gray-700">{m.company}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
         <div className="space-y-6">
