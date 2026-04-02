@@ -487,12 +487,14 @@ export const getPendingTimeConfirmationMaintenancesForUser = async (
   isAdmin = false
 ): Promise<Maintenance[]> => {
   try {
-    const allPending = await getPendingTimeConfirmationMaintenances(isAdmin ? undefined : userId);
+    // Obtener TODOS los pending (sin filtro de asignación)
+    const allPending = await getPendingTimeConfirmationMaintenances(undefined);
 
     if (!userId || isAdmin) {
       return allPending;
     }
 
+    // Para usuarios normales: filtrar por asignación directa O equipos asignados
     const userEquipment = await getEquipment({ assignedTo: userId });
     const userEquipmentIds = new Set(userEquipment.map((eq) => eq.id));
 
