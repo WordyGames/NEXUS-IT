@@ -34,6 +34,7 @@ const toDate = (value: any): Date => {
 const Maintenances = () => {
   const location = useLocation();
   const isPortalView = location.pathname.includes('/portal/');
+  const isConfirmationRoute = location.pathname.includes('/maintenance-confirmation');
   const { hasPermission } = useAuth();
   const { showToast, confirm } = useUiFeedback();
   const canManageMaintenances = hasPermission(UserPermission.MAINTENANCES_MANAGE);
@@ -46,7 +47,9 @@ const Maintenances = () => {
   const [showStatusEditor, setShowStatusEditor] = useState(false);
   const [showDetailView, setShowDetailView] = useState(false);
   const [justCreatedMaintenance, setJustCreatedMaintenance] = useState<Maintenance | undefined>();
-  const [viewMode, setViewMode] = useState<'list' | 'confirmations'>(isPortalView ? 'confirmations' : 'list');
+  const [viewMode, setViewMode] = useState<'list' | 'confirmations'>(
+    isPortalView || isConfirmationRoute ? 'confirmations' : 'list'
+  );
   
   // Filtros
   const [companyFilter, setCompanyFilter] = useState<Company | ''>('');
@@ -57,7 +60,11 @@ const Maintenances = () => {
 
   // Actualizar viewMode cuando cambia la ruta
   useEffect(() => {
-    setViewMode(location.pathname.includes('/portal/') ? 'confirmations' : 'list');
+    setViewMode(
+      location.pathname.includes('/portal/') || location.pathname.includes('/maintenance-confirmation')
+        ? 'confirmations'
+        : 'list'
+    );
   }, [location.pathname]);
 
   useEffect(() => {

@@ -29,6 +29,12 @@ const Sidebar: React.FC = () => {
       permission: UserPermission.TICKETS_VIEW
     },
     {
+      path: '/maintenance-confirmation',
+      label: 'Confirmar Horas',
+      icon: '📅',
+      permission: UserPermission.TICKETS_VIEW
+    },
+    {
       path: '/maintenances',
       label: 'Mantenimientos',
       icon: '🔧',

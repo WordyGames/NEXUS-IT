@@ -120,6 +120,14 @@ function App() {
                   }
                 />
                 <Route
+                  path="maintenance-confirmation"
+                  element={
+                    <PrivateRoute requiredPermission={UserPermission.TICKETS_VIEW}>
+                      <Maintenances />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
                   path="reports"
                   element={
                     <PrivateRoute requiredPermission={UserPermission.REPORTS_VIEW}>
