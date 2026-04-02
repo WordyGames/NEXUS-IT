@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Wrench, Plus, Calendar, AlertTriangle, CheckCircle2, Clock, Filter, Download } from 'lucide-react';
 import {
   Maintenance,
@@ -31,6 +32,8 @@ const toDate = (value: any): Date => {
 };
 
 const Maintenances = () => {
+  const location = useLocation();
+  const isPortalView = location.pathname.includes('/portal/');
   const { hasPermission } = useAuth();
   const { showToast, confirm } = useUiFeedback();
   const canManageMaintenances = hasPermission(UserPermission.MAINTENANCES_MANAGE);
@@ -43,7 +46,7 @@ const Maintenances = () => {
   const [showStatusEditor, setShowStatusEditor] = useState(false);
   const [showDetailView, setShowDetailView] = useState(false);
   const [justCreatedMaintenance, setJustCreatedMaintenance] = useState<Maintenance | undefined>();
-  const [viewMode, setViewMode] = useState<'list' | 'confirmations'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'confirmations'>(isPortalView ? 'confirmations' : 'list');
   
   // Filtros
   const [companyFilter, setCompanyFilter] = useState<Company | ''>('');

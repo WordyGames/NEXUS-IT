@@ -68,6 +68,7 @@ function App() {
                 <Route path="equipment" element={<MyEquipment />} />
                 <Route path="tickets" element={<Tickets />} />
                 <Route path="chat" element={<Chat />} />
+                <Route path="maintenance-confirmation" element={<Maintenances />} />
               </Route>
               <Route
                 path="/"

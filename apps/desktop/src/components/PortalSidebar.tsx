@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Ticket, Computer } from 'lucide-react';
+import { LayoutDashboard, Ticket, Computer, Clock } from 'lucide-react';
 
 interface PortalSidebarProps {
   collapsed: boolean;
@@ -52,6 +52,20 @@ const PortalSidebar: React.FC<PortalSidebarProps> = ({ collapsed }) => {
             title="Mis Tickets"
           >
             <Ticket size={20} />
+          </NavLink>
+
+          <NavLink
+            to="/portal/maintenance-confirmation"
+            className={({ isActive }) =>
+              `flex items-center justify-center p-3 rounded-lg transition-colors ${
+                isActive
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`
+            }
+            title="Confirmar Horas"
+          >
+            <Clock size={20} />
           </NavLink>
         </nav>
       </aside>
@@ -107,6 +121,20 @@ const PortalSidebar: React.FC<PortalSidebarProps> = ({ collapsed }) => {
         >
           <Ticket size={20} />
           <span>Mis Tickets</span>
+        </NavLink>
+
+        <NavLink
+          to="/portal/maintenance-confirmation"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              isActive
+                ? 'bg-blue-500 text-white'
+                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`
+          }
+        >
+          <Clock size={20} />
+          <span>📅 Confirmar Horas</span>
         </NavLink>
       </nav>
 
