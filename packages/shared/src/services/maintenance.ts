@@ -12,6 +12,7 @@ import {
   orderBy,
   QueryConstraint,
   Timestamp,
+  deleteField,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Maintenance, MaintenanceFilters, MaintenanceStatus, MaintenanceTask, MaintenanceType } from '../types';
@@ -386,6 +387,54 @@ export const updateMaintenanceStatus = async (id: string, status: MaintenanceSta
     await updateMaintenance(id, { status });
   } catch (error) {
     console.error('Error updating maintenance status:', error);
+    throw error;
+  }
+};
+
+/**
+ * Reprograma un mantenimiento y reinicia su confirmación de hora
+ */
+export const rescheduleMaintenance = async (
+  id: string,
+  newScheduledDate: Date,
+  options?: {
+    resetTimeConfirmation?: boolean;
+    notes?: string;
+  }
+): Promise<void> => {
+  try {
+    const maintenance = await getMaintenanceById(id);
+    if (!maintenance) {
+      throw new Error('Maintenance not found');
+    }
+
+    const normalizedDate = new Date(newScheduledDate);
+    if (Number.isNaN(normalizedDate.getTime())) {
+      throw new Error('Fecha de reprogramación inválida');
+    }
+    normalizedDate.setHours(0, 0, 0, 0);
+
+    const updates: Record<string, any> = {
+      scheduledDate: Timestamp.fromDate(normalizedDate),
+      status: MaintenanceStatus.PROGRAMADO,
+      updatedAt: Timestamp.now(),
+    };
+
+    if (options?.notes !== undefined) {
+      updates.notes = options.notes;
+    }
+
+    if (options?.resetTimeConfirmation ?? true) {
+      updates.timeConfirmationStatus = 'pending';
+      updates.scheduledTime = deleteField();
+      updates.timeConfirmedBy = deleteField();
+      updates.timeConfirmedByName = deleteField();
+      updates.timeConfirmedAt = deleteField();
+    }
+
+    await updateDoc(doc(db, COLLECTION_NAME, id), updates);
+  } catch (error) {
+    console.error('Error rescheduling maintenance:', error);
     throw error;
   }
 };

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Wrench, Plus, Calendar, AlertTriangle, CheckCircle2, Clock, Filter, Download } from 'lucide-react';
 import {
@@ -23,6 +23,45 @@ import MaintenanceDetail from '../components/MaintenanceDetail';
 import MaintenanceConfirmationSchedule from '../components/MaintenanceConfirmationSchedule';
 import { exportMaintenancesToExcel } from '../utils/exportToExcel';
 import { sendMaintenanceSavedEmail } from '../utils/maintenanceEmail';
+
+const MAINTENANCE_FILTERS_STORAGE_KEY = 'nexus-it:maintenances:filters:v1';
+
+interface PersistedMaintenanceFilters {
+  companyFilter?: Company | '';
+  statusFilter?: MaintenanceStatus | '';
+  typeFilter?: MaintenanceType | '';
+  searchTerm?: string;
+}
+
+const readPersistedMaintenanceFilters = (): PersistedMaintenanceFilters => {
+  if (typeof window === 'undefined') return {};
+
+  try {
+    const raw = window.localStorage.getItem(MAINTENANCE_FILTERS_STORAGE_KEY);
+    if (!raw) return {};
+
+    const parsed = JSON.parse(raw) as PersistedMaintenanceFilters;
+    const companyFilter = Object.values(Company).includes(parsed.companyFilter as Company)
+      ? parsed.companyFilter
+      : '';
+    const statusFilter = Object.values(MaintenanceStatus).includes(parsed.statusFilter as MaintenanceStatus)
+      ? parsed.statusFilter
+      : '';
+    const typeFilter = Object.values(MaintenanceType).includes(parsed.typeFilter as MaintenanceType)
+      ? parsed.typeFilter
+      : '';
+
+    return {
+      companyFilter,
+      statusFilter,
+      typeFilter,
+      searchTerm: typeof parsed.searchTerm === 'string' ? parsed.searchTerm : ''
+    };
+  } catch (error) {
+    console.warn('No se pudieron leer filtros persistidos de mantenimientos:', error);
+    return {};
+  }
+};
 
 const toDate = (value: any): Date => {
   if (!value) return new Date();
@@ -50,12 +89,13 @@ const Maintenances = () => {
   const [viewMode, setViewMode] = useState<'list' | 'confirmations'>(
     isPortalView || isConfirmationRoute ? 'confirmations' : 'list'
   );
+  const persistedFilters = useMemo(() => readPersistedMaintenanceFilters(), []);
   
   // Filtros
-  const [companyFilter, setCompanyFilter] = useState<Company | ''>('');
-  const [statusFilter, setStatusFilter] = useState<MaintenanceStatus | ''>('');
-  const [typeFilter, setTypeFilter] = useState<MaintenanceType | ''>('');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [companyFilter, setCompanyFilter] = useState<Company | ''>(persistedFilters.companyFilter || '');
+  const [statusFilter, setStatusFilter] = useState<MaintenanceStatus | ''>(persistedFilters.statusFilter || '');
+  const [typeFilter, setTypeFilter] = useState<MaintenanceType | ''>(persistedFilters.typeFilter || '');
+  const [searchTerm, setSearchTerm] = useState(persistedFilters.searchTerm || '');
 
 
   // Actualizar viewMode cuando cambia la ruta
@@ -70,6 +110,23 @@ const Maintenances = () => {
   useEffect(() => {
     loadMaintenances();
   }, [companyFilter, statusFilter, typeFilter, searchTerm]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const payload: PersistedMaintenanceFilters = {
+        companyFilter,
+        statusFilter,
+        typeFilter,
+        searchTerm,
+      };
+      window.localStorage.setItem(MAINTENANCE_FILTERS_STORAGE_KEY, JSON.stringify(payload));
+    } catch (error) {
+      console.warn('No se pudieron persistir filtros de mantenimientos:', error);
+    }
+  }, [companyFilter, statusFilter, typeFilter, searchTerm]);
+
   const loadMaintenances = async () => {
     setLoading(true);
     try {

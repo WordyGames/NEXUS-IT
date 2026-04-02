@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useUiFeedback } from '../contexts/UiFeedbackContext';
 import { useNavigate } from 'react-router-dom';
 import { 
   Company, 
@@ -11,6 +12,10 @@ import {
   getUpcomingMaintenances,
   getOverdueMaintenances,
   getPendingTimeConfirmationMaintenancesForUser,
+  updateMaintenanceStatus,
+  completeMaintenance,
+  rescheduleMaintenance,
+  MaintenanceStatus,
   Maintenance,
   Equipment,
   Ticket
@@ -31,6 +36,7 @@ interface WarrantyAlert {
 
 const Dashboard = () => {
   const { userData, hasPermission } = useAuth();
+  const { showToast, confirm } = useUiFeedback();
   const navigate = useNavigate();
   const canViewAdminDashboard = hasPermission(UserPermission.DASHBOARD_ADMIN);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -42,6 +48,7 @@ const Dashboard = () => {
   const [pendingTimeConfirmations, setPendingTimeConfirmations] = useState<Maintenance[]>([]);
   const [warrantyAlerts, setWarrantyAlerts] = useState<WarrantyAlert>({ expired: 0, expiringSoon: 0 });
   const [equipmentByType, setEquipmentByType] = useState<Record<string, number>>({});
+  const [actionLoadingById, setActionLoadingById] = useState<Record<string, 'start' | 'complete' | 'reschedule'>>({});
   const [loading, setLoading] = useState(true);
 
   const companies = [
@@ -161,6 +168,121 @@ const Dashboard = () => {
       .slice(0, 8);
   }, [overdueMaintenances, upcomingMaintenances]);
 
+  const refreshAdminOperationalData = useCallback(async () => {
+    if (!canViewAdminDashboard) return;
+
+    const [upcoming, overdue, pendingTime] = await Promise.all([
+      getUpcomingMaintenances(),
+      getOverdueMaintenances(),
+      getPendingTimeConfirmationMaintenancesForUser(userData?.id, true)
+    ]);
+
+    setUpcomingMaintenances(upcoming);
+    setOverdueMaintenances(overdue);
+    setPendingTimeConfirmations(pendingTime);
+  }, [canViewAdminDashboard, userData?.id]);
+
+  const getSuggestedRescheduleDate = (maintenance: Maintenance): Date => {
+    const urgency = getMaintenanceUrgency(maintenance);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const scheduledDate = toDate(maintenance.scheduledDate);
+    scheduledDate.setHours(0, 0, 0, 0);
+
+    const baseDate = scheduledDate < today ? today : scheduledDate;
+    const daysToAdd = urgency.score === 3 ? 1 : urgency.score === 2 ? 3 : 7;
+
+    const nextDate = new Date(baseDate);
+    nextDate.setDate(nextDate.getDate() + daysToAdd);
+    return nextDate;
+  };
+
+  const handleQuickMaintenanceAction = async (
+    maintenance: Maintenance,
+    action: 'start' | 'complete' | 'reschedule'
+  ) => {
+    if (!userData?.id) {
+      showToast({
+        type: 'error',
+        title: 'Sesión no válida',
+        message: 'No se pudo identificar al usuario actual.'
+      });
+      return;
+    }
+
+    const actionConfig = {
+      start: {
+        title: 'Marcar en progreso',
+        message: '¿Quieres marcar este mantenimiento como en progreso?',
+        successTitle: 'Mantenimiento actualizado',
+        successMessage: 'Se marcó como en progreso.'
+      },
+      complete: {
+        title: 'Completar mantenimiento',
+        message: '¿Confirmas que este mantenimiento ya está completado?',
+        successTitle: 'Mantenimiento completado',
+        successMessage: 'Se completó y se evaluó la recurrencia automática.'
+      },
+      reschedule: {
+        title: 'Reprogramar mantenimiento',
+        message: `Se moverá a ${getSuggestedRescheduleDate(maintenance).toLocaleDateString('es-MX')}. ¿Deseas continuar?`,
+        successTitle: 'Mantenimiento reprogramado',
+        successMessage: 'Se movió la fecha y se reinició la confirmación de hora.'
+      }
+    };
+
+    const accepted = await confirm({
+      title: actionConfig[action].title,
+      message: actionConfig[action].message,
+      confirmText: 'Confirmar',
+      cancelText: 'Cancelar',
+      intent: 'primary'
+    });
+
+    if (!accepted) return;
+
+    setActionLoadingById((prev) => ({ ...prev, [maintenance.id]: action }));
+
+    try {
+      if (action === 'start') {
+        await updateMaintenanceStatus(maintenance.id, MaintenanceStatus.EN_PROGRESO);
+      }
+
+      if (action === 'complete') {
+        await completeMaintenance(
+          maintenance.id,
+          userData.id,
+          userData.name || userData.username || 'Usuario'
+        );
+      }
+
+      if (action === 'reschedule') {
+        await rescheduleMaintenance(maintenance.id, getSuggestedRescheduleDate(maintenance));
+      }
+
+      await refreshAdminOperationalData();
+
+      showToast({
+        type: 'success',
+        title: actionConfig[action].successTitle,
+        message: actionConfig[action].successMessage
+      });
+    } catch (error) {
+      showToast({
+        type: 'error',
+        title: 'No se pudo ejecutar la acción',
+        message: error instanceof Error ? error.message : 'Ocurrió un error inesperado.'
+      });
+    } finally {
+      setActionLoadingById((prev) => {
+        const next = { ...prev };
+        delete next[maintenance.id];
+        return next;
+      });
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -190,14 +312,7 @@ const Dashboard = () => {
 
         // Cargar alertas de mantenimiento y garantías para admin
         if (canViewAdminDashboard) {
-          const [upcoming, overdue, pendingTime] = await Promise.all([
-            getUpcomingMaintenances(),
-            getOverdueMaintenances(),
-            getPendingTimeConfirmationMaintenancesForUser(userData?.id, true)
-          ]);
-          setUpcomingMaintenances(upcoming);
-          setOverdueMaintenances(overdue);
-          setPendingTimeConfirmations(pendingTime);
+          await refreshAdminOperationalData();
 
           // Calcular alertas de garantías
           const allEquipment = await getEquipment({});
@@ -235,7 +350,7 @@ const Dashboard = () => {
     };
 
     loadData();
-  }, [canViewAdminDashboard, userData]);
+  }, [canViewAdminDashboard, userData, refreshAdminOperationalData]);
 
   if (loading) {
     return (
@@ -463,12 +578,35 @@ const Dashboard = () => {
                   <span className="text-sm text-gray-600 dark:text-gray-400">
                     {toDate(maintenance.scheduledDate).toLocaleDateString('es-MX')}
                   </span>
-                  <button
-                    onClick={() => navigate('/maintenances')}
-                    className="ml-auto text-sm text-blue-600 hover:text-blue-700 font-semibold"
-                  >
-                    Ver →
-                  </button>
+                  <div className="ml-auto flex items-center gap-2">
+                    <button
+                      onClick={() => handleQuickMaintenanceAction(maintenance, 'start')}
+                      disabled={Boolean(actionLoadingById[maintenance.id])}
+                      className="px-2.5 py-1.5 text-xs rounded bg-amber-100 text-amber-800 hover:bg-amber-200 disabled:opacity-60"
+                    >
+                      {actionLoadingById[maintenance.id] === 'start' ? 'Iniciando…' : 'En progreso'}
+                    </button>
+                    <button
+                      onClick={() => handleQuickMaintenanceAction(maintenance, 'complete')}
+                      disabled={Boolean(actionLoadingById[maintenance.id])}
+                      className="px-2.5 py-1.5 text-xs rounded bg-green-100 text-green-800 hover:bg-green-200 disabled:opacity-60"
+                    >
+                      {actionLoadingById[maintenance.id] === 'complete' ? 'Completando…' : 'Completar'}
+                    </button>
+                    <button
+                      onClick={() => handleQuickMaintenanceAction(maintenance, 'reschedule')}
+                      disabled={Boolean(actionLoadingById[maintenance.id])}
+                      className="px-2.5 py-1.5 text-xs rounded bg-slate-100 text-slate-800 hover:bg-slate-200 disabled:opacity-60"
+                    >
+                      {actionLoadingById[maintenance.id] === 'reschedule' ? 'Reprogramando…' : 'Reprogramar'}
+                    </button>
+                    <button
+                      onClick={() => navigate('/maintenances')}
+                      className="text-sm text-blue-600 hover:text-blue-700 font-semibold"
+                    >
+                      Ver →
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
