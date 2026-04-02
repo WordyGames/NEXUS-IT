@@ -265,13 +265,19 @@ const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleP
                   </div>
                   <button
                     onClick={() => {
+                      if (isAdmin) return;
                       setSelectedMaintenance(m);
                       setShowTimeModal(true);
                       setSelectedTimeText('09:00');
                     }}
-                    className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 transition-colors whitespace-nowrap"
+                    disabled={isAdmin}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+                      isAdmin
+                        ? 'text-amber-700 bg-amber-100 cursor-not-allowed'
+                        : 'text-white bg-amber-600 hover:bg-amber-700'
+                    }`}
                   >
-                    Confirmar Hora
+                    {isAdmin ? 'Pendiente de usuario' : 'Confirmar Hora'}
                   </button>
                 </div>
               );

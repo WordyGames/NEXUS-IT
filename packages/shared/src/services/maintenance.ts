@@ -15,7 +15,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Maintenance, MaintenanceFilters, MaintenanceStatus, MaintenanceTask } from '../types';
-import { getEquipment } from './equipment';
+import { getEquipment, getEquipmentById } from './equipment';
+import { isAdmin as isAdminUser } from './users';
 import { deleteFile, resolveAttachmentStoragePath } from './storage';
 
 const COLLECTION_NAME = 'maintenances';
@@ -522,6 +523,32 @@ export const confirmMaintenanceTime = async (
   confirmedByName: string
 ): Promise<void> => {
   try {
+    const maintenance = await getMaintenanceById(maintenanceId);
+    if (!maintenance) {
+      throw new Error('Mantenimiento no encontrado');
+    }
+
+    if (maintenance.timeConfirmationStatus === 'confirmed') {
+      throw new Error('Este mantenimiento ya fue confirmado');
+    }
+
+    if (maintenance.status !== MaintenanceStatus.PROGRAMADO) {
+      throw new Error('Solo se puede confirmar hora en mantenimientos programados');
+    }
+
+    const confirmerIsAdmin = await isAdminUser(confirmedBy);
+    if (confirmerIsAdmin) {
+      throw new Error('La hora debe ser confirmada por el usuario responsable, no por administrador');
+    }
+
+    const equipment = await getEquipmentById(maintenance.equipmentId);
+    const isAssignedTechnician = maintenance.assignedTo === confirmedBy;
+    const isAssignedEquipmentUser = equipment?.assignedTo === confirmedBy;
+
+    if (!isAssignedTechnician && !isAssignedEquipmentUser) {
+      throw new Error('No tienes permisos para confirmar la hora de este mantenimiento');
+    }
+
     const maintenanceRef = doc(db, COLLECTION_NAME, maintenanceId);
 
     await updateDoc(maintenanceRef, {
