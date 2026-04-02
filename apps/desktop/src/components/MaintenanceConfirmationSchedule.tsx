@@ -1,19 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { getMaintenancesByDateRange, Maintenance } from '@nexus-it/shared';
+import { getMaintenancesByDateRange, Maintenance, getPendingTimeConfirmationMaintenancesForUser, confirmMaintenanceTime } from '@nexus-it/shared';
+import { useAuth } from '../contexts/AuthContext';
 
 interface MaintenanceConfirmationScheduleProps {
   onClose?: () => void;
 }
 
 const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleProps> = () => {
+  const { userData, isAdmin } = useAuth();
   const [confirmations, setConfirmations] = useState<Maintenance[]>([]);
+  const [pendingConfirmations, setPendingConfirmations] = useState<Maintenance[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<'day' | 'week'>('week');
+  const [selectedMaintenance, setSelectedMaintenance] = useState<Maintenance | null>(null);
+  const [showTimeModal, setShowTimeModal] = useState(false);
+  const [selectedTimeText, setSelectedTimeText] = useState('09:00');
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadConfirmations();
-  }, [selectedDate, viewMode]);
+  }, [selectedDate, viewMode, userData?.id]);
 
   const loadConfirmations = async () => {
     try {
@@ -22,6 +29,10 @@ const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleP
       const endDate = getEndDate(selectedDate, viewMode);
       const data = await getMaintenancesByDateRange(startDate, endDate);
       setConfirmations(data);
+
+      // Cargar pendientes de confirmar para el usuario actual
+      const pending = await getPendingTimeConfirmationMaintenancesForUser(userData?.id, isAdmin);
+      setPendingConfirmations(pending);
     } catch (error) {
       console.error('Error loading confirmations:', error);
     } finally {
@@ -94,16 +105,101 @@ const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleP
     });
   };
 
+  const handleConfirmTime = async () => {
+    if (!selectedMaintenance || !userData?.id) return;
+
+    try {
+      setConfirmingId(selectedMaintenance.id);
+
+      const timeString = selectedTimeText.trim();
+      const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+      if (!timePattern.test(timeString)) {
+        alert('Hora inválida. Usa el formato HH:MM, por ejemplo 14:30.');
+        return;
+      }
+
+      await confirmMaintenanceTime(
+        selectedMaintenance.id,
+        timeString,
+        userData.id,
+        userData.name || 'Usuario'
+      );
+
+      alert('✅ Hora confirmada correctamente');
+      setShowTimeModal(false);
+      setSelectedMaintenance(null);
+      setSelectedTimeText('09:00');
+      await loadConfirmations();
+    } catch (error) {
+      console.error('Error confirming time:', error);
+      alert('❌ Error al confirmar la hora');
+    } finally {
+      setConfirmingId(null);
+    }
+  };
+
   const groupedByDate = groupByDate(confirmations);
   const conflicts = getTimeConflicts();
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
+    <div className="space-y-6">
+      {/* Modal de confirmación de hora */}
+      {showTimeModal && selectedMaintenance && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">
+              Confirmar Hora de Mantenimiento
+            </h3>
+
+            <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+              <p className="text-sm font-medium text-blue-900">{selectedMaintenance.equipmentName}</p>
+              <p className="text-xs text-blue-700 mt-1">{selectedMaintenance.title}</p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Hora (formato HH:MM, ej: 14:30)
+              </label>
+              <input
+                type="text"
+                value={selectedTimeText}
+                onChange={(e) => setSelectedTimeText(e.target.value)}
+                placeholder="09:00"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg font-mono text-center text-lg"
+              />
+              <p className="text-xs text-gray-500 mt-1">Usa formato 24 horas</p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowTimeModal(false);
+                  setSelectedMaintenance(null);
+                  setSelectedTimeText('09:00');
+                }}
+                className="flex-1 px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmTime}
+                disabled={confirmingId === selectedMaintenance.id}
+                className="flex-1 px-4 py-2 text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-colors font-medium"
+              >
+                {confirmingId === selectedMaintenance.id ? '...' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="bg-white rounded-lg shadow-lg p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Calendario de Confirmaciones</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Confirmación de Mantenimientos</h2>
           <p className="text-sm text-gray-600 mt-1">
+            {pendingConfirmations.length > 0 && `${pendingConfirmations.length} pendiente(s) de confirmar • `}
             {confirmations.filter(m => m.timeConfirmationStatus === 'confirmed').length} confirmadas
           </p>
         </div>
@@ -143,6 +239,48 @@ const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleP
           />
         </div>
       </div>
+
+      {/* SECCIÓN DE PENDIENTES DE CONFIRMAR */}
+      {pendingConfirmations.length > 0 && (
+        <div className="mb-8 p-4 bg-amber-50 border-2 border-amber-200 rounded-lg">
+          <h3 className="text-lg font-bold text-amber-900 mb-4">
+            ⏳ Pendientes de Confirmar ({pendingConfirmations.length})
+          </h3>
+          <div className="space-y-3">
+            {pendingConfirmations.map((m) => {
+              const schedDate = m.scheduledDate instanceof Date 
+                ? m.scheduledDate 
+                : new Date(m.scheduledDate);
+              return (
+                <div
+                  key={m.id}
+                  className="flex items-center gap-4 p-4 bg-white border border-amber-200 rounded-lg hover:border-amber-400 transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900">{m.equipmentName}</p>
+                    <p className="text-sm text-gray-600">{m.title}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Programado: {schedDate.toLocaleDateString('es-MX')}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedMaintenance(m);
+                      setShowTimeModal(true);
+                      setSelectedTimeText('09:00');
+                    }}
+                    className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 transition-colors whitespace-nowrap"
+                  >
+                    Confirmar Hora
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* SECCIÓN DE CONFIRMADAS (existente) */}
 
       {/* Alertas de conflictos */}
       {conflicts.length > 0 && (
@@ -266,6 +404,7 @@ const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleP
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };
