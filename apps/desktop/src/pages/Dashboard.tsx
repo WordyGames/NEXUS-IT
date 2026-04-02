@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -10,6 +10,7 @@ import {
   getTickets,
   getUpcomingMaintenances,
   getOverdueMaintenances,
+  getPendingTimeConfirmationMaintenancesForUser,
   Maintenance,
   Equipment,
   Ticket
@@ -38,6 +39,7 @@ const Dashboard = () => {
   const [recentTickets, setRecentTickets] = useState<any[]>([]);
   const [upcomingMaintenances, setUpcomingMaintenances] = useState<Maintenance[]>([]);
   const [overdueMaintenances, setOverdueMaintenances] = useState<Maintenance[]>([]);
+  const [pendingTimeConfirmations, setPendingTimeConfirmations] = useState<Maintenance[]>([]);
   const [warrantyAlerts, setWarrantyAlerts] = useState<WarrantyAlert>({ expired: 0, expiringSoon: 0 });
   const [equipmentByType, setEquipmentByType] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -105,6 +107,60 @@ const Dashboard = () => {
     return merged;
   };
 
+  const getMaintenanceUrgency = (maintenance: Maintenance) => {
+    const maintenanceDate = toDate(maintenance.scheduledDate);
+    const today = new Date();
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const startOfMaintenance = new Date(
+      maintenanceDate.getFullYear(),
+      maintenanceDate.getMonth(),
+      maintenanceDate.getDate()
+    );
+
+    const dayDiff = Math.floor((startOfMaintenance.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (dayDiff < 0 || maintenance.status === 'atrasado') {
+      return {
+        score: 3,
+        label: 'Vencido',
+        className: 'bg-red-100 text-red-800 border-red-300'
+      };
+    }
+
+    if (dayDiff <= 2) {
+      return {
+        score: 2,
+        label: 'Crítico',
+        className: 'bg-amber-100 text-amber-800 border-amber-300'
+      };
+    }
+
+    return {
+      score: 1,
+      label: 'Próximo',
+      className: 'bg-green-100 text-green-800 border-green-300'
+    };
+  };
+
+  const prioritizedMaintenances = useMemo(() => {
+    const uniqueMaintenances = new Map<string, Maintenance>();
+
+    [...overdueMaintenances, ...upcomingMaintenances].forEach((maintenance) => {
+      uniqueMaintenances.set(maintenance.id, maintenance);
+    });
+
+    return Array.from(uniqueMaintenances.values())
+      .map((maintenance) => ({
+        maintenance,
+        urgency: getMaintenanceUrgency(maintenance)
+      }))
+      .sort((a, b) => {
+        if (b.urgency.score !== a.urgency.score) return b.urgency.score - a.urgency.score;
+        return toDate(a.maintenance.scheduledDate).getTime() - toDate(b.maintenance.scheduledDate).getTime();
+      })
+      .slice(0, 8);
+  }, [overdueMaintenances, upcomingMaintenances]);
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -134,12 +190,14 @@ const Dashboard = () => {
 
         // Cargar alertas de mantenimiento y garantías para admin
         if (canViewAdminDashboard) {
-          const [upcoming, overdue] = await Promise.all([
+          const [upcoming, overdue, pendingTime] = await Promise.all([
             getUpcomingMaintenances(),
-            getOverdueMaintenances()
+            getOverdueMaintenances(),
+            getPendingTimeConfirmationMaintenancesForUser(userData?.id, true)
           ]);
           setUpcomingMaintenances(upcoming);
           setOverdueMaintenances(overdue);
+          setPendingTimeConfirmations(pendingTime);
 
           // Calcular alertas de garantías
           const allEquipment = await getEquipment({});
@@ -339,6 +397,83 @@ const Dashboard = () => {
         <p className="text-gray-600 dark:text-gray-400">
           Vista general del sistema
         </p>
+      </div>
+
+      {/* Centro de Operaciones */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow space-y-4">
+        <div>
+          <h2 className="text-xl font-bold text-gray-800 dark:text-white">⚡ Centro de Operaciones</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Resumen diario para ejecutar acciones rápidas sin cambiar de módulo.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <button
+            onClick={() => navigate('/maintenance-confirmation')}
+            className="text-left p-4 rounded-lg border border-amber-200 bg-amber-50 hover:shadow transition-shadow"
+          >
+            <p className="text-xs text-amber-700 font-semibold uppercase">Confirmaciones pendientes</p>
+            <p className="text-3xl font-bold text-amber-900 mt-1">{pendingTimeConfirmations.length}</p>
+            <p className="text-xs text-amber-700 mt-2">Ver y gestionar →</p>
+          </button>
+
+          <button
+            onClick={() => navigate('/maintenances')}
+            className="text-left p-4 rounded-lg border border-red-200 bg-red-50 hover:shadow transition-shadow"
+          >
+            <p className="text-xs text-red-700 font-semibold uppercase">Mantenimientos vencidos</p>
+            <p className="text-3xl font-bold text-red-900 mt-1">{overdueMaintenances.length}</p>
+            <p className="text-xs text-red-700 mt-2">Prioridad alta →</p>
+          </button>
+
+          <button
+            onClick={() => navigate('/maintenances')}
+            className="text-left p-4 rounded-lg border border-blue-200 bg-blue-50 hover:shadow transition-shadow"
+          >
+            <p className="text-xs text-blue-700 font-semibold uppercase">Próximos 7 días</p>
+            <p className="text-3xl font-bold text-blue-900 mt-1">{upcomingMaintenances.length}</p>
+            <p className="text-xs text-blue-700 mt-2">Revisar calendario →</p>
+          </button>
+
+          <button
+            onClick={() => navigate('/tickets')}
+            className="text-left p-4 rounded-lg border border-green-200 bg-green-50 hover:shadow transition-shadow"
+          >
+            <p className="text-xs text-green-700 font-semibold uppercase">Tickets abiertos</p>
+            <p className="text-3xl font-bold text-green-900 mt-1">{stats?.tickets.byStatus?.open || 0}</p>
+            <p className="text-xs text-green-700 mt-2">Atender incidencias →</p>
+          </button>
+        </div>
+
+        {prioritizedMaintenances.length > 0 && (
+          <div className="pt-2">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">🚦 Semáforo de prioridad</h3>
+            <div className="space-y-2">
+              {prioritizedMaintenances.map(({ maintenance, urgency }) => (
+                <div
+                  key={maintenance.id}
+                  className="flex flex-wrap items-center gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg"
+                >
+                  <span className={`text-xs px-2 py-1 rounded border font-semibold ${urgency.className}`}>
+                    {urgency.label}
+                  </span>
+                  <span className="font-medium text-gray-900 dark:text-white">{maintenance.equipmentName}</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">{maintenance.title}</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    {toDate(maintenance.scheduledDate).toLocaleDateString('es-MX')}
+                  </span>
+                  <button
+                    onClick={() => navigate('/maintenances')}
+                    className="ml-auto text-sm text-blue-600 hover:text-blue-700 font-semibold"
+                  >
+                    Ver →
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Estadísticas Generales */}

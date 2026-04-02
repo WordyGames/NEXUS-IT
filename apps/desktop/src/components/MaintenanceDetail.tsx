@@ -1,6 +1,6 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X, Calendar, AlertTriangle, CheckCircle2, User, FileText, DollarSign, Paperclip, Clock, Download } from 'lucide-react';
-import { Maintenance, MaintenanceStatus } from '@nexus-it/shared';
+import { Maintenance, MaintenanceStatus, getMaintenances } from '@nexus-it/shared';
 import jsPDF from 'jspdf';
 
 interface MaintenanceDetailProps {
@@ -13,6 +13,34 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
   onClose,
 }) => {
   const contentRef = useRef<HTMLDivElement>(null);
+  const [equipmentHistory, setEquipmentHistory] = useState<Maintenance[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
+  useEffect(() => {
+    const loadEquipmentHistory = async () => {
+      try {
+        setHistoryLoading(true);
+        const history = await getMaintenances({ equipmentId: maintenance.equipmentId });
+
+        const getDateValue = (date: any) => {
+          if (!date) return 0;
+          if (date.toDate) return date.toDate().getTime();
+          const parsed = new Date(date).getTime();
+          return Number.isNaN(parsed) ? 0 : parsed;
+        };
+
+        history.sort((a, b) => getDateValue(b.scheduledDate) - getDateValue(a.scheduledDate));
+        setEquipmentHistory(history.slice(0, 8));
+      } catch (error) {
+        console.error('Error loading equipment history:', error);
+        setEquipmentHistory([]);
+      } finally {
+        setHistoryLoading(false);
+      }
+    };
+
+    void loadEquipmentHistory();
+  }, [maintenance.equipmentId]);
 
   const sanitizePdfText = (value: string) => {
     if (!value) return '';
@@ -251,6 +279,8 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
           </div>
           <button
             onClick={onClose}
+            aria-label="Cerrar detalle de mantenimiento"
+            title="Cerrar"
             className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
           >
             <X size={24} />
@@ -290,6 +320,43 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
               <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Descripción</label>
               <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">{maintenance.description || 'Sin descripción'}</p>
             </div>
+          </div>
+
+          {/* Historial por equipo */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-3">
+              📚 Historial del equipo (últimos mantenimientos)
+            </label>
+
+            {historyLoading ? (
+              <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-4 text-sm text-gray-600 dark:text-gray-300">
+                Cargando historial...
+              </div>
+            ) : equipmentHistory.length === 0 ? (
+              <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-4 text-sm text-gray-600 dark:text-gray-300">
+                Este equipo aún no tiene historial de mantenimientos.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {equipmentHistory.map((historyItem) => (
+                  <div
+                    key={historyItem.id}
+                    className="flex flex-wrap items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg"
+                  >
+                    <span className={`px-2 py-1 rounded text-xs font-semibold ${getStatusColor(historyItem.status)}`}>
+                      {historyItem.status}
+                    </span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {formatDateOnly(historyItem.scheduledDate)}
+                    </span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">{historyItem.title}</span>
+                    {historyItem.id === maintenance.id && (
+                      <span className="ml-auto text-xs font-semibold text-blue-700 dark:text-blue-300">Esta orden</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Fechas */}
@@ -367,6 +434,8 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
                       type="checkbox"
                       checked={task.completed}
                       disabled
+                      aria-label={`Tarea ${task.description}`}
+                      title={`Tarea ${task.description}`}
                       className="mt-1 flex-shrink-0 w-5 h-5 rounded cursor-default"
                     />
                     <div className="flex-1 min-w-0">
@@ -391,7 +460,7 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
           {/* Notas */}
           {maintenance.notes && (
             <div>
-              <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2 flex items-center gap-2">
+              <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2 flex items-center gap-2">
                 <FileText size={16} />
                 Notas Adicionales
               </label>
@@ -417,7 +486,7 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
           {/* Adjuntos */}
           {maintenance.attachments && maintenance.attachments.length > 0 && (
             <div>
-              <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-3 flex items-center gap-2">
+              <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-3 flex items-center gap-2">
                 <Paperclip size={16} />
                 Adjuntos ({maintenance.attachments.length})
               </label>
