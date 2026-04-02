@@ -1,0 +1,12 @@
+{
+    "git.ignoreLimitWarning": true,
+    "java.compile.nullAnalysis.mode": "automatic",
+    "vscode-edge-devtools.webhint": false,
+    "files.associations": {
+        ".github/workflows/*.yml": "yaml",
+        ".github/workflows/*.yaml": "yaml",
+        "**/.github/workflows/mobile-ota-production.yml": "yaml",
+        "**/.github/workflows/*.yml": "yaml",
+        "**/.github/workflows/*.yaml": "yaml"
+    }
+}
