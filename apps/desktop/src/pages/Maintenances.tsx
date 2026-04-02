@@ -54,10 +54,15 @@ const Maintenances = () => {
   const [typeFilter, setTypeFilter] = useState<MaintenanceType | ''>('');
   const [searchTerm, setSearchTerm] = useState('');
 
+
+  // Actualizar viewMode cuando cambia la ruta
+  useEffect(() => {
+    setViewMode(location.pathname.includes('/portal/') ? 'confirmations' : 'list');
+  }, [location.pathname]);
+
   useEffect(() => {
     loadMaintenances();
   }, [companyFilter, statusFilter, typeFilter, searchTerm]);
-
   const loadMaintenances = async () => {
     setLoading(true);
     try {
