@@ -3,8 +3,10 @@ import { X, Save } from 'lucide-react';
 import {
   Maintenance,
   MaintenanceStatus,
+  completeMaintenance,
   updateMaintenance,
 } from '@nexus-it/shared';
+import { useAuth } from '../contexts/AuthContext';
 
 interface MaintenanceStatusEditorProps {
   maintenance: Maintenance;
@@ -17,6 +19,7 @@ const MaintenanceStatusEditor: React.FC<MaintenanceStatusEditorProps> = ({
   onClose,
   onUpdate,
 }) => {
+  const { userData } = useAuth();
   const [status, setStatus] = useState<MaintenanceStatus>(maintenance.status);
   const [notes, setNotes] = useState(maintenance.notes || '');
   const [loading, setLoading] = useState(false);
@@ -26,11 +29,25 @@ const MaintenanceStatusEditor: React.FC<MaintenanceStatusEditorProps> = ({
     setLoading(true);
     setError('');
     try {
-      await updateMaintenance(maintenance.id, {
-        ...maintenance,
-        status,
-        notes,
-      } as any);
+      if (status === MaintenanceStatus.COMPLETADO) {
+        if (!userData?.id) {
+          throw new Error('No se pudo identificar al usuario que completa el mantenimiento');
+        }
+
+        await completeMaintenance(
+          maintenance.id,
+          userData.id,
+          userData.name || 'Usuario',
+          notes
+        );
+      } else {
+        await updateMaintenance(maintenance.id, {
+          ...maintenance,
+          status,
+          notes,
+        } as any);
+      }
+
       await onUpdate();
       onClose();
     } catch (err) {

@@ -14,12 +14,20 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { Maintenance, MaintenanceFilters, MaintenanceStatus, MaintenanceTask } from '../types';
+import { Maintenance, MaintenanceFilters, MaintenanceStatus, MaintenanceTask, MaintenanceType } from '../types';
 import { getEquipment, getEquipmentById } from './equipment';
 import { isAdmin as isAdminUser } from './users';
 import { deleteFile, resolveAttachmentStoragePath } from './storage';
 
 const COLLECTION_NAME = 'maintenances';
+
+const getDefaultFrequencyForType = (type: MaintenanceType): Maintenance['frequency'] | undefined => {
+  if (type === MaintenanceType.PREVENTIVO) {
+    // Recomendación operativa por defecto para TI: cada 6 meses
+    return 'semiannual';
+  }
+  return undefined;
+};
 
 /**
  * Obtiene todos los mantenimientos con filtros opcionales
@@ -279,20 +287,34 @@ export const completeMaintenance = async (
     if (!maintenance) {
       throw new Error('Maintenance not found');
     }
+
+    // Evitar duplicar auto-agendado si el mantenimiento ya estaba completado
+    if (maintenance.status === MaintenanceStatus.COMPLETADO) {
+      if (notes !== undefined) {
+        await updateMaintenance(id, { notes });
+      }
+      return;
+    }
+
+    const effectiveFrequency = maintenance.frequency || getDefaultFrequencyForType(maintenance.type);
     
     const updates: Partial<Maintenance> = {
       status: MaintenanceStatus.COMPLETADO,
       completedDate: Timestamp.now(),
       notes: notes || maintenance.notes,
     };
+
+    if (!maintenance.frequency && effectiveFrequency) {
+      updates.frequency = effectiveFrequency;
+    }
     
     // Si tiene frecuencia, programar el siguiente
-    if (maintenance.frequency) {
+    if (effectiveFrequency) {
       const nextDate = calculateNextMaintenanceDate(
         maintenance.scheduledDate instanceof Timestamp 
           ? maintenance.scheduledDate.toDate() 
           : new Date(maintenance.scheduledDate),
-        maintenance.frequency
+        effectiveFrequency
       );
       updates.nextMaintenanceDate = Timestamp.fromDate(nextDate);
     }
@@ -300,7 +322,7 @@ export const completeMaintenance = async (
     await updateMaintenance(id, updates);
     
     // Si tiene frecuencia, crear el siguiente mantenimiento automáticamente
-    if (maintenance.frequency && updates.nextMaintenanceDate) {
+    if (effectiveFrequency && updates.nextMaintenanceDate) {
       const incompleteTasks = maintenance.tasks.map(task => ({
         ...task,
         completed: false,
@@ -313,6 +335,7 @@ export const completeMaintenance = async (
         scheduledDate: updates.nextMaintenanceDate,
         status: MaintenanceStatus.PROGRAMADO,
         completedDate: undefined,
+        frequency: effectiveFrequency,
         tasks: incompleteTasks,
         createdBy: userId,
         createdByName: userName,
