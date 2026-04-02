@@ -442,9 +442,9 @@ export const getPendingTimeConfirmationMaintenances = async (
   try {
     const constraints: QueryConstraint[] = [
       where('status', '==', MaintenanceStatus.PROGRAMADO),
-      where('timeConfirmationStatus', '==', 'pending'),
     ];
 
+    // No buscar por timeConfirmationStatus si no existe, pero filtrar en cliente
     if (assignedToId) {
       constraints.push(where('assignedTo', '==', assignedToId));
     }
@@ -457,8 +457,11 @@ export const getPendingTimeConfirmationMaintenances = async (
       ...doc.data(),
     })) as Maintenance[];
 
+    // Filtrar en cliente: incluir solo mantenimientos que NO estén confirmados
+    const pendingMaintenances = maintenances.filter((m) => m.timeConfirmationStatus !== 'confirmed');
+
     // Ordenar por fecha
-    maintenances.sort((a, b) => {
+    pendingMaintenances.sort((a, b) => {
       const aTime =
         a.scheduledDate instanceof Timestamp
           ? a.scheduledDate.toMillis()
@@ -470,7 +473,7 @@ export const getPendingTimeConfirmationMaintenances = async (
       return aTime - bTime;
     });
 
-    return maintenances;
+    return pendingMaintenances;
   } catch (error) {
     console.error('Error getting pending time confirmation maintenances:', error);
     throw error;
