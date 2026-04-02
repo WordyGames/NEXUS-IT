@@ -17,13 +17,52 @@ import {
   confirmMaintenanceTime 
 } from '@nexus-it/shared';
 
+const toJSDate = (value: any): Date | null => {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value?.toDate === 'function') {
+    const date = value.toDate();
+    return Number.isNaN(date?.getTime?.()) ? null : date;
+  }
+  if (typeof value?.seconds === 'number') {
+    const date = new Date(value.seconds * 1000);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const to12hFrom24h = (time24?: string) => {
+  if (!time24 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time24)) return '09:00 AM';
+  const [hourStr, minute] = time24.split(':');
+  const hour24 = Number(hourStr);
+  const period = hour24 >= 12 ? 'PM' : 'AM';
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  return `${String(hour12).padStart(2, '0')}:${minute} ${period}`;
+};
+
+const to24hFrom12h = (time12: string) => {
+  const normalized = time12.trim().toUpperCase();
+  const match = normalized.match(/^(0?[1-9]|1[0-2]):([0-5]\d)\s?(AM|PM)$/);
+  if (!match) return null;
+
+  const hour = Number(match[1]);
+  const minute = match[2];
+  const period = match[3];
+
+  let hour24 = hour % 12;
+  if (period === 'PM') hour24 += 12;
+
+  return `${String(hour24).padStart(2, '0')}:${minute}`;
+};
+
 const MaintenanceConfirmationScreen = ({ navigation }: any) => {
   const { userData } = useAuth();
   const [maintenances, setMaintenances] = useState<Maintenance[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMaintenance, setSelectedMaintenance] = useState<Maintenance | null>(null);
   const [showTimeModal, setShowTimeModal] = useState(false);
-  const [selectedTimeText, setSelectedTimeText] = useState('09:00');
+  const [selectedTimeText, setSelectedTimeText] = useState('09:00 AM');
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -48,11 +87,10 @@ const MaintenanceConfirmationScreen = ({ navigation }: any) => {
     try {
       setConfirmingId(selectedMaintenance.id);
       
-      const timeString = selectedTimeText.trim();
-      const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+      const timeString = to24hFrom12h(selectedTimeText);
 
-      if (!timePattern.test(timeString)) {
-        Alert.alert('Hora inválida', 'Usa el formato HH:MM, por ejemplo 14:30.');
+      if (!timeString) {
+        Alert.alert('Hora inválida', 'Usa formato de 12 horas, por ejemplo 09:30 AM.');
         return;
       }
 
@@ -104,7 +142,8 @@ const MaintenanceConfirmationScreen = ({ navigation }: any) => {
   };
 
   const formatDate = (date: Date | any) => {
-    const d = new Date(date);
+    const d = toJSDate(date);
+    if (!d) return 'Fecha no disponible';
     return d.toLocaleDateString('es-MX', { 
       weekday: 'long', 
       year: 'numeric', 
@@ -145,7 +184,7 @@ const MaintenanceConfirmationScreen = ({ navigation }: any) => {
                 style={styles.maintenanceCard}
                 onPress={() => {
                   setSelectedMaintenance(maintenance);
-                  setSelectedTimeText(maintenance.scheduledTime || '09:00');
+                  setSelectedTimeText(to12hFrom24h(maintenance.scheduledTime));
                   setShowTimeModal(true);
                 }}
               >
@@ -197,17 +236,17 @@ const MaintenanceConfirmationScreen = ({ navigation }: any) => {
                 <View style={styles.timePickerContainer}>
                   <Text style={styles.timeLabel}>Selecciona la hora:</Text>
                   <Text style={styles.timeHelpText}>
-                    Escribe la hora en formato 24 horas, por ejemplo 14:30.
+                    Escribe la hora en formato 12 horas, por ejemplo 09:30 AM.
                   </Text>
 
                   <TextInput
                     value={selectedTimeText}
                     onChangeText={setSelectedTimeText}
-                    placeholder="HH:MM"
+                    placeholder="hh:mm AM/PM"
                     placeholderTextColor="#9ca3af"
-                    keyboardType="numbers-and-punctuation"
+                    keyboardType="default"
                     style={styles.timeInput}
-                    maxLength={5}
+                    maxLength={8}
                     autoCapitalize="none"
                     autoCorrect={false}
                   />

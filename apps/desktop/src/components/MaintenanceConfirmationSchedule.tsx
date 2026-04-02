@@ -6,6 +6,51 @@ interface MaintenanceConfirmationScheduleProps {
   onClose?: () => void;
 }
 
+const toJSDate = (value: any): Date | null => {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value?.toDate === 'function') {
+    const date = value.toDate();
+    return Number.isNaN(date?.getTime?.()) ? null : date;
+  }
+  if (typeof value?.seconds === 'number') {
+    const date = new Date(value.seconds * 1000);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const to12hParts = (time24?: string) => {
+  if (!time24 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time24)) {
+    return { hour: '09', minute: '00', period: 'AM' as 'AM' | 'PM' };
+  }
+
+  const [hourStr, minute] = time24.split(':');
+  const hour24 = Number(hourStr);
+  const period: 'AM' | 'PM' = hour24 >= 12 ? 'PM' : 'AM';
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+
+  return {
+    hour: String(hour12).padStart(2, '0'),
+    minute,
+    period,
+  };
+};
+
+const to24h = (hour12: string, minute: string, period: 'AM' | 'PM') => {
+  const hourNumber = Number(hour12);
+  let hour24 = hourNumber % 12;
+  if (period === 'PM') hour24 += 12;
+  return `${String(hour24).padStart(2, '0')}:${minute}`;
+};
+
+const formatTime12h = (time24?: string) => {
+  if (!time24) return 'Pendiente';
+  const parts = to12hParts(time24);
+  return `${parts.hour}:${parts.minute} ${parts.period}`;
+};
+
 const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleProps> = () => {
   const { userData, isAdmin } = useAuth();
   const [confirmations, setConfirmations] = useState<Maintenance[]>([]);
@@ -15,7 +60,9 @@ const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleP
   const [viewMode, setViewMode] = useState<'day' | 'week'>('week');
   const [selectedMaintenance, setSelectedMaintenance] = useState<Maintenance | null>(null);
   const [showTimeModal, setShowTimeModal] = useState(false);
-  const [selectedTimeText, setSelectedTimeText] = useState('09:00');
+  const [selectedHour12, setSelectedHour12] = useState('09');
+  const [selectedMinute, setSelectedMinute] = useState('00');
+  const [selectedPeriod, setSelectedPeriod] = useState<'AM' | 'PM'>('AM');
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -65,9 +112,8 @@ const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleP
   const groupByDate = (maintenances: Maintenance[]) => {
     const grouped: Record<string, Maintenance[]> = {};
     maintenances.forEach((m) => {
-      const date = m.scheduledDate instanceof Date 
-        ? m.scheduledDate 
-        : new Date(m.scheduledDate);
+      const date = toJSDate(m.scheduledDate);
+      if (!date) return;
       const key = date.toLocaleDateString('es-MX');
       if (!grouped[key]) {
         grouped[key] = [];
@@ -96,8 +142,9 @@ const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleP
       .map(([time, items]) => ({ time, count: items.length }));
   };
 
-  const formatDate = (date: Date | any) => {
-    const d = date instanceof Date ? date : new Date(date);
+  const formatDate = (date: any) => {
+    const d = toJSDate(date);
+    if (!d) return 'Fecha no disponible';
     return d.toLocaleDateString('es-MX', {
       weekday: 'short',
       month: 'short',
@@ -111,13 +158,7 @@ const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleP
     try {
       setConfirmingId(selectedMaintenance.id);
 
-      const timeString = selectedTimeText.trim();
-      const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
-
-      if (!timePattern.test(timeString)) {
-        alert('Hora inválida. Usa el formato HH:MM, por ejemplo 14:30.');
-        return;
-      }
+      const timeString = to24h(selectedHour12, selectedMinute, selectedPeriod);
 
       await confirmMaintenanceTime(
         selectedMaintenance.id,
@@ -129,7 +170,9 @@ const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleP
       alert('✅ Hora confirmada correctamente');
       setShowTimeModal(false);
       setSelectedMaintenance(null);
-      setSelectedTimeText('09:00');
+      setSelectedHour12('09');
+      setSelectedMinute('00');
+      setSelectedPeriod('AM');
       await loadConfirmations();
     } catch (error) {
       console.error('Error confirming time:', error);
@@ -159,16 +202,47 @@ const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleP
 
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Hora (formato HH:MM, ej: 14:30)
+                Hora disponible
               </label>
-              <input
-                type="text"
-                value={selectedTimeText}
-                onChange={(e) => setSelectedTimeText(e.target.value)}
-                placeholder="09:00"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg font-mono text-center text-lg"
-              />
-              <p className="text-xs text-gray-500 mt-1">Usa formato 24 horas</p>
+              <div className="grid grid-cols-3 gap-2">
+                <select
+                  aria-label="Hora en formato 12 horas"
+                  title="Hora"
+                  value={selectedHour12}
+                  onChange={(e) => setSelectedHour12(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg font-semibold"
+                >
+                  {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map((hour) => (
+                    <option key={hour} value={hour}>
+                      {hour}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Minutos"
+                  title="Minutos"
+                  value={selectedMinute}
+                  onChange={(e) => setSelectedMinute(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg font-semibold"
+                >
+                  {Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0')).map((minute) => (
+                    <option key={minute} value={minute}>
+                      {minute}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Periodo AM o PM"
+                  title="Periodo"
+                  value={selectedPeriod}
+                  onChange={(e) => setSelectedPeriod(e.target.value as 'AM' | 'PM')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg font-semibold"
+                >
+                  <option value="AM">AM</option>
+                  <option value="PM">PM</option>
+                </select>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Formato de 12 horas (AM/PM)</p>
             </div>
 
             <div className="flex gap-3">
@@ -176,7 +250,9 @@ const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleP
                 onClick={() => {
                   setShowTimeModal(false);
                   setSelectedMaintenance(null);
-                  setSelectedTimeText('09:00');
+                  setSelectedHour12('09');
+                  setSelectedMinute('00');
+                  setSelectedPeriod('AM');
                 }}
                 className="flex-1 px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors font-medium"
               >
@@ -248,9 +324,6 @@ const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleP
           </h3>
           <div className="space-y-3">
             {pendingConfirmations.map((m) => {
-              const schedDate = m.scheduledDate instanceof Date 
-                ? m.scheduledDate 
-                : new Date(m.scheduledDate);
               return (
                 <div
                   key={m.id}
@@ -260,15 +333,18 @@ const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleP
                     <p className="font-semibold text-gray-900">{m.equipmentName}</p>
                     <p className="text-sm text-gray-600">{m.title}</p>
                     <p className="text-xs text-gray-500 mt-1">
-                      Programado: {schedDate.toLocaleDateString('es-MX')}
+                      Programado: {formatDate(m.scheduledDate)}
                     </p>
                   </div>
                   <button
                     onClick={() => {
                       if (isAdmin) return;
                       setSelectedMaintenance(m);
+                      const timeParts = to12hParts(m.scheduledTime);
+                      setSelectedHour12(timeParts.hour);
+                      setSelectedMinute(timeParts.minute);
+                      setSelectedPeriod(timeParts.period);
                       setShowTimeModal(true);
-                      setSelectedTimeText('09:00');
                     }}
                     disabled={isAdmin}
                     className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
@@ -350,7 +426,7 @@ const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleP
                           <div>
                             <span className="text-gray-500">Hora:</span>
                             <span className="ml-2 font-semibold text-gray-900">
-                              {m.scheduledTime || 'Pendiente'}
+                              {formatTime12h(m.scheduledTime)}
                             </span>
                           </div>
 
