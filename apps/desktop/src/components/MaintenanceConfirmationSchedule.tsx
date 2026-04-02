@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getMaintenancesByDateRange, Maintenance, getPendingTimeConfirmationMaintenancesForUser, confirmMaintenanceTime } from '@nexus-it/shared';
+import { getMaintenancesByDateRangeForUser, Maintenance, getPendingTimeConfirmationMaintenancesForUser, confirmMaintenanceTime } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
 
 interface MaintenanceConfirmationScheduleProps {
@@ -80,7 +80,7 @@ const MaintenanceConfirmationSchedule: React.FC<MaintenanceConfirmationScheduleP
       setLoading(true);
       const startDate = getStartDate(selectedDate, viewMode);
       const endDate = getEndDate(selectedDate, viewMode);
-      const data = await getMaintenancesByDateRange(startDate, endDate);
+      const data = await getMaintenancesByDateRangeForUser(startDate, endDate, userData?.id, isAdmin);
       setConfirmations(data);
 
       // Cargar pendientes de confirmar para el usuario actual

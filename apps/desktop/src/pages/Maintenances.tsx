@@ -6,7 +6,7 @@ import {
   MaintenanceStatus,
   MaintenanceType,
   UserPermission,
-  getMaintenances,
+  getMaintenancesForUser,
   createMaintenance,
   updateMaintenance,
   deleteMaintenance,
@@ -74,7 +74,7 @@ const Maintenances = () => {
   const location = useLocation();
   const isPortalView = location.pathname.includes('/portal/');
   const isConfirmationRoute = location.pathname.includes('/maintenance-confirmation');
-  const { hasPermission } = useAuth();
+  const { hasPermission, isAdmin, userData } = useAuth();
   const { showToast, confirm } = useUiFeedback();
   const canManageMaintenances = hasPermission(UserPermission.MAINTENANCES_MANAGE);
   const [maintenances, setMaintenances] = useState<Maintenance[]>([]);
@@ -109,7 +109,7 @@ const Maintenances = () => {
 
   useEffect(() => {
     loadMaintenances();
-  }, [companyFilter, statusFilter, typeFilter, searchTerm]);
+  }, [companyFilter, statusFilter, typeFilter, searchTerm, userData?.id, isAdmin]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -136,11 +136,33 @@ const Maintenances = () => {
       if (typeFilter) filters.type = typeFilter;
       if (searchTerm) filters.search = searchTerm;
 
-      const [allMaintenances, upcoming, overdue] = await Promise.all([
-        getMaintenances(filters),
-        getUpcomingMaintenances(),
-        getOverdueMaintenances(),
-      ]);
+      const allMaintenances = await getMaintenancesForUser(filters, userData?.id, isAdmin);
+
+      let upcoming: Maintenance[] = [];
+      let overdue: Maintenance[] = [];
+
+      if (isAdmin) {
+        [upcoming, overdue] = await Promise.all([
+          getUpcomingMaintenances(),
+          getOverdueMaintenances(),
+        ]);
+      } else {
+        const now = new Date();
+        const next7Days = new Date();
+        next7Days.setDate(next7Days.getDate() + 7);
+
+        upcoming = allMaintenances.filter((maintenance) => {
+          if (maintenance.status !== MaintenanceStatus.PROGRAMADO) return false;
+          const scheduledDate = toDate(maintenance.scheduledDate);
+          return scheduledDate >= now && scheduledDate <= next7Days;
+        });
+
+        overdue = allMaintenances.filter((maintenance) => {
+          if (maintenance.status !== MaintenanceStatus.PROGRAMADO) return false;
+          const scheduledDate = toDate(maintenance.scheduledDate);
+          return scheduledDate < now;
+        });
+      }
 
       setMaintenances(allMaintenances);
       setUpcomingMaintenances(upcoming);

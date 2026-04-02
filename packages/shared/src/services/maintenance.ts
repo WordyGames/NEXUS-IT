@@ -110,6 +110,40 @@ export const getMaintenances = async (filters?: MaintenanceFilters): Promise<Mai
 };
 
 /**
+ * Filtra mantenimientos visibles para un usuario:
+ * - Admin: todos
+ * - Usuario normal: asignados directamente o ligados a equipo asignado
+ */
+export const filterMaintenancesForUser = async (
+  maintenances: Maintenance[],
+  userId?: string,
+  isAdmin = false
+): Promise<Maintenance[]> => {
+  if (isAdmin || !userId) {
+    return maintenances;
+  }
+
+  const userEquipment = await getEquipment({ assignedTo: userId });
+  const userEquipmentIds = new Set(userEquipment.map((eq) => eq.id));
+
+  return maintenances.filter((maintenance) => (
+    maintenance.assignedTo === userId || userEquipmentIds.has(maintenance.equipmentId)
+  ));
+};
+
+/**
+ * Obtiene mantenimientos visibles para el usuario actual.
+ */
+export const getMaintenancesForUser = async (
+  filters?: MaintenanceFilters,
+  userId?: string,
+  isAdmin = false
+): Promise<Maintenance[]> => {
+  const maintenances = await getMaintenances(filters);
+  return filterMaintenancesForUser(maintenances, userId, isAdmin);
+};
+
+/**
  * Obtiene un mantenimiento por ID
  */
 export const getMaintenanceById = async (id: string): Promise<Maintenance | null> => {
@@ -660,4 +694,17 @@ export const getMaintenancesByDateRange = async (
     console.error('Error getting maintenances by date range:', error);
     throw error;
   }
+};
+
+/**
+ * Obtiene mantenimientos confirmados por rango de fecha, con alcance según usuario.
+ */
+export const getMaintenancesByDateRangeForUser = async (
+  startDate: Date,
+  endDate: Date,
+  userId?: string,
+  isAdmin = false
+): Promise<Maintenance[]> => {
+  const maintenances = await getMaintenancesByDateRange(startDate, endDate);
+  return filterMaintenancesForUser(maintenances, userId, isAdmin);
 };
