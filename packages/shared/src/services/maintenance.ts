@@ -297,10 +297,13 @@ export const completeMaintenance = async (
     }
 
     const effectiveFrequency = maintenance.frequency || getDefaultFrequencyForType(maintenance.type);
+    const completedAt = Timestamp.now();
+    const completedAtDate = completedAt.toDate();
+    completedAtDate.setHours(0, 0, 0, 0);
     
     const updates: Partial<Maintenance> = {
       status: MaintenanceStatus.COMPLETADO,
-      completedDate: Timestamp.now(),
+      completedDate: completedAt,
       notes: notes || maintenance.notes,
     };
 
@@ -311,9 +314,7 @@ export const completeMaintenance = async (
     // Si tiene frecuencia, programar el siguiente
     if (effectiveFrequency) {
       const nextDate = calculateNextMaintenanceDate(
-        maintenance.scheduledDate instanceof Timestamp 
-          ? maintenance.scheduledDate.toDate() 
-          : new Date(maintenance.scheduledDate),
+        completedAtDate,
         effectiveFrequency
       );
       updates.nextMaintenanceDate = Timestamp.fromDate(nextDate);
