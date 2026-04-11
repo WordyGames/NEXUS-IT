@@ -17,6 +17,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useUiFeedback } from '../contexts/UiFeedbackContext';
 import { 
   UserPlus, 
+  PencilLine,
   Settings2,
   Lock, 
   UserCheck, 
@@ -127,6 +128,7 @@ const Users = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -145,6 +147,15 @@ const Users = () => {
     department: '',
     phone: '',
     email: ''
+  });
+
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    company: Company.ESPECIAS_NATURALES,
+    department: '',
+    phone: '',
+    email: '',
+    isActive: true
   });
 
   const [newPassword, setNewPassword] = useState('');
@@ -168,6 +179,17 @@ const Users = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const resetEditForm = () => {
+    setEditFormData({
+      name: '',
+      company: Company.ESPECIAS_NATURALES,
+      department: '',
+      phone: '',
+      email: '',
+      isActive: true
+    });
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -283,6 +305,89 @@ const Users = () => {
     }
   };
 
+  const handleOpenEditModal = (user: User) => {
+    setSelectedUser(user);
+    setEditFormData({
+      name: user.name,
+      company: user.company,
+      department: user.department || '',
+      phone: user.phone || '',
+      email: user.email || '',
+      isActive: user.isActive
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canManageUsers || !selectedUser) return;
+
+    const normalizedName = editFormData.name.trim();
+    const normalizedDepartment = editFormData.department.trim();
+    const normalizedPhone = editFormData.phone.trim();
+    const normalizedEmail = editFormData.email.trim();
+
+    if (normalizedName.length < 3) {
+      showToast({
+        type: 'warning',
+        title: 'Nombre invalido',
+        message: 'Captura el nombre completo del usuario'
+      });
+      return;
+    }
+
+    if (normalizedPhone.length < 8) {
+      showToast({
+        type: 'warning',
+        title: 'Telefono invalido',
+        message: 'Captura un telefono valido para registrar la cuenta'
+      });
+      return;
+    }
+
+    if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      showToast({
+        type: 'warning',
+        title: 'Correo invalido',
+        message: 'Captura un correo valido o deja el campo vacío'
+      });
+      return;
+    }
+
+    try {
+      await updateUser(selectedUser.id, {
+        name: normalizedName,
+        company: editFormData.company,
+        department: normalizedDepartment,
+        phone: normalizedPhone,
+        email: normalizedEmail,
+        isActive: editFormData.isActive
+      });
+
+      await loadUsers();
+
+      if (selectedUser.id === userData?.id) {
+        await refreshUser();
+      }
+
+      setShowEditModal(false);
+      setSelectedUser(null);
+      resetEditForm();
+
+      showToast({
+        type: 'success',
+        title: 'Usuario actualizado',
+        message: 'Los datos del usuario se guardaron correctamente'
+      });
+    } catch (error: any) {
+      showToast({
+        type: 'error',
+        title: 'Error al actualizar usuario',
+        message: error.message || 'No se pudo actualizar el usuario'
+      });
+    }
+  };
+
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canManageUsers) return;
@@ -365,6 +470,12 @@ const Users = () => {
       phone: '',
       email: ''
     });
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setSelectedUser(null);
+    resetEditForm();
   };
 
   const handleOpenPermissionsModal = (user: User) => {
@@ -593,6 +704,13 @@ const Users = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex gap-2">
                         <button
+                          onClick={() => handleOpenEditModal(user)}
+                          className="text-emerald-600 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-300"
+                          title="Editar datos y empresa"
+                        >
+                          <PencilLine size={18} />
+                        </button>
+                        <button
                           onClick={() => handleOpenPermissionsModal(user)}
                           className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
                           title="Editar permisos"
@@ -784,6 +902,132 @@ const Users = () => {
                     setShowCreateModal(false);
                     resetForm();
                   }}
+                  className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-lg transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {showEditModal && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
+              Editar Usuario
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Usuario: <strong>{selectedUser.username}</strong>
+            </p>
+            <form onSubmit={handleUpdateUser} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Nombre Completo *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Nombre completo"
+                  aria-label="Nombre completo"
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Empresa *
+                </label>
+                <select
+                  aria-label="Seleccionar empresa"
+                  value={editFormData.company}
+                  onChange={(e) => setEditFormData({ ...editFormData, company: e.target.value as Company })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                  required
+                >
+                  <option value={Company.ESPECIAS_NATURALES}>Especias Naturales del Norte</option>
+                  <option value={Company.GRUPO_AMEX}>Grupo AMEX</option>
+                  <option value={Company.EQUIPOS_OSENAL}>Equipos OSENAL</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Departamento
+                </label>
+                <input
+                  type="text"
+                  placeholder="Departamento"
+                  aria-label="Departamento"
+                  value={editFormData.department}
+                  onChange={(e) => setEditFormData({ ...editFormData, department: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Teléfono *
+                </label>
+                <input
+                  type="tel"
+                  placeholder="Teléfono"
+                  aria-label="Teléfono"
+                  value={editFormData.phone}
+                  onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Correo electrónico
+                </label>
+                <input
+                  type="email"
+                  placeholder="correo@empresa.com"
+                  aria-label="Correo electrónico"
+                  value={editFormData.email}
+                  onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Estado
+                </label>
+                <select
+                  aria-label="Estado del usuario"
+                  value={editFormData.isActive ? 'active' : 'inactive'}
+                  onChange={(e) =>
+                    setEditFormData({
+                      ...editFormData,
+                      isActive: e.target.value === 'active'
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="active">Activo</option>
+                  <option value="inactive">Inactivo</option>
+                </select>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                >
+                  Guardar cambios
+                </button>
+                <button
+                  type="button"
+                  onClick={closeEditModal}
                   className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-lg transition-colors"
                 >
                   Cancelar

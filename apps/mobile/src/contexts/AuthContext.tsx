@@ -101,11 +101,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loadUserData = async () => {
     try {
       const session = await restoreSession();
-      setCurrentSession(session);
       
       if (session) {
         const data = await getUserById(session.userId);
         setUserData(data);
+        setCurrentSession(
+          data
+            ? {
+                ...session,
+                username: data.username,
+                name: data.name,
+                role: data.role,
+                company: data.company
+              }
+            : session
+        );
 
         if (data?.username) {
           await AsyncStorage.setItem(
@@ -140,10 +150,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await AsyncStorage.setItem(MOBILE_SESSION_KEY, session.id);
     }
 
-    setCurrentSession(session);
-    
     const data = await getUserById(session.userId);
     setUserData(data);
+    setCurrentSession(
+      data
+        ? {
+            ...session,
+            username: data.username,
+            name: data.name,
+            role: data.role,
+            company: data.company
+          }
+        : session
+    );
 
     if (data?.username) {
       await AsyncStorage.setItem(

@@ -42,12 +42,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loadUserData = async () => {
     try {
       const session = await getCurrentSession();
-      setCurrentSession(session);
       
       if (session) {
         const data = await getUserById(session.userId);
         setUserData(data);
+        setCurrentSession(
+          data
+            ? {
+                ...session,
+                username: data.username,
+                name: data.name,
+                role: data.role,
+                company: data.company
+              }
+            : session
+        );
       } else {
+        setCurrentSession(null);
         setUserData(null);
       }
     } catch (error) {
@@ -65,10 +76,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (username: string, password: string) => {
     const session = await signIn(username, password);
-    setCurrentSession(session);
     
     const data = await getUserById(session.userId);
     setUserData(data);
+    setCurrentSession(
+      data
+        ? {
+            ...session,
+            username: data.username,
+            name: data.name,
+            role: data.role,
+            company: data.company
+          }
+        : session
+    );
     return data;
   };
 
