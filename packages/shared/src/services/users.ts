@@ -369,8 +369,43 @@ export const getUsersByCompany = async (company: Company): Promise<User[]> => {
 export const updateUser = async (uid: string, data: Partial<User>): Promise<void> => {
   try {
     const docRef = doc(db, COLLECTION_NAME, uid);
+    const currentUserDoc = await getDoc(docRef);
+
+    if (!currentUserDoc.exists()) {
+      throw new Error('Usuario no encontrado');
+    }
+
+    const sanitizedData = Object.fromEntries(
+      Object.entries(data).filter(([, value]) => value !== undefined)
+    ) as Partial<User>;
+
+    if (typeof sanitizedData.username === 'string') {
+      const normalizedUsername = sanitizedData.username.trim().toLowerCase();
+
+      if (normalizedUsername.length < 3) {
+        throw new Error('El nombre de usuario debe tener al menos 3 caracteres');
+      }
+
+      if (!/^[a-z0-9._-]+$/.test(normalizedUsername)) {
+        throw new Error('Solo se permiten letras minusculas, numeros, punto, guion y guion bajo');
+      }
+
+      const currentUsername = String(currentUserDoc.data().username || '')
+        .trim()
+        .toLowerCase();
+
+      if (normalizedUsername !== currentUsername) {
+        const existingUser = await getUserByUsername(normalizedUsername);
+        if (existingUser && existingUser.id !== uid) {
+          throw new Error('El nombre de usuario ya existe');
+        }
+      }
+
+      sanitizedData.username = normalizedUsername;
+    }
+
     await updateDoc(docRef, {
-      ...data,
+      ...sanitizedData,
       updatedAt: Timestamp.now()
     });
   } catch (error) {

@@ -1,6 +1,7 @@
 import React, { Component, ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Updates from 'expo-updates';
+import { logRuntimeError } from '@nexus-it/shared';
 
 interface AppErrorBoundaryProps {
   children: ReactNode;
@@ -28,7 +29,9 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-    console.error('[MOBILE] Error fatal en render:', error, errorInfo);
+    logRuntimeError('mobile', 'Error fatal en render', error, {
+      componentStack: errorInfo.componentStack
+    });
   }
 
   handleRetry = async () => {
@@ -44,7 +47,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
         }
       }
     } catch (error) {
-      console.error('[MOBILE] Error al reintentar con OTA:', error);
+      logRuntimeError('mobile', 'Error al reintentar con OTA', error);
     }
 
     this.setState({

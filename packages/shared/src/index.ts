@@ -2,6 +2,7 @@ export * from './types';
 export * from './config/firebase';
 export * from './utils/helpers';
 export * from './utils/permissions';
+export * from './utils/runtimeLogger';
 export * from './services/equipment';
 export * from './services/tickets';
 export * from './services/users';

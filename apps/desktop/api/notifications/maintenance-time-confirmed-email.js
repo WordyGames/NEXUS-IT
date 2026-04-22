@@ -1,11 +1,5 @@
 const nodemailer = require('nodemailer');
-
-const SMTP_HOST = process.env.SMTP_HOST || 'smtp.office365.com';
-const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
-const SMTP_SECURE = (process.env.SMTP_SECURE || 'false').toLowerCase() === 'true';
-const SMTP_USER = process.env.SMTP_USER || 'soporte@grupoamex.com.mx';
-const SMTP_PASS = process.env.SMTP_PASS || '';
-const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER;
+const { getSmtpConfig } = require('./_smtpConfig');
 
 const toReadableDate = (value) => {
   if (!value) return 'No especificada';
@@ -35,12 +29,9 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  if (!SMTP_PASS) {
-    res.status(500).json({ error: 'SMTP_PASS no está configurado en variables de entorno' });
-    return;
-  }
-
   try {
+    const smtp = getSmtpConfig();
+
     const body = req.body || {};
     const adminEmail = sanitize(body.adminEmail);
     const adminName = sanitize(body.adminName);
@@ -58,13 +49,13 @@ module.exports = async function handler(req, res) {
     }
 
     const transporter = nodemailer.createTransport({
-      host: SMTP_HOST,
-      port: SMTP_PORT,
-      secure: SMTP_SECURE,
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.secure,
       requireTLS: true,
       auth: {
-        user: SMTP_USER,
-        pass: SMTP_PASS
+        user: smtp.user,
+        pass: smtp.pass
       }
     });
 
@@ -126,7 +117,7 @@ module.exports = async function handler(req, res) {
     `;
 
     await transporter.sendMail({
-      from: SMTP_FROM,
+      from: smtp.from,
       to: adminEmail,
       subject,
       html

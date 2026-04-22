@@ -11,10 +11,12 @@ import {
   TextInput,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { assertMobileNotificationEnv, mobileEnv } from '../config/env';
 import { 
   Maintenance, 
   getPendingTimeConfirmationMaintenancesForUser,
-  confirmMaintenanceTime 
+  confirmMaintenanceTime,
+  logRuntimeError,
 } from '@nexus-it/shared';
 
 const toJSDate = (value: any): Date | null => {
@@ -75,7 +77,7 @@ const MaintenanceConfirmationScreen = ({ navigation }: any) => {
       const data = await getPendingTimeConfirmationMaintenancesForUser(userData?.id, false);
       setMaintenances(data);
     } catch (error) {
-      console.error('Error loading maintenances:', error);
+      logRuntimeError('mobile', 'Error loading maintenances', error);
     } finally {
       setLoading(false);
     }
@@ -103,13 +105,15 @@ const MaintenanceConfirmationScreen = ({ navigation }: any) => {
 
       // Enviar email de notificación al admin (no bloqueante)
       try {
+        assertMobileNotificationEnv();
+
         await fetch(
-          'https://nexus-it-wordygames-projects.vercel.app/api/notifications/maintenance-time-confirmed-email',
+          `${mobileEnv.apiBaseUrl}/api/notifications/maintenance-time-confirmed-email`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              adminEmail: process.env.EXPO_PUBLIC_ADMIN_EMAIL || 'lsolis@grupoamex.com.mx',
+              adminEmail: mobileEnv.adminEmail,
               adminName: 'Luis',
               maintenanceId: selectedMaintenance.id,
               equipmentName: selectedMaintenance.equipmentName,
@@ -122,7 +126,7 @@ const MaintenanceConfirmationScreen = ({ navigation }: any) => {
           }
         );
       } catch (emailError) {
-        console.error('Error sending confirmation email:', emailError);
+        logRuntimeError('mobile', 'Error sending confirmation email', emailError);
         // No bloquear si hay error en email
       }
 
@@ -134,7 +138,7 @@ const MaintenanceConfirmationScreen = ({ navigation }: any) => {
       // Mostrar confirmación
       Alert.alert('✅ Confirmado', 'La hora se guardó correctamente.');
     } catch (error) {
-      console.error('Error confirming time:', error);
+      logRuntimeError('mobile', 'Error confirming maintenance time', error);
       Alert.alert('Error', 'No se pudo confirmar la hora.');
     } finally {
       setConfirmingId(null);

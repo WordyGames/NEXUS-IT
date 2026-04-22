@@ -150,6 +150,7 @@ const Users = () => {
   });
 
   const [editFormData, setEditFormData] = useState({
+    username: '',
     name: '',
     company: Company.ESPECIAS_NATURALES,
     department: '',
@@ -183,6 +184,7 @@ const Users = () => {
 
   const resetEditForm = () => {
     setEditFormData({
+      username: '',
       name: '',
       company: Company.ESPECIAS_NATURALES,
       department: '',
@@ -308,6 +310,7 @@ const Users = () => {
   const handleOpenEditModal = (user: User) => {
     setSelectedUser(user);
     setEditFormData({
+      username: user.username,
       name: user.name,
       company: user.company,
       department: user.department || '',
@@ -322,10 +325,29 @@ const Users = () => {
     e.preventDefault();
     if (!canManageUsers || !selectedUser) return;
 
+    const normalizedUsername = editFormData.username.trim().toLowerCase();
     const normalizedName = editFormData.name.trim();
     const normalizedDepartment = editFormData.department.trim();
     const normalizedPhone = editFormData.phone.trim();
     const normalizedEmail = editFormData.email.trim();
+
+    if (normalizedUsername.length < 3) {
+      showToast({
+        type: 'warning',
+        title: 'Usuario invalido',
+        message: 'El nombre de usuario debe tener al menos 3 caracteres'
+      });
+      return;
+    }
+
+    if (!/^[a-z0-9._-]+$/.test(normalizedUsername)) {
+      showToast({
+        type: 'warning',
+        title: 'Usuario invalido',
+        message: 'Solo se permiten letras minusculas, numeros, punto, guion y guion bajo'
+      });
+      return;
+    }
 
     if (normalizedName.length < 3) {
       showToast({
@@ -356,6 +378,7 @@ const Users = () => {
 
     try {
       await updateUser(selectedUser.id, {
+        username: normalizedUsername,
         name: normalizedName,
         company: editFormData.company,
         department: normalizedDepartment,
@@ -919,10 +942,22 @@ const Users = () => {
             <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
               Editar Usuario
             </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Usuario: <strong>{selectedUser.username}</strong>
-            </p>
             <form onSubmit={handleUpdateUser} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Usuario *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Nombre de usuario"
+                  aria-label="Nombre de usuario"
+                  value={editFormData.username}
+                  onChange={(e) => setEditFormData({ ...editFormData, username: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                  required
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Nombre Completo *

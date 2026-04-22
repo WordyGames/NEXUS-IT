@@ -10,6 +10,12 @@
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",
     "build": "npm run build --workspace=apps/desktop",
+    "build:desktop": "npm run build --workspace=apps/desktop",
+    "build:mobile": "npm run build:ci --workspace=apps/mobile",
+    "build:all": "npm run build:desktop && npm run build:mobile",
+    "typecheck": "npm run typecheck --workspace=packages/shared && npm run typecheck --workspace=apps/desktop && npm run typecheck --workspace=apps/mobile",
+    "lint": "npm run lint --workspace=packages/shared --if-present && npm run lint --workspace=apps/desktop --if-present && npm run lint --workspace=apps/mobile --if-present",
+    "test": "npm run test --workspace=packages/shared --if-present",
     "brand:assets": "node scripts/generate-brand-assets.cjs",
     "clean": "rimraf node_modules packages/*/node_modules apps/*/node_modules packages/*/dist apps/*/dist",
     "desktop": "npm run dev --workspace=apps/desktop",

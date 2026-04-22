@@ -103,8 +103,8 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
       const pageHeight = pdf.internal.pageSize.getHeight();
       let yPosition = 15;
 
-      const darkGray = [50, 50, 50];
-      const primaryColor = [30, 120, 200];
+      const darkGray: [number, number, number] = [50, 50, 50];
+      const primaryColor: [number, number, number] = [30, 120, 200];
 
       // Header
       pdf.setTextColor(...darkGray);

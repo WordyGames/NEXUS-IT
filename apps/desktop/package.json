@@ -8,6 +8,8 @@
     "dev:react": "vite",
     "dev:electron": "wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .",
     "build": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "npm run typecheck",
     "build:full": "tsc && vite build && electron-builder",
     "build:react": "vite build",
     "build:electron": "tsc --project tsconfig.electron.json",

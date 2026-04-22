@@ -15,6 +15,7 @@ import NotificationsScreen from './src/screens/NotificationsScreen';
 import MobileEnrollmentScreen from './src/screens/MobileEnrollmentScreen';
 import MaintenanceConfirmationScreen from './src/screens/MaintenanceConfirmationScreen';
 import { AppErrorBoundary } from './src/components/AppErrorBoundary';
+import { logRuntimeError } from '@nexus-it/shared';
 
 const Stack = createNativeStackNavigator();
 
@@ -45,7 +46,7 @@ export default function App() {
       const update = await Updates.checkForUpdateAsync();
       setUpdateRequired(update.isAvailable);
     } catch (error: any) {
-      console.error('[OTA] Error checking update:', error);
+      logRuntimeError('mobile', 'Error checking OTA update', error);
       setUpdateError(error?.message || 'No se pudo verificar la actualización.');
     } finally {
       checkingRef.current = false;
@@ -61,7 +62,7 @@ export default function App() {
       await Updates.fetchUpdateAsync();
       await Updates.reloadAsync();
     } catch (error: any) {
-      console.error('[OTA] Error applying update:', error);
+      logRuntimeError('mobile', 'Error applying OTA update', error);
       setUpdateError(error?.message || 'No se pudo aplicar la actualización.');
       setIsApplyingUpdate(false);
     }

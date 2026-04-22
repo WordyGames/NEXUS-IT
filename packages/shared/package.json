@@ -6,6 +6,9 @@
   "react-native": "src/index.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json.build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "npm run typecheck",
+    "test": "vitest run",
     "dev": "tsc --watch",
     "clean": "rimraf dist"
   },
@@ -15,6 +18,7 @@
   "devDependencies": {
     "@types/node": "^20.10.6",
     "rimraf": "^5.0.5",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^2.1.8"
   }
 }

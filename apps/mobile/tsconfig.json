@@ -2,7 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "target": "ESNext",
-    "lib": ["ESNext"],
+    "lib": ["ESNext", "DOM"],
     "jsx": "react-native",
     "module": "ESNext",
     "moduleResolution": "node",
@@ -18,7 +18,7 @@
     "incremental": false,
     "baseUrl": ".",
     "paths": {
-      "@nexus-it/shared": ["../../packages/shared/dist/index.d.ts"]
+      "@nexus-it/shared": ["../../packages/shared/src/index.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"],
