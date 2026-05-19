@@ -1,79 +1,50 @@
 import React from 'react';
+import { RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useUpdater } from '../contexts/UpdaterContext';
+import { Card, Button } from '../components/ui';
+
+const Row = ({ label, value }: { label: string; value?: string }) => (
+  <div className="flex items-center gap-3 py-2.5 border-b border-slate-50 last:border-0">
+    <span className="text-sm text-slate-500 w-28 shrink-0">{label}</span>
+    <span className="text-sm font-medium text-slate-800">{value || '—'}</span>
+  </div>
+);
 
 const Settings = () => {
   const { userData } = useAuth();
   const { checkForUpdates } = useUpdater();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 max-w-2xl">
       <div>
-        <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-2">
-          Configuración
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Panel de administrador
-        </p>
+        <h1 className="text-2xl font-bold text-slate-800 mb-1">Configuración</h1>
+        <p className="text-sm text-slate-500">Panel de administrador</p>
       </div>
 
-      {/* Información del Usuario */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow">
-        <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
-          Información del Administrador
-        </h2>
-        <div className="space-y-3">
-          <div className="flex items-center">
-            <span className="text-gray-600 dark:text-gray-400 w-32">Nombre:</span>
-            <span className="text-gray-800 dark:text-white font-medium">{userData?.name}</span>
-          </div>
-          <div className="flex items-center">
-            <span className="text-gray-600 dark:text-gray-400 w-32">Usuario:</span>
-            <span className="text-gray-800 dark:text-white font-medium">{userData?.username}</span>
-          </div>
-          <div className="flex items-center">
-            <span className="text-gray-600 dark:text-gray-400 w-32">Empresa:</span>
-            <span className="text-gray-800 dark:text-white font-medium">{userData?.company}</span>
-          </div>
-          <div className="flex items-center">
-            <span className="text-gray-600 dark:text-gray-400 w-32">Rol:</span>
-            <span className="text-gray-800 dark:text-white font-medium capitalize">{userData?.role}</span>
-          </div>
-        </div>
-      </div>
+      <Card>
+        <h2 className="text-sm font-semibold text-slate-700 mb-3">Información del Administrador</h2>
+        <Row label="Nombre"  value={userData?.name} />
+        <Row label="Usuario" value={userData?.username} />
+        <Row label="Empresa" value={userData?.company} />
+        <Row label="Rol"     value={userData?.role} />
+      </Card>
 
-      {/* Actualizaciones */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow">
-        <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
-          Actualizaciones
-        </h2>
-        <p className="text-gray-600 dark:text-gray-400 mb-4">
+      <Card>
+        <h2 className="text-sm font-semibold text-slate-700 mb-1">Actualizaciones</h2>
+        <p className="text-xs text-slate-500 mb-4">
           Mantén la aplicación actualizada para obtener las últimas funciones y correcciones de seguridad.
         </p>
-        <button
-          onClick={checkForUpdates}
-          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-        >
+        <Button variant="primary" size="sm" onClick={checkForUpdates} iconLeft={<RefreshCw size={14} />}>
           Buscar Actualizaciones
-        </button>
-      </div>
+        </Button>
+      </Card>
 
-      {/* Información del Sistema */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow">
-        <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
-          Información del Sistema
-        </h2>
-        <div className="space-y-3">
-          <div className="flex items-center">
-            <span className="text-gray-600 dark:text-gray-400 w-32">Versión:</span>
-            <span className="text-gray-800 dark:text-white font-medium">1.0.0</span>
-          </div>
-          <div className="flex items-center">
-            <span className="text-gray-600 dark:text-gray-400 w-32">Plataforma:</span>
-            <span className="text-gray-800 dark:text-white font-medium">Electron + React</span>
-          </div>
-        </div>
-      </div>
+      <Card>
+        <h2 className="text-sm font-semibold text-slate-700 mb-3">Información del Sistema</h2>
+        <Row label="Versión"    value="1.0.0" />
+        <Row label="Plataforma" value="Electron + React" />
+      </Card>
     </div>
   );
 };

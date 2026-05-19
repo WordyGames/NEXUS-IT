@@ -15,10 +15,11 @@ import {
 import EquipmentCard from '../components/EquipmentCard';
 import EquipmentForm from '../components/EquipmentForm';
 import EquipmentQRCode from '../components/EquipmentQRCode';
-import { Download } from 'lucide-react';
+import { Download, Plus, Monitor } from 'lucide-react';
 import { exportEquipmentToExcel } from '../utils/exportToExcel';
 import { generateCartaResponsivaPDF } from '../utils/cartaResponsivaPDF';
 import { useUiFeedback } from '../contexts/UiFeedbackContext';
+import { Spinner, Card, Button, EmptyState } from '../components/ui';
 
 const Equipment = () => {
   const { userData, hasPermission } = useAuth();
@@ -252,81 +253,62 @@ const Equipment = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-gray-600 dark:text-gray-400">Cargando...</div>
-      </div>
-    );
-  }
+  if (loading) return <Spinner size="xl" label="Cargando equipos..." className="h-64 justify-center" />;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-2">
-            Equipos
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
+          <h1 className="text-2xl font-bold text-slate-800 mb-1">Equipos</h1>
+          <p className="text-sm text-slate-500">
             Gestión de equipos informáticos
+            {isRefreshing && <span className="ml-2 text-blue-500">· Actualizando...</span>}
           </p>
-          {isRefreshing && (
-            <p className="text-xs text-blue-500 dark:text-blue-400 mt-1">
-              Actualizando resultados...
-            </p>
-          )}
         </div>
 
-        <div className="flex gap-2">
-          <button
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => exportEquipmentToExcel(filteredEquipment, 'inventario-equipos', assignedUserNamesById)}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2"
             disabled={filteredEquipment.length === 0}
+            iconLeft={<Download size={15} />}
           >
-            <Download size={18} />
-            Exportar Excel
-          </button>
+            Exportar
+          </Button>
           {canManageEquipment && (
-            <button
-              onClick={handleCreate}
-              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-            >
-              + Nuevo Equipo
-            </button>
+            <Button variant="primary" size="sm" onClick={handleCreate} iconLeft={<Plus size={15} />}>
+              Nuevo Equipo
+            </Button>
           )}
         </div>
       </div>
 
       {/* Filtros */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <Card padding="sm">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Empresa
-            </label>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Empresa</label>
             <select
               aria-label="Filtrar por empresa"
               value={filters.company || ''}
               onChange={(e) => setFilters({ ...filters, company: e.target.value as Company })}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             >
               <option value="">Todas</option>
               {Object.values(Company).map((company) => (
-                <option key={company} value={company}>
-                  {company}
-                </option>
+                <option key={company} value={company}>{company}</option>
               ))}
             </select>
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Estado
-            </label>
-            <select              aria-label="Filtrar por estado"              value={filters.status || ''}
+            <label className="block text-xs font-medium text-slate-600 mb-1">Estado</label>
+            <select
+              aria-label="Filtrar por estado"
+              value={filters.status || ''}
               onChange={(e) => setFilters({ ...filters, status: e.target.value as any })}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             >
               <option value="">Todos</option>
               <option value="active">Activo</option>
@@ -335,14 +317,13 @@ const Equipment = () => {
               <option value="retired">Retirado</option>
             </select>
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Tipo
-            </label>
-            <select              aria-label="Filtrar por tipo"              value={filters.type || ''}
+            <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
+            <select
+              aria-label="Filtrar por tipo"
+              value={filters.type || ''}
               onChange={(e) => setFilters({ ...filters, type: e.target.value as any })}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             >
               <option value="">Todos</option>
               <option value="desktop">Desktop</option>
@@ -356,29 +337,27 @@ const Equipment = () => {
               <option value="other">Otro</option>
             </select>
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Buscar
-            </label>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Buscar</label>
             <input
               type="text"
               value={filters.search || ''}
               onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              placeholder="Nombre, hostname, serial o asignado a..."
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+              placeholder="Nombre, hostname, serial..."
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             />
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Lista de Equipos */}
       {filteredEquipment.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow text-center">
-          <p className="text-gray-600 dark:text-gray-400">
-            No se encontraron equipos
-          </p>
-        </div>
+        <EmptyState
+          icon={<Monitor size={28} />}
+          title="Sin equipos"
+          description="No se encontraron equipos con los filtros actuales."
+          action={canManageEquipment ? { label: 'Nuevo Equipo', onClick: handleCreate } : undefined}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredEquipment.map((eq) => (

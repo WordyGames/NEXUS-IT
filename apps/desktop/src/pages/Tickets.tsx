@@ -9,13 +9,24 @@ import {
   UserPermission,
   getTickets,
   createTicket,
-  updateTicket
 } from '@nexus-it/shared';
 import TicketForm from '../components/TicketForm';
 import TicketDetail from '../components/TicketDetail';
-import { Download } from 'lucide-react';
+import { Download, Plus, ClipboardList } from 'lucide-react';
 import { exportTicketsToExcel } from '../utils/exportToExcel';
 import { useUiFeedback } from '../contexts/UiFeedbackContext';
+import { getTicketSortValue } from '../utils/dateUtils';
+import { Spinner, Card, Button, EmptyState, ticketStatusBadge, priorityBadge } from '../components/ui';
+
+const normalizePriority = (value: unknown): TicketPriority =>
+  Object.values(TicketPriority).includes(value as TicketPriority)
+    ? (value as TicketPriority)
+    : TicketPriority.MEDIUM;
+
+const normalizeStatus = (value: unknown): TicketStatus =>
+  Object.values(TicketStatus).includes(value as TicketStatus)
+    ? (value as TicketStatus)
+    : TicketStatus.OPEN;
 
 const Tickets = () => {
   const { userData, hasPermission } = useAuth();
@@ -35,66 +46,30 @@ const Tickets = () => {
   }, [companyFilter, canViewAllTickets, userData?.id, userData?.username, userData?.name]);
 
   useEffect(() => {
-    // Si viene un ID de ticket en la URL, abrirlo automáticamente
     if (ticketIdFromUrl && tickets.length > 0) {
-      const ticket = tickets.find(t => t.id === ticketIdFromUrl);
-      if (ticket) {
-        handleOpenDetail(ticket);
-      }
+      const ticket = tickets.find((t) => t.id === ticketIdFromUrl);
+      if (ticket) handleOpenDetail(ticket);
     }
   }, [ticketIdFromUrl, tickets]);
 
-  const getTicketSortValue = (ticket: Ticket) => {
-    const createdAt: any = ticket.createdAt;
-    if (!createdAt) return 0;
-    if (createdAt instanceof Date) return createdAt.getTime();
-    if (typeof createdAt === 'object' && 'toDate' in createdAt) {
-      return createdAt.toDate().getTime();
-    }
-    if (typeof createdAt === 'object' && 'seconds' in createdAt) {
-      return createdAt.seconds * 1000;
-    }
-    const parsed = new Date(createdAt).getTime();
-    return Number.isNaN(parsed) ? 0 : parsed;
-  };
-
-  const loadUserTickets = async () => {
-    if (!userData) return [] as Ticket[];
-
+  const loadUserTickets = async (): Promise<Ticket[]> => {
+    if (!userData) return [];
     try {
-      const identifiers = new Set<string>();
-      if (userData.id) identifiers.add(userData.id);
-      if (userData.username) identifiers.add(userData.username);
-      if (userData.name) identifiers.add(userData.name);
-
       const queries: Promise<Ticket[]>[] = [];
-      identifiers.forEach((identifier) => {
-        queries.push(getTickets({ createdBy: identifier }));
-      });
+      const ids = new Set<string>();
+      if (userData.id) ids.add(userData.id);
+      if (userData.username) ids.add(userData.username);
+      ids.forEach((id) => queries.push(getTickets({ createdBy: id })));
+      if (userData.name) queries.push(getTickets({ createdByName: userData.name }));
+      if (queries.length === 0) return [];
 
-      if (userData.name) {
-        queries.push(getTickets({ createdByName: userData.name }));
-      }
-
-      if (queries.length === 0) return [] as Ticket[];
-
-      const results = await Promise.all(queries);
       const unique = new Map<string, Ticket>();
-
-      results.flat().forEach((ticket) => {
-        unique.set(ticket.id, ticket);
-      });
-
+      (await Promise.all(queries)).flat().forEach((t) => unique.set(t.id, t));
       let merged = Array.from(unique.values());
-
-      if (userData.company) {
-        merged = merged.filter((ticket) => ticket.company === userData.company);
-      }
-
+      if (userData.company) merged = merged.filter((t) => t.company === userData.company);
       merged.sort((a, b) => getTicketSortValue(b) - getTicketSortValue(a));
       return merged;
-    } catch (error) {
-      console.error('Error loading user tickets:', error);
+    } catch {
       return [];
     }
   };
@@ -102,20 +77,12 @@ const Tickets = () => {
   const loadTickets = async () => {
     try {
       setLoading(true);
-
       if (!canViewAllTickets) {
-        const userTickets = await loadUserTickets();
-        setTickets(userTickets);
+        setTickets(await loadUserTickets());
         return;
       }
-
-      const filters: any = {};
-      if (companyFilter) {
-        filters.company = companyFilter;
-      }
-
-      const data = await getTickets(Object.keys(filters).length ? filters : undefined);
-      setTickets(data);
+      const filters: any = companyFilter ? { company: companyFilter } : {};
+      setTickets(await getTickets(Object.keys(filters).length ? filters : undefined));
     } catch (error) {
       console.error('Error loading tickets:', error);
     } finally {
@@ -124,27 +91,19 @@ const Tickets = () => {
   };
 
   const handleCreateTicket = async (data: any): Promise<string> => {
+    if (!userData?.id) throw new Error('Usuario no autenticado');
     try {
-      if (!userData?.id) {
-        throw new Error('Usuario no autenticado');
-      }
-
       const createdId = await createTicket({
         ...data,
         createdBy: userData.id,
         createdByName: userData.name
       });
-
       setShowForm(false);
       await loadTickets();
       showToast({ type: 'success', title: 'Ticket creado', message: 'El ticket se guardó correctamente' });
       return createdId;
     } catch (error: any) {
-      showToast({
-        type: 'error',
-        title: 'Error al crear ticket',
-        message: error.message || 'No se pudo crear el ticket'
-      });
+      showToast({ type: 'error', title: 'Error al crear ticket', message: error.message || 'No se pudo crear el ticket' });
       throw error;
     }
   };
@@ -159,80 +118,23 @@ const Tickets = () => {
     setSelectedTicket(null);
   };
 
-  const priorityColors: Record<TicketPriority, string> = {
-    [TicketPriority.LOW]: 'bg-gray-100 text-gray-800',
-    [TicketPriority.MEDIUM]: 'bg-blue-100 text-blue-800',
-    [TicketPriority.HIGH]: 'bg-orange-100 text-orange-800',
-    [TicketPriority.URGENT]: 'bg-red-100 text-red-800'
-  };
-
-  const statusColors: Record<TicketStatus, string> = {
-    [TicketStatus.OPEN]: 'bg-green-100 text-green-800',
-    [TicketStatus.IN_PROGRESS]: 'bg-yellow-100 text-yellow-800',
-    [TicketStatus.RESOLVED]: 'bg-blue-100 text-blue-800',
-    [TicketStatus.CLOSED]: 'bg-gray-100 text-gray-800',
-    [TicketStatus.CANCELLED]: 'bg-red-100 text-red-800'
-  };
-
-  const normalizePriority = (value: unknown): TicketPriority => {
-    return Object.values(TicketPriority).includes(value as TicketPriority)
-      ? (value as TicketPriority)
-      : TicketPriority.MEDIUM;
-  };
-
-  const normalizeStatus = (value: unknown): TicketStatus => {
-    return Object.values(TicketStatus).includes(value as TicketStatus)
-      ? (value as TicketStatus)
-      : TicketStatus.OPEN;
-  };
-
-  const getPriorityLabel = (priority: TicketPriority): string => {
-    const labels: Record<TicketPriority, string> = {
-      [TicketPriority.LOW]: 'Baja',
-      [TicketPriority.MEDIUM]: 'Media',
-      [TicketPriority.HIGH]: 'Alta',
-      [TicketPriority.URGENT]: 'Urgente'
-    };
-    return labels[priority];
-  };
-
-  const getStatusLabel = (status: TicketStatus): string => {
-    const labels: Record<TicketStatus, string> = {
-      [TicketStatus.OPEN]: 'Abierto',
-      [TicketStatus.IN_PROGRESS]: 'En progreso',
-      [TicketStatus.RESOLVED]: 'Resuelto',
-      [TicketStatus.CLOSED]: 'Cerrado',
-      [TicketStatus.CANCELLED]: 'Cancelado'
-    };
-    return labels[status];
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-gray-600 dark:text-gray-400">Cargando...</div>
-      </div>
-    );
-  }
+  if (loading) return <Spinner size="xl" label="Cargando tickets..." className="h-64 justify-center" />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-2">
-            Tickets
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Sistema de soporte técnico
-          </p>
+          <h1 className="text-2xl font-bold text-slate-800 mb-1">Tickets</h1>
+          <p className="text-sm text-slate-500">Sistema de soporte técnico</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           {canViewAllTickets && (
             <select
               aria-label="Filtrar por empresa"
               value={companyFilter}
               onChange={(e) => setCompanyFilter(e.target.value as Company | '')}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+              className="px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             >
               <option value="">Todas las empresas</option>
               {Object.values(Company).map((c) => (
@@ -240,87 +142,77 @@ const Tickets = () => {
               ))}
             </select>
           )}
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => exportTicketsToExcel(tickets, 'tickets')}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2"
             disabled={tickets.length === 0}
+            iconLeft={<Download size={15} />}
           >
-            <Download size={18} />
-            Exportar Excel
-          </button>
-          <button
+            Exportar
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
             onClick={() => setShowForm(true)}
-            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+            iconLeft={<Plus size={15} />}
           >
-            + Nuevo Ticket
-          </button>
+            Nuevo Ticket
+          </Button>
         </div>
       </div>
 
+      {/* Table */}
       {tickets.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow text-center">
-          <p className="text-gray-600 dark:text-gray-400">
-            No hay tickets registrados
-          </p>
-        </div>
+        <EmptyState
+          icon={<ClipboardList size={28} />}
+          title="Sin tickets"
+          description="No hay tickets registrados. Crea el primero."
+          action={{ label: 'Nuevo Ticket', onClick: () => setShowForm(true) }}
+        />
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <Card padding="none">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                    Número
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                    Título
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                    Prioridad
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                    Estado
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                    Creado por
-                  </th>
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50">
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Número</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Título</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Prioridad</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Estado</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Creado por</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody className="divide-y divide-slate-50">
                 {tickets.map((ticket) => {
-                  const safePriority = normalizePriority((ticket as { priority?: unknown }).priority);
-                  const safeStatus = normalizeStatus((ticket as { status?: unknown }).status);
-
+                  const safePriority = normalizePriority((ticket as any).priority);
+                  const safeStatus = normalizeStatus((ticket as any).status);
                   return (
-                    <tr 
-                      key={ticket.id} 
+                    <tr
+                      key={ticket.id}
                       onClick={() => handleOpenDetail(ticket)}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition"
+                      className="hover:bg-slate-50 cursor-pointer transition-colors"
                     >
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                        {ticket.ticketNumber}
+                      <td className="px-5 py-3.5 whitespace-nowrap text-sm font-semibold text-slate-700">
+                        #{ticket.ticketNumber}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">
+                      <td className="px-5 py-3.5 text-sm text-slate-700 max-w-xs">
                         <div className="flex items-center gap-2">
-                          {ticket.title}
+                          <span className="truncate">{ticket.title}</span>
                           {ticket.comments && ticket.comments.length > 0 && (
-                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                              {ticket.comments.length} 💬
+                            <span className="shrink-0 text-xs bg-blue-50 text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded-full">
+                              {ticket.comments.length}
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-medium rounded ${priorityColors[safePriority]}`}>
-                          {getPriorityLabel(safePriority)}
-                        </span>
+                      <td className="px-5 py-3.5 whitespace-nowrap">
+                        {priorityBadge(safePriority)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-medium rounded ${statusColors[safeStatus]}`}>
-                          {getStatusLabel(safeStatus)}
-                        </span>
+                      <td className="px-5 py-3.5 whitespace-nowrap">
+                        {ticketStatusBadge(safeStatus)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                      <td className="px-5 py-3.5 whitespace-nowrap text-sm text-slate-500">
                         {ticket.createdByName}
                       </td>
                     </tr>
@@ -329,23 +221,18 @@ const Tickets = () => {
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       )}
 
-      {/* Modal de formulario */}
       {showForm && (
         <TicketForm
           ticket={selectedTicket}
           onSubmit={handleCreateTicket}
-          onCancel={() => {
-            setShowForm(false);
-            setSelectedTicket(null);
-          }}
+          onCancel={() => { setShowForm(false); setSelectedTicket(null); }}
           userName={userData?.name || 'Usuario'}
         />
       )}
 
-      {/* Modal de detalle */}
       {showDetail && selectedTicket && (
         <TicketDetail
           ticket={selectedTicket}

@@ -7,8 +7,8 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   size?: Size;
   loading?: boolean;
-  icon?: React.ReactNode;
-  iconEnd?: React.ReactNode;
+  iconLeft?: React.ReactNode;
+  iconRight?: React.ReactNode;
 }
 
 const variants: Record<Variant, string> = {
@@ -26,7 +26,7 @@ const sizes: Record<Size, string> = {
 };
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'primary', size = 'md', loading, icon, iconEnd, children, disabled, className = '', ...props }, ref) => {
+  ({ variant = 'primary', size = 'md', loading, iconLeft, iconRight, children, disabled, className = '', ...props }, ref) => {
     const isDisabled = disabled || loading;
     return (
       <button
@@ -43,11 +43,11 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       >
         {loading ? (
           <span className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin flex-shrink-0" />
-        ) : icon ? (
-          <span className="flex-shrink-0">{icon}</span>
+        ) : iconLeft ? (
+          <span className="flex-shrink-0">{iconLeft}</span>
         ) : null}
         {children}
-        {!loading && iconEnd && <span className="flex-shrink-0">{iconEnd}</span>}
+        {!loading && iconRight && <span className="flex-shrink-0">{iconRight}</span>}
       </button>
     );
   }

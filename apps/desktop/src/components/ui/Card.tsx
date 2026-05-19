@@ -58,8 +58,8 @@ export const CardHeader: React.FC<CardHeaderProps> = ({ title, subtitle, action,
 interface StatCardProps {
   label: string;
   value: string | number;
-  icon: React.ReactNode;
-  color?: 'blue' | 'green' | 'yellow' | 'red' | 'purple' | 'cyan';
+  icon?: React.ReactNode;
+  color?: 'blue' | 'green' | 'yellow' | 'red' | 'purple' | 'cyan' | 'slate';
   trend?: { value: number; label: string };
 }
 
@@ -70,15 +70,18 @@ const statColors = {
   red:    { bg: 'bg-red-50',    text: 'text-red-600',    ring: 'ring-red-100' },
   purple: { bg: 'bg-purple-50', text: 'text-purple-600', ring: 'ring-purple-100' },
   cyan:   { bg: 'bg-cyan-50',   text: 'text-cyan-600',   ring: 'ring-cyan-100' },
+  slate:  { bg: 'bg-slate-100', text: 'text-slate-500',  ring: 'ring-slate-200' },
 };
 
 export const StatCard: React.FC<StatCardProps> = ({ label, value, icon, color = 'blue', trend }) => {
   const c = statColors[color];
   return (
     <Card className="flex items-center gap-4">
-      <div className={`w-12 h-12 rounded-xl ${c.bg} ring-1 ${c.ring} flex items-center justify-center flex-shrink-0 ${c.text}`}>
-        {icon}
-      </div>
+      {icon && (
+        <div className={`w-12 h-12 rounded-xl ${c.bg} ring-1 ${c.ring} flex items-center justify-center flex-shrink-0 ${c.text}`}>
+          {icon}
+        </div>
+      )}
       <div className="min-w-0">
         <p className="text-2xl font-bold text-slate-800">{value}</p>
         <p className="text-sm text-slate-500 truncate">{label}</p>
