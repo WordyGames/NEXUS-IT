@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Calendar, Download, Filter } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Calendar, Download, Filter, ClipboardList, CheckCircle2, Wrench, CheckSquare } from 'lucide-react';
 import {
   Ticket,
   Maintenance,
@@ -25,7 +25,9 @@ import {
   Cell
 } from 'recharts';
 import { exportCompleteReport } from '../utils/exportToExcel';
-import styles from './Reports.module.css';
+import { toDate } from '../utils/dateUtils';
+import { useTheme } from '../contexts/ThemeContext';
+import { Spinner, StatCard, Card, Button } from '../components/ui';
 
 interface ReportStats {
   period: string;
@@ -42,464 +44,282 @@ interface CompanyStats {
   resolutionRate: number;
 }
 
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+
 const Reports: React.FC = () => {
+  const { theme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [maintenances, setMaintenances] = useState<Maintenance[]>([]);
 
-  // Filtros
-  const [dateFrom, setDateFrom] = useState<string>();
-  const [dateTo, setDateTo] = useState<string>();
-  const [company, setCompany] = useState<Company>();
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
+  const [company, setCompany] = useState<Company | ''>('');
 
-  // Datos calculados
-  const [dailyStats, setDailyStats] = useState<ReportStats[]>([]);
-  const [companyStats, setCompanyStats] = useState<CompanyStats[]>([]);
-  const [statusDistribution, setStatusDistribution] = useState<any[]>([]);
-
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [ticketsData, maintenancesData] = await Promise.all([
-        getTickets(),
-        getMaintenances()
-      ]);
-      setTickets(ticketsData);
-      setMaintenances(maintenancesData);
-    } catch (error) {
-      console.error('Error loading report data:', error);
+      const [t, m] = await Promise.all([getTickets(), getMaintenances()]);
+      setTickets(t);
+      setMaintenances(m);
+    } catch {
+      // silent
     } finally {
       setLoading(false);
     }
   };
 
-  // Calcular estadísticas cuando cambian filtros o datos
-  useEffect(() => {
-    calculateStats();
-  }, [tickets, maintenances, dateFrom, dateTo, company]);
+  // ── Apply filters once ───────────────────────────────────────────────────────
 
-  const calculateStats = () => {
-    let filteredTickets = [...tickets];
-    let filteredMaintenances = [...maintenances];
+  const { filteredTickets, filteredMaintenances } = useMemo(() => {
+    let ft = [...tickets];
+    let fm = [...maintenances];
 
-    // Aplicar filtros de fecha
     if (dateFrom) {
       const from = new Date(dateFrom);
-      filteredTickets = filteredTickets.filter(
-        t => new Date(t.createdAt as any) >= from
-      );
-      filteredMaintenances = filteredMaintenances.filter(
-        m => new Date(m.createdAt as any) >= from
-      );
+      ft = ft.filter((t) => toDate(t.createdAt as any) >= from);
+      fm = fm.filter((m) => toDate(m.createdAt as any) >= from);
     }
-
     if (dateTo) {
       const to = new Date(dateTo);
       to.setHours(23, 59, 59, 999);
-      filteredTickets = filteredTickets.filter(
-        t => new Date(t.createdAt as any) <= to
-      );
-      filteredMaintenances = filteredMaintenances.filter(
-        m => new Date(m.createdAt as any) <= to
-      );
+      ft = ft.filter((t) => toDate(t.createdAt as any) <= to);
+      fm = fm.filter((m) => toDate(m.createdAt as any) <= to);
     }
-
-    // Aplicar filtro de empresa
     if (company) {
-      filteredTickets = filteredTickets.filter(t => t.company === company);
-      filteredMaintenances = filteredMaintenances.filter(
-        m => m.company === company
-      );
+      ft = ft.filter((t) => t.company === company);
+      fm = fm.filter((m) => m.company === company);
     }
 
-    // Calcular estadísticas diarias
+    return { filteredTickets: ft, filteredMaintenances: fm };
+  }, [tickets, maintenances, dateFrom, dateTo, company]);
+
+  // ── Computed chart data ──────────────────────────────────────────────────────
+
+  const { dailyStats, companyStats, statusDistribution } = useMemo(() => {
     const dailyMap = new Map<string, ReportStats>();
 
-    filteredTickets.forEach(t => {
+    filteredTickets.forEach((t) => {
       if (!t.createdAt) return;
-      const dateObj = new Date(t.createdAt as any);
-      if (isNaN(dateObj.getTime())) return;
-      const date = dateObj.toISOString().split('T')[0];
-      const current = dailyMap.get(date) || {
-        period: date,
-        tickets: 0,
-        maintenances: 0,
-        resolvedTickets: 0,
-        completedMaintenances: 0
-      };
-      current.tickets++;
-      if (
-        t.status === TicketStatus.RESOLVED ||
-        t.status === TicketStatus.CLOSED
-      ) {
-        current.resolvedTickets++;
-      }
-      dailyMap.set(date, current);
+      const d = toDate(t.createdAt as any);
+      if (isNaN(d.getTime())) return;
+      const key = d.toISOString().split('T')[0];
+      const cur = dailyMap.get(key) ?? { period: key, tickets: 0, maintenances: 0, resolvedTickets: 0, completedMaintenances: 0 };
+      cur.tickets++;
+      if (t.status === TicketStatus.RESOLVED || t.status === TicketStatus.CLOSED) cur.resolvedTickets++;
+      dailyMap.set(key, cur);
     });
 
-    filteredMaintenances.forEach(m => {
+    filteredMaintenances.forEach((m) => {
       if (!m.createdAt) return;
-      const dateObj = new Date(m.createdAt as any);
-      if (isNaN(dateObj.getTime())) return;
-      const date = dateObj.toISOString().split('T')[0];
-      const current = dailyMap.get(date) || {
-        period: date,
-        tickets: 0,
-        maintenances: 0,
-        resolvedTickets: 0,
-        completedMaintenances: 0
-      };
-      current.maintenances++;
-      if (m.status === MaintenanceStatus.COMPLETADO) {
-        current.completedMaintenances++;
-      }
-      dailyMap.set(date, current);
+      const d = toDate(m.createdAt as any);
+      if (isNaN(d.getTime())) return;
+      const key = d.toISOString().split('T')[0];
+      const cur = dailyMap.get(key) ?? { period: key, tickets: 0, maintenances: 0, resolvedTickets: 0, completedMaintenances: 0 };
+      cur.maintenances++;
+      if (m.status === MaintenanceStatus.COMPLETADO) cur.completedMaintenances++;
+      dailyMap.set(key, cur);
     });
 
-    setDailyStats(
-      Array.from(dailyMap.values()).sort((a, b) =>
-        a.period.localeCompare(b.period)
-      )
-    );
-
-    // Calcular estadísticas por empresa
     const companyMap = new Map<string, CompanyStats>();
-
-    filteredTickets.forEach(t => {
-      const current = companyMap.get(t.company) || {
-        company: t.company,
-        tickets: 0,
-        maintenances: 0,
-        resolutionRate: 0
-      };
-      current.tickets++;
-      companyMap.set(t.company, current);
+    filteredTickets.forEach((t) => {
+      const cur = companyMap.get(t.company) ?? { company: t.company, tickets: 0, maintenances: 0, resolutionRate: 0 };
+      cur.tickets++;
+      companyMap.set(t.company, cur);
     });
-
-    filteredMaintenances.forEach(m => {
-      const current = companyMap.get(m.company) || {
-        company: m.company,
-        tickets: 0,
-        maintenances: 0,
-        resolutionRate: 0
-      };
-      current.maintenances++;
-      companyMap.set(m.company, current);
+    filteredMaintenances.forEach((m) => {
+      const cur = companyMap.get(m.company) ?? { company: m.company, tickets: 0, maintenances: 0, resolutionRate: 0 };
+      cur.maintenances++;
+      companyMap.set(m.company, cur);
     });
-
-    // Calcular tasa de resolución
-    Array.from(companyMap.values()).forEach(stats => {
-      const companyTickets = filteredTickets.filter(
-        t => t.company === stats.company
-      );
-      if (companyTickets.length > 0) {
-        const resolved = companyTickets.filter(
-          t =>
-            t.status === TicketStatus.RESOLVED ||
-            t.status === TicketStatus.CLOSED
-        ).length;
-        stats.resolutionRate = Math.round((resolved / companyTickets.length) * 100);
+    companyMap.forEach((stats) => {
+      const ct = filteredTickets.filter((t) => t.company === stats.company);
+      if (ct.length > 0) {
+        const resolved = ct.filter((t) => t.status === TicketStatus.RESOLVED || t.status === TicketStatus.CLOSED).length;
+        stats.resolutionRate = Math.round((resolved / ct.length) * 100);
       }
     });
 
-    setCompanyStats(Array.from(companyMap.values()));
+    const statusCount = filteredTickets.reduce((acc, t) => {
+      const s = t.status || 'unknown';
+      acc[s] = (acc[s] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
 
-    // Distribución de estados
-    const statusCount = filteredTickets.reduce(
-      (acc, t) => {
-        const status = t.status || 'unknown';
-        acc[status] = (acc[status] || 0) + 1;
-        return acc;
-      },
-      {} as Record<string, number>
-    );
+    return {
+      dailyStats: Array.from(dailyMap.values()).sort((a, b) => a.period.localeCompare(b.period)),
+      companyStats: Array.from(companyMap.values()),
+      statusDistribution: Object.entries(statusCount).map(([name, value]) => ({ name, value })),
+    };
+  }, [filteredTickets, filteredMaintenances]);
 
-    setStatusDistribution(
-      Object.entries(statusCount).map(([status, count]) => ({
-        name: status,
-        value: count
-      }))
-    );
-  };
+  // ── Theme-aware tooltip styles ────────────────────────────────────────────────
+  const tooltipStyle = theme === 'dark'
+    ? { backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#f1f5f9' }
+    : { backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#1e293b' };
 
-  const handleExportReport = () => {
-    exportCompleteReport([], tickets, maintenances);
-  };
+  const axisColor = theme === 'dark' ? '#64748b' : '#94a3b8';
+  const gridColor = theme === 'dark' ? '#1e293b' : '#f1f5f9';
 
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+  const resolvedCount = filteredTickets.filter((t) => t.status === TicketStatus.RESOLVED || t.status === TicketStatus.CLOSED).length;
+  const completedCount = filteredMaintenances.filter((m) => m.status === MaintenanceStatus.COMPLETADO).length;
+
+  const inputCls = 'w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-colors';
+
+  if (loading) return <Spinner size="xl" label="Cargando reportes..." className="h-64 justify-center" />;
 
   return (
     <div className="space-y-6">
+
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-            <Calendar className="text-blue-600" />
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-1 flex items-center gap-2">
+            <Calendar size={22} className="text-blue-500" />
             Reportes por Período
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Análisis temporal de tickets y mantenimientos
-          </p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Análisis temporal de tickets y mantenimientos</p>
         </div>
-        <button
-          onClick={handleExportReport}
-          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2"
+        <Button
+          variant="primary"
+          iconLeft={<Download size={15} />}
+          onClick={() => exportCompleteReport([], tickets, maintenances)}
           disabled={loading}
         >
-          <Download size={18} />
           Exportar Reporte
-        </button>
+        </Button>
       </div>
 
       {/* Filtros */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow space-y-4">
+      <Card>
         <div className="flex items-center gap-2 mb-4">
-          <Filter size={20} className="text-gray-600 dark:text-gray-400" />
-          <h2 className="font-semibold text-gray-800 dark:text-white">Filtros</h2>
+          <Filter size={16} className="text-slate-500 dark:text-slate-400" />
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Filtros</h2>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Desde
-            </label>
-            <input
-              type="date"
-              aria-label="Fecha de inicio"
-              value={dateFrom || ''}
-              onChange={(e) => setDateFrom(e.target.value || undefined)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-            />
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">Desde</label>
+            <input type="date" aria-label="Fecha de inicio" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={inputCls} />
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Hasta
-            </label>
-            <input
-              type="date"
-              aria-label="Fecha final"
-              value={dateTo || ''}
-              onChange={(e) => setDateTo(e.target.value || undefined)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-            />
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">Hasta</label>
+            <input type="date" aria-label="Fecha final" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={inputCls} />
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Empresa
-            </label>
-            <select
-              aria-label="Filtrar por empresa"
-              value={company || ''}
-              onChange={(e) => setCompany((e.target.value as Company) || undefined)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-            >
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">Empresa</label>
+            <select aria-label="Filtrar por empresa" value={company} onChange={(e) => setCompany(e.target.value as Company | '')} className={inputCls}>
               <option value="">Todas las empresas</option>
-              {Object.values(Company).map(c => (
+              {Object.values(Company).map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
           </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Estadísticas Generales */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-          <p className="text-blue-600 dark:text-blue-400 text-sm font-medium">Total Tickets</p>
-          <p className="text-3xl font-bold text-blue-900 dark:text-blue-100 mt-2">
-            {tickets.filter(t => {
-              if (dateFrom && new Date(t.createdAt as any) < new Date(dateFrom)) return false;
-              if (dateTo && new Date(t.createdAt as any) > new Date(dateTo + 'T23:59:59')) return false;
-              if (company && t.company !== company) return false;
-              return true;
-            }).length}
-          </p>
-        </div>
-
-        <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
-          <p className="text-green-600 dark:text-green-400 text-sm font-medium">Resueltos</p>
-          <p className="text-3xl font-bold text-green-900 dark:text-green-100 mt-2">
-            {tickets.filter(t => {
-              if (dateFrom && new Date(t.createdAt as any) < new Date(dateFrom)) return false;
-              if (dateTo && new Date(t.createdAt as any) > new Date(dateTo + 'T23:59:59')) return false;
-              if (company && t.company !== company) return false;
-              return t.status === TicketStatus.RESOLVED || t.status === TicketStatus.CLOSED;
-            }).length}
-          </p>
-        </div>
-
-        <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
-          <p className="text-purple-600 dark:text-purple-400 text-sm font-medium">Mantenimientos</p>
-          <p className="text-3xl font-bold text-purple-900 dark:text-purple-100 mt-2">
-            {maintenances.filter(m => {
-              if (dateFrom && new Date(m.createdAt as any) < new Date(dateFrom)) return false;
-              if (dateTo && new Date(m.createdAt as any) > new Date(dateTo + 'T23:59:59')) return false;
-              if (company && m.company !== company) return false;
-              return true;
-            }).length}
-          </p>
-        </div>
-
-        <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4">
-          <p className="text-orange-600 dark:text-orange-400 text-sm font-medium">Completados</p>
-          <p className="text-3xl font-bold text-orange-900 dark:text-orange-100 mt-2">
-            {maintenances.filter(m => {
-              if (dateFrom && new Date(m.createdAt as any) < new Date(dateFrom)) return false;
-              if (dateTo && new Date(m.createdAt as any) > new Date(dateTo + 'T23:59:59')) return false;
-              if (company && m.company !== company) return false;
-              return m.status === MaintenanceStatus.COMPLETADO;
-            }).length}
-          </p>
-        </div>
+      {/* Estadísticas */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Total Tickets" value={filteredTickets.length} icon={<ClipboardList size={18} />} color="blue" />
+        <StatCard label="Resueltos" value={resolvedCount} icon={<CheckCircle2 size={18} />} color="green" />
+        <StatCard label="Mantenimientos" value={filteredMaintenances.length} icon={<Wrench size={18} />} color="purple" />
+        <StatCard label="Completados" value={completedCount} icon={<CheckSquare size={18} />} color="yellow" />
       </div>
 
       {/* Gráficas */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Tendencia Diaria */}
+
         {dailyStats.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
-            <h3 className="font-semibold text-gray-800 dark:text-white mb-4">
-              Tendencia Diaria
-            </h3>
-            <ResponsiveContainer width="100%" height={300}>
+          <Card>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4">Tendencia Diaria</h3>
+            <ResponsiveContainer width="100%" height={280}>
               <LineChart data={dailyStats}>
-                <CartesianGrid stroke="#e5e7eb" strokeDasharray="5 5" />
-                <XAxis
-                  dataKey="period"
-                  stroke="#6b7280"
-                  tick={{ fontSize: 12 }}
-                />
-                <YAxis stroke="#6b7280" tick={{ fontSize: 12 }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#1f2937',
-                    border: 'none',
-                    borderRadius: '8px'
-                  }}
-                  labelStyle={{ color: '#fff' }}
-                />
+                <CartesianGrid stroke={gridColor} strokeDasharray="5 5" />
+                <XAxis dataKey="period" stroke={axisColor} tick={{ fontSize: 11 }} />
+                <YAxis stroke={axisColor} tick={{ fontSize: 11 }} />
+                <Tooltip contentStyle={tooltipStyle} labelStyle={{ fontWeight: 600 }} />
                 <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="tickets"
-                  stroke="#3b82f6"
-                  name="Tickets"
-                  dot={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="maintenances"
-                  stroke="#8b5cf6"
-                  name="Mantenimientos"
-                  dot={false}
-                />
+                <Line type="monotone" dataKey="tickets" stroke="#3b82f6" name="Tickets" dot={false} strokeWidth={2} />
+                <Line type="monotone" dataKey="maintenances" stroke="#8b5cf6" name="Mantenimientos" dot={false} strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
-          </div>
+          </Card>
         )}
 
-        {/* Distribución por Empresa */}
         {companyStats.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
-            <h3 className="font-semibold text-gray-800 dark:text-white mb-4">
-              Actividad por Empresa
-            </h3>
-            <ResponsiveContainer width="100%" height={300}>
+          <Card>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4">Actividad por Empresa</h3>
+            <ResponsiveContainer width="100%" height={280}>
               <BarChart data={companyStats}>
-                <CartesianGrid stroke="#e5e7eb" strokeDasharray="5 5" />
-                <XAxis
-                  dataKey="company"
-                  stroke="#6b7280"
-                  tick={{ fontSize: 12 }}
-                />
-                <YAxis stroke="#6b7280" tick={{ fontSize: 12 }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#1f2937',
-                    border: 'none',
-                    borderRadius: '8px'
-                  }}
-                  labelStyle={{ color: '#fff' }}
-                />
+                <CartesianGrid stroke={gridColor} strokeDasharray="5 5" />
+                <XAxis dataKey="company" stroke={axisColor} tick={{ fontSize: 11 }} />
+                <YAxis stroke={axisColor} tick={{ fontSize: 11 }} />
+                <Tooltip contentStyle={tooltipStyle} labelStyle={{ fontWeight: 600 }} />
                 <Legend />
-                <Bar dataKey="tickets" fill="#3b82f6" name="Tickets" />
-                <Bar dataKey="maintenances" fill="#8b5cf6" name="Mantenimientos" />
+                <Bar dataKey="tickets" fill="#3b82f6" name="Tickets" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="maintenances" fill="#8b5cf6" name="Mantenimientos" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
+          </Card>
         )}
 
-        {/* Distribución de Estados */}
         {statusDistribution.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
-            <h3 className="font-semibold text-gray-800 dark:text-white mb-4">
-              Distribución de Estados
-            </h3>
-            <ResponsiveContainer width="100%" height={300}>
+          <Card>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4">Distribución de Estados</h3>
+            <ResponsiveContainer width="100%" height={280}>
               <PieChart>
                 <Pie
                   data={statusDistribution}
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, value }) =>
-                    `${name}: ${value}`
-                  }
-                  outerRadius={80}
-                  fill="#8884d8"
+                  label={({ name, value }) => `${name}: ${value}`}
+                  outerRadius={90}
                   dataKey="value"
                 >
                   {statusDistribution.map((_, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={COLORS[index % COLORS.length]}
-                    />
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip contentStyle={tooltipStyle} />
               </PieChart>
             </ResponsiveContainer>
-          </div>
+          </Card>
         )}
 
-        {/* Tasa de Resolución */}
         {companyStats.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
-            <h3 className="font-semibold text-gray-800 dark:text-white mb-4">
-              Tasa de Resolución por Empresa
-            </h3>
-            <div className="space-y-3">
-              {companyStats.map(stat => (
+          <Card>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4">Tasa de Resolución por Empresa</h3>
+            <div className="space-y-4 mt-2">
+              {companyStats.map((stat) => (
                 <div key={stat.company}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">
-                      {stat.company}
-                    </span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {stat.resolutionRate}%
-                    </span>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm text-slate-600 dark:text-slate-400 truncate">{stat.company}</span>
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-100 ml-4 tabular-nums">{stat.resolutionRate}%</span>
                   </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                    <progress
-                      aria-label={`Tasa de resolución: ${stat.resolutionRate}%`}
-                      title={`${stat.resolutionRate}% de resolución`}
-                      className={styles.resolutionProgress}
-                      value={Math.max(0, Math.min(100, stat.resolutionRate))}
-                      max={100}
+                  <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                    {/* dynamic percentage — inline width is the only viable approach here */}
+                    {/* eslint-disable-next-line react/forbid-component-props */}
+                    <div
+                      className="h-full rounded-full bg-blue-500 dark:bg-blue-400 transition-all duration-500"
+                      style={{ width: `${Math.max(0, Math.min(100, stat.resolutionRate))}%` }} // eslint-disable-line
                     />
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         )}
       </div>
+
+      {(dailyStats.length === 0 && companyStats.length === 0) && (
+        <Card>
+          <p className="text-center text-sm text-slate-400 dark:text-slate-500 py-8">
+            Sin datos para el período y filtros seleccionados.
+          </p>
+        </Card>
+      )}
     </div>
   );
 };

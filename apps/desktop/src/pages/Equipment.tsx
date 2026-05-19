@@ -15,11 +15,13 @@ import {
 import EquipmentCard from '../components/EquipmentCard';
 import EquipmentForm from '../components/EquipmentForm';
 import EquipmentQRCode from '../components/EquipmentQRCode';
-import { Download, Plus, Monitor } from 'lucide-react';
+import { Download, Plus, Monitor, ChevronLeft, ChevronRight } from 'lucide-react';
 import { exportEquipmentToExcel } from '../utils/exportToExcel';
 import { generateCartaResponsivaPDF } from '../utils/cartaResponsivaPDF';
 import { useUiFeedback } from '../contexts/UiFeedbackContext';
 import { Spinner, Card, Button, EmptyState } from '../components/ui';
+
+const PAGE_SIZE = 24;
 
 const Equipment = () => {
   const { userData, hasPermission } = useAuth();
@@ -34,7 +36,18 @@ const Equipment = () => {
   const [showQRModal, setShowQRModal] = useState(false);
   const [selectedEquipmentForQR, setSelectedEquipmentForQR] = useState<EquipmentType | null>(null);
   const [filters, setFilters] = useState<EquipmentFilters>({});
+  const [searchInput, setSearchInput] = useState('');
+  const [page, setPage] = useState(1);
   const isFirstLoadRef = useRef(true);
+
+  // Debounce search input → filters.search (300 ms)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setFilters((f) => ({ ...f, search: searchInput }));
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   const usersById = useMemo(() => {
     return users.reduce<Record<string, User>>((acc, user) => {
@@ -76,6 +89,9 @@ const Equipment = () => {
       );
     });
   }, [equipment, filters.search, usersById]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredEquipment.length / PAGE_SIZE));
+  const paginatedEquipment = filteredEquipment.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const getAssignedUserLabel = (eq: EquipmentType): string => {
     if (!eq.assignedTo) return 'Sin asignar';
@@ -260,10 +276,10 @@ const Equipment = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 mb-1">Equipos</h1>
-          <p className="text-sm text-slate-500">
-            Gestión de equipos informáticos
-            {isRefreshing && <span className="ml-2 text-blue-500">· Actualizando...</span>}
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-1">Equipos</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {filteredEquipment.length} equipo{filteredEquipment.length !== 1 ? 's' : ''}
+            {isRefreshing && <span className="ml-2 text-blue-500 dark:text-blue-400">· Actualizando...</span>}
           </p>
         </div>
 
@@ -289,12 +305,12 @@ const Equipment = () => {
       <Card padding="sm">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Empresa</label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Empresa</label>
             <select
               aria-label="Filtrar por empresa"
               value={filters.company || ''}
-              onChange={(e) => setFilters({ ...filters, company: e.target.value as Company })}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              onChange={(e) => { setFilters({ ...filters, company: e.target.value as Company }); setPage(1); }}
+              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             >
               <option value="">Todas</option>
               {Object.values(Company).map((company) => (
@@ -303,12 +319,12 @@ const Equipment = () => {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Estado</label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Estado</label>
             <select
               aria-label="Filtrar por estado"
               value={filters.status || ''}
-              onChange={(e) => setFilters({ ...filters, status: e.target.value as any })}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              onChange={(e) => { setFilters({ ...filters, status: e.target.value as any }); setPage(1); }}
+              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             >
               <option value="">Todos</option>
               <option value="active">Activo</option>
@@ -318,12 +334,12 @@ const Equipment = () => {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Tipo</label>
             <select
               aria-label="Filtrar por tipo"
               value={filters.type || ''}
-              onChange={(e) => setFilters({ ...filters, type: e.target.value as any })}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              onChange={(e) => { setFilters({ ...filters, type: e.target.value as any }); setPage(1); }}
+              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             >
               <option value="">Todos</option>
               <option value="desktop">Desktop</option>
@@ -338,13 +354,13 @@ const Equipment = () => {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Buscar</label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Buscar</label>
             <input
-              type="text"
-              value={filters.search || ''}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              type="search"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Nombre, hostname, serial..."
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             />
           </div>
         </div>
@@ -359,20 +375,39 @@ const Equipment = () => {
           action={canManageEquipment ? { label: 'Nuevo Equipo', onClick: handleCreate } : undefined}
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredEquipment.map((eq) => (
-            <EquipmentCard
-              key={eq.id}
-              equipment={eq}
-              assignedToLabel={getAssignedUserLabel(eq)}
-              onEdit={() => handleEdit(eq)}
-              onDelete={() => handleDelete(eq.id)}
-              onShowQR={() => handleShowQR(eq)}
-              onGenerateCarta={() => handleGenerateCarta(eq)}
-              canEdit={canManageEquipment}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {paginatedEquipment.map((eq) => (
+              <EquipmentCard
+                key={eq.id}
+                equipment={eq}
+                assignedToLabel={getAssignedUserLabel(eq)}
+                onEdit={() => handleEdit(eq)}
+                onDelete={() => handleDelete(eq.id)}
+                onShowQR={() => handleShowQR(eq)}
+                onGenerateCarta={() => handleGenerateCarta(eq)}
+                canEdit={canManageEquipment}
+              />
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-500 dark:text-slate-400">
+                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredEquipment.length)} de {filteredEquipment.length} equipos
+              </span>
+              <div className="flex items-center gap-1">
+                <button type="button" aria-label="Página anterior" onClick={() => setPage((p) => p - 1)} disabled={page === 1} className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-30 transition-colors border border-slate-200 dark:border-slate-700">
+                  <ChevronLeft size={15} />
+                </button>
+                <span className="text-sm text-slate-600 dark:text-slate-300 px-3">{page} / {totalPages}</span>
+                <button type="button" aria-label="Página siguiente" onClick={() => setPage((p) => p + 1)} disabled={page === totalPages} className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-30 transition-colors border border-slate-200 dark:border-slate-700">
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Formulario Modal */}
