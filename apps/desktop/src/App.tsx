@@ -7,6 +7,7 @@ import { UiFeedbackProvider } from './contexts/UiFeedbackContext';
 import PrivateRoute from './components/PrivateRoute';
 import Layout from './components/Layout';
 import PortalLayout from './components/PortalLayout';
+import { PageSpinner } from './components/ui/Spinner';
 
 const GlobalSearch = lazy(() => import('./components/GlobalSearch').then((module) => ({ default: module.GlobalSearch })));
 const Login = lazy(() => import('./pages/Login'));
@@ -57,7 +58,7 @@ function App() {
               />
             </Suspense>
 
-            <Suspense fallback={<div style={{ padding: 16, color: '#374151' }}>Cargando módulo...</div>}>
+            <Suspense fallback={<PageSpinner />}>
               <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route

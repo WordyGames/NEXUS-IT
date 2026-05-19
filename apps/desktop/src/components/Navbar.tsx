@@ -1,118 +1,115 @@
 import React, { useEffect, useState } from 'react';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, LogOut, Search } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { subscribeSupportChatThread, subscribeSupportChatThreads } from '@nexus-it/shared';
 import { NotificationBell } from './NotificationBell';
-import styles from './Navbar.module.css';
 
-const getCompanyBadgeVariant = (company: string) => {
-  const normalized = company.toUpperCase();
-  if (normalized.includes('ESPECIAS')) return styles.companyEspecias;
-  if (normalized.includes('AMEX')) return styles.companyAmex;
-  if (normalized.includes('OSENAL')) return styles.companyOsenal;
-  return styles.companyDefault;
+const COMPANY_COLORS: Record<string, string> = {
+  ESPECIAS: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  AMEX:     'bg-blue-100   text-blue-700   border-blue-200',
+  OSENAL:   'bg-purple-100 text-purple-700 border-purple-200',
+};
+
+const getCompanyStyle = (company: string): string => {
+  const key = Object.keys(COMPANY_COLORS).find((k) =>
+    company.toUpperCase().includes(k)
+  );
+  return key ? COMPANY_COLORS[key] : 'bg-slate-100 text-slate-600 border-slate-200';
 };
 
 const Navbar = () => {
   const { userData, logout, isAdmin } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const navigate   = useNavigate();
+  const location   = useLocation();
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
   const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (error) {
-      console.error('Error logging out:', error);
-    }
+    try { await logout(); } catch { /* ignore */ }
   };
 
   const handleOpenChat = () => {
-    const isPortalRoute = location.pathname.startsWith('/portal');
-    navigate(isPortalRoute ? '/portal/chat' : '/chat');
+    navigate(location.pathname.startsWith('/portal') ? '/portal/chat' : '/chat');
   };
 
   useEffect(() => {
-    if (!userData?.id) {
-      setChatUnreadCount(0);
-      return;
-    }
+    if (!userData?.id) { setChatUnreadCount(0); return; }
 
     if (isAdmin) {
-      const unsubscribe = subscribeSupportChatThreads(
-        (threads) => {
-          setChatUnreadCount(threads.filter((thread) => thread.hasUnreadForAdmin).length);
-        },
-        {
-          onError: () => setChatUnreadCount(0)
-        }
+      const unsub = subscribeSupportChatThreads(
+        (threads) => setChatUnreadCount(threads.filter((t) => t.hasUnreadForAdmin).length),
+        { onError: () => setChatUnreadCount(0) }
       );
-
-      return () => unsubscribe();
+      return unsub;
     }
 
-    const unsubscribe = subscribeSupportChatThread(
+    const unsub = subscribeSupportChatThread(
       userData.id,
-      (thread) => {
-        setChatUnreadCount(thread?.hasUnreadForUser ? 1 : 0);
-      },
-      () => {
-        setChatUnreadCount(0);
-      }
+      (thread) => setChatUnreadCount(thread?.hasUnreadForUser ? 1 : 0),
+      () => setChatUnreadCount(0)
     );
-
-    return () => unsubscribe();
+    return unsub;
   }, [isAdmin, userData?.id]);
 
   return (
-    <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
-            Bienvenido, {userData?.name}
-          </h2>
-        </div>
+    <header className="bg-white border-b border-slate-100 px-6 h-[60px] flex items-center justify-between flex-shrink-0">
 
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={handleOpenChat}
-            className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center gap-2 relative"
-            title="Abrir chat de soporte"
-          >
-            <MessageCircle size={16} />
-            Chat
-            {chatUnreadCount > 0 && (
-              <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] leading-[18px] text-center border border-white">
-                {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
-              </span>
-            )}
-          </button>
-
-          {/* Notificaciones */}
-          <NotificationBell />
-
-          {/* Empresa */}
-          {userData?.company && (
-            <div
-              aria-label={`Empresa: ${userData.company}`}
-              title={userData.company}
-              className={`${styles.companyBadge} ${getCompanyBadgeVariant(userData.company)}`}
-            >
-              {userData.company}
-            </div>
-          )}
-
-          {/* Logout */}
-          <button
-            onClick={handleLogout}
-            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
-          >
-            Cerrar Sesión
-          </button>
-        </div>
+      {/* Left: breadcrumb / greeting */}
+      <div className="flex items-center gap-2">
+        <p className="text-sm font-medium text-slate-700">
+          Hola,{' '}
+          <span className="text-slate-900 font-semibold">{userData?.name ?? '—'}</span>
+        </p>
+        {userData?.company && (
+          <span className={`hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getCompanyStyle(userData.company)}`}>
+            {userData.company}
+          </span>
+        )}
       </div>
-    </div>
+
+      {/* Right: actions */}
+      <div className="flex items-center gap-2">
+
+        {/* Search hint */}
+        <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 text-xs cursor-default select-none">
+          <Search size={13} />
+          <span>Buscar</span>
+          <kbd className="ml-1 px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 font-mono text-[10px]">⌘K</kbd>
+        </div>
+
+        {/* Chat */}
+        <button
+          onClick={handleOpenChat}
+          className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200
+                     text-slate-600 hover:bg-slate-100 hover:text-slate-800 text-xs font-medium transition-all"
+          title="Chat de soporte"
+        >
+          <MessageCircle size={15} />
+          <span className="hidden sm:inline">Chat</span>
+          {chatUnreadCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[17px] h-[17px] px-1 rounded-full
+                             bg-red-500 text-white text-[9px] font-bold leading-[17px] text-center
+                             border-2 border-white">
+              {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+            </span>
+          )}
+        </button>
+
+        {/* Notificaciones */}
+        <NotificationBell />
+
+        {/* Logout */}
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+                     text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 transition-all"
+          title="Cerrar sesión"
+        >
+          <LogOut size={14} />
+          <span className="hidden sm:inline">Salir</span>
+        </button>
+      </div>
+    </header>
   );
 };
 
