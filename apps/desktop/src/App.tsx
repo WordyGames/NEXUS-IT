@@ -4,6 +4,7 @@ import { UserPermission } from '@nexus-it/shared';
 import { AuthProvider } from './contexts/AuthContext';
 import { UpdaterProvider } from './contexts/UpdaterContext';
 import { UiFeedbackProvider } from './contexts/UiFeedbackContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import PrivateRoute from './components/PrivateRoute';
 import Layout from './components/Layout';
 import PortalLayout from './components/PortalLayout';
@@ -48,6 +49,7 @@ function App() {
 
   return (
     <RouterComponent>
+      <ThemeProvider>
       <AuthProvider>
         <UpdaterProvider>
           <UiFeedbackProvider>
@@ -180,6 +182,7 @@ function App() {
           </UiFeedbackProvider>
         </UpdaterProvider>
       </AuthProvider>
+      </ThemeProvider>
     </RouterComponent>
   );
 }

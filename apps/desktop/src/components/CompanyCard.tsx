@@ -1,4 +1,5 @@
 import React from 'react';
+import { Building2 } from 'lucide-react';
 import { Company } from '@nexus-it/shared';
 
 interface CompanyCardProps {
@@ -7,43 +8,35 @@ interface CompanyCardProps {
   color: string;
 }
 
-const CompanyCard = ({ company, equipmentCount, color }: CompanyCardProps) => {
-  const colorClasses: Record<string, string> = {
-    'especias': 'bg-green-500 hover:bg-green-600',
-    'grupo-amex': 'bg-blue-500 hover:bg-blue-600',
-    'montacargas': 'bg-amber-500 hover:bg-amber-600',
-    'equipos-osenal': 'bg-purple-500 hover:bg-purple-600',
-    'amex-juarez': 'bg-purple-500 hover:bg-purple-600'
-  };
+const colorClasses: Record<string, string> = {
+  'especias':      'bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-700',
+  'grupo-amex':    'bg-blue-500    hover:bg-blue-600    dark:bg-blue-600    dark:hover:bg-blue-700',
+  'montacargas':   'bg-amber-500   hover:bg-amber-600   dark:bg-amber-600   dark:hover:bg-amber-700',
+  'equipos-osenal':'bg-purple-500  hover:bg-purple-600  dark:bg-purple-600  dark:hover:bg-purple-700',
+  'amex-juarez':   'bg-cyan-500    hover:bg-cyan-600    dark:bg-cyan-600    dark:hover:bg-cyan-700',
+};
 
-  return (
-    <div
-      className={`${colorClasses[color]} text-white rounded-lg p-6 shadow-lg transition-all hover:scale-105 cursor-pointer`}
-    >
-      <div className="flex flex-col space-y-4">
+const CompanyCard = ({ company, equipmentCount, color }: CompanyCardProps) => (
+  <div className={`${colorClasses[color] ?? 'bg-slate-500 hover:bg-slate-600'} text-white rounded-xl p-5 shadow-card transition-all hover:scale-[1.02] cursor-pointer`}>
+    <div className="flex flex-col gap-3">
+      <div className="flex items-start justify-between">
         <div>
-          <h3 className="text-lg font-semibold mb-2">
-            {company}
-          </h3>
-          <div className="h-1 w-16 bg-white opacity-50 rounded"></div>
+          <h3 className="text-sm font-semibold leading-tight opacity-90">{company}</h3>
+          <div className="h-0.5 w-10 bg-white/40 rounded mt-1.5" />
         </div>
+        <Building2 size={20} className="opacity-30" />
+      </div>
 
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-sm opacity-75">Equipos</p>
-            <p className="text-4xl font-bold">{equipmentCount}</p>
-          </div>
-          <div className="text-5xl opacity-20">🏢</div>
-        </div>
+      <div>
+        <p className="text-xs opacity-70 mb-0.5">Equipos</p>
+        <p className="text-4xl font-bold">{equipmentCount}</p>
+      </div>
 
-        <div className="pt-2 border-t border-white border-opacity-20">
-          <p className="text-sm opacity-75">
-            Ver todos →
-          </p>
-        </div>
+      <div className="pt-2 border-t border-white/20">
+        <p className="text-xs opacity-60">Ver todos →</p>
       </div>
     </div>
-  );
-};
+  </div>
+);
 
 export default CompanyCard;
