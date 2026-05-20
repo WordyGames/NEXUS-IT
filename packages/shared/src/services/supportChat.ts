@@ -3,6 +3,12 @@ import { SupportChatMessage, SupportChatSender, SupportChatThread } from '../typ
 
 export type Unsubscribe = () => void;
 
+const freshChannel = (name: string) => {
+  const existing = supabase.getChannels().find(ch => ch.topic === `realtime:${name}`);
+  if (existing) supabase.removeChannel(existing);
+  return supabase.channel(name);
+};
+
 const toDate = (v: string | null | undefined): Date => {
   if (!v) return new Date(0);
   const d = new Date(v);
@@ -77,8 +83,7 @@ export const subscribeSupportChatThread = (
 ): Unsubscribe => {
   if (!userId?.trim()) throw new Error('userId es requerido para suscribirse al chat');
 
-  const channel = supabase
-    .channel(`support_chat_thread_${userId}`)
+  const channel = freshChannel(`support_chat_thread_${userId}`)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'support_chats', filter: `user_id=eq.${userId}` },
@@ -109,8 +114,7 @@ export const subscribeSupportChatThreads = (
   onData: (threads: SupportChatThread[]) => void,
   options?: { maxItems?: number; onError?: (error: unknown) => void }
 ): Unsubscribe => {
-  const channel = supabase
-    .channel('support_chat_threads')
+  const channel = freshChannel('support_chat_threads')
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'support_chats' },
@@ -167,8 +171,7 @@ export const subscribeSupportChatMessages = (
       if (!data) return;
       chatId = data.id;
 
-      channel = supabase
-        .channel(`chat_messages_${chatId}`)
+      channel = freshChannel(`chat_messages_${chatId}`)
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'chat_messages', filter: `chat_id=eq.${chatId}` },
