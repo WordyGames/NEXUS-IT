@@ -164,22 +164,38 @@ const Chat: React.FC = () => {
       return;
     }
 
+    const sender = isAdminInboxMode ? SupportChatSender.AGENT : SupportChatSender.USER;
+    const optimisticId = `optimistic-${Date.now()}`;
+    const optimistic: SupportChatMessage = {
+      id: optimisticId,
+      userId: activeChatUserId,
+      userName: activeChatUserName,
+      sender,
+      senderName: userData?.name || userData?.username || 'Soporte',
+      text: trimmedText,
+      createdAt: new Date()
+    };
+
+    setMessages((prev) => [...prev, optimistic]);
+    setText('');
+    setSending(true);
+
     try {
-      setSending(true);
       await sendSupportChatMessage({
         userId: activeChatUserId,
         userName: activeChatUserName,
         text: trimmedText,
-        sender: isAdminInboxMode ? SupportChatSender.AGENT : SupportChatSender.USER,
+        sender,
         senderName: userData?.name || userData?.username || 'Soporte'
       });
-      setText('');
-    } catch (error: any) {
-      console.error('Error sending support chat message:', error);
+      // Realtime will replace optimistic message with the persisted row
+    } catch (error: unknown) {
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      setText(trimmedText);
       showToast({
         type: 'error',
         title: 'No se pudo enviar el mensaje',
-        message: error?.message || 'Intenta nuevamente.'
+        message: error instanceof Error ? error.message : 'Intenta nuevamente.'
       });
     } finally {
       setSending(false);
