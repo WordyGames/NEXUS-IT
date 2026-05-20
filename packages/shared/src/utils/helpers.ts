@@ -1,7 +1,7 @@
-import { Timestamp } from 'firebase/firestore';
+import { Timestamp } from '../types';
 
 /**
- * Convierte un Timestamp de Firestore a Date
+ * Convierte un Timestamp a Date
  */
 export const timestampToDate = (timestamp: Timestamp | Date): Date => {
   if (timestamp instanceof Date) {

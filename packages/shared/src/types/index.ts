@@ -1,4 +1,10 @@
-import { Timestamp } from 'firebase/firestore';
+// Timestamp-compatible interface (no longer requires firebase/firestore)
+export interface Timestamp {
+  seconds: number;
+  nanoseconds: number;
+  toDate(): Date;
+  toMillis(): number;
+}
 
 // Tipo para adjuntos
 export interface Attachment {

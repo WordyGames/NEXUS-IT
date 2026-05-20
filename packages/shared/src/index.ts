@@ -1,5 +1,5 @@
 export * from './types';
-export * from './config/firebase';
+export * from './config/supabase';
 export * from './utils/helpers';
 export * from './utils/permissions';
 export * from './utils/runtimeLogger';

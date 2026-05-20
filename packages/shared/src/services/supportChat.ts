@@ -1,287 +1,190 @@
-import {
-  addDoc,
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  limit,
-  onSnapshot,
-  orderBy,
-  QueryConstraint,
-  query,
-  setDoc,
-  Timestamp,
-  Unsubscribe
-} from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { supabase } from '../config/supabase';
 import { SupportChatMessage, SupportChatSender, SupportChatThread } from '../types';
 
-const SUPPORT_CHATS_COLLECTION = 'supportChats';
-const MESSAGES_COLLECTION = 'messages';
+export type Unsubscribe = () => void;
 
-const toDate = (value: unknown): Date => {
-  if (!value) return new Date(0);
-  if (value instanceof Date) return value;
-  if (typeof value === 'object' && value !== null && 'toDate' in value) {
-    const withToDate = value as { toDate: () => Date };
-    return withToDate.toDate();
-  }
-  if (typeof value === 'object' && value !== null && 'seconds' in value) {
-    const withSeconds = value as { seconds: number };
-    return new Date(withSeconds.seconds * 1000);
-  }
-  const parsed = new Date(String(value));
-  return Number.isNaN(parsed.getTime()) ? new Date(0) : parsed;
+const toDate = (v: string | null | undefined): Date => {
+  if (!v) return new Date(0);
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? new Date(0) : d;
 };
 
-const normalizeText = (text: string) => text.trim().replace(/\s+/g, ' ');
-
-const buildThreadRef = (userId: string) => doc(db, SUPPORT_CHATS_COLLECTION, userId);
-
-const buildMessagesCollectionRef = (userId: string) =>
-  collection(db, SUPPORT_CHATS_COLLECTION, userId, MESSAGES_COLLECTION);
-
-const normalizeUserId = (userId: string) => userId.trim();
-
-const isIndexError = (error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.toLowerCase().includes('index') || message.includes('FAILED_PRECONDITION');
-};
-
-const parseThread = (id: string, data: Omit<SupportChatThread, 'id'>): SupportChatThread => ({
-  id,
-  ...data
+const rowToThread = (row: any): SupportChatThread => ({
+  id: row.id,
+  userId: row.user_id,
+  userName: row.user_name,
+  lastMessage: row.last_message ?? undefined,
+  lastSender: row.last_sender as SupportChatSender ?? undefined,
+  hasUnreadForUser: row.has_unread_for_user ?? false,
+  hasUnreadForAdmin: row.has_unread_for_admin ?? false,
+  userLastReadAt: toDate(row.user_last_read_at),
+  adminLastReadAt: toDate(row.admin_last_read_at),
+  lastMessageAt: toDate(row.last_message_at),
+  createdAt: toDate(row.created_at),
+  updatedAt: toDate(row.updated_at)
 });
 
-const parseMessage = (id: string, data: Omit<SupportChatMessage, 'id'>): SupportChatMessage => ({
-  id,
-  ...data
+const rowToMessage = (row: any): SupportChatMessage => ({
+  id: row.id,
+  userId: row.user_id ?? '',
+  userName: row.user_name ?? '',
+  sender: row.sender as SupportChatSender,
+  senderName: row.sender_name ?? undefined,
+  text: row.text,
+  createdAt: toDate(row.created_at)
 });
 
-const getSortValue = (value: unknown) => toDate(value).getTime();
+const ensureThread = async (userId: string, userName: string): Promise<string> => {
+  const { data: existing } = await supabase
+    .from('support_chats')
+    .select('id')
+    .eq('user_id', userId)
+    .single();
 
-const ensureThread = async (userId: string, userName: string): Promise<void> => {
-  const threadRef = buildThreadRef(userId);
-  const threadSnapshot = await getDoc(threadRef);
-  const now = Timestamp.now();
-
-  if (!threadSnapshot.exists()) {
-    const payload: Omit<SupportChatThread, 'id'> = {
-      userId,
-      userName,
-      hasUnreadForUser: false,
-      hasUnreadForAdmin: false,
-      userLastReadAt: now,
-      adminLastReadAt: now,
-      createdAt: now,
-      updatedAt: now
-    };
-
-    await setDoc(threadRef, payload, { merge: true });
-    return;
+  if (existing) {
+    await supabase.from('support_chats').update({ user_name: userName }).eq('user_id', userId);
+    return existing.id;
   }
 
-  await setDoc(
-    threadRef,
-    {
-      userName,
-      updatedAt: now
-    },
-    { merge: true }
-  );
+  const { data, error } = await supabase.from('support_chats').insert({
+    user_id: userId,
+    user_name: userName,
+    has_unread_for_user: false,
+    has_unread_for_admin: false
+  }).select('id').single();
+
+  if (error) throw error;
+  return data.id;
 };
 
-/**
- * Obtiene el hilo individual de un usuario.
- */
 export const getSupportChatThread = async (userId: string): Promise<SupportChatThread | null> => {
-  if (!userId?.trim()) {
-    throw new Error('userId es requerido para cargar el chat');
-  }
+  if (!userId?.trim()) throw new Error('userId es requerido para cargar el chat');
 
-  try {
-    const threadRef = buildThreadRef(normalizeUserId(userId));
-    const threadSnapshot = await getDoc(threadRef);
+  const { data, error } = await supabase
+    .from('support_chats')
+    .select('*')
+    .eq('user_id', userId.trim())
+    .single();
 
-    if (!threadSnapshot.exists()) {
-      return null;
-    }
-
-    return parseThread(threadSnapshot.id, threadSnapshot.data() as Omit<SupportChatThread, 'id'>);
-  } catch (error) {
-    console.error('Error getting support chat thread:', error);
-    throw error;
-  }
+  if (error || !data) return null;
+  return rowToThread(data);
 };
 
-/**
- * Suscribe en tiempo real al hilo individual de chat de un usuario.
- */
 export const subscribeSupportChatThread = (
   userId: string,
   onData: (thread: SupportChatThread | null) => void,
   onError?: (error: unknown) => void
 ): Unsubscribe => {
-  if (!userId?.trim()) {
-    throw new Error('userId es requerido para suscribirse al chat');
-  }
+  if (!userId?.trim()) throw new Error('userId es requerido para suscribirse al chat');
 
-  const threadRef = buildThreadRef(normalizeUserId(userId));
-
-  return onSnapshot(
-    threadRef,
-    (snapshot) => {
-      if (!snapshot.exists()) {
-        onData(null);
-        return;
+  const channel = supabase
+    .channel(`support_chat_thread_${userId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'support_chats', filter: `user_id=eq.${userId}` },
+      async () => {
+        const thread = await getSupportChatThread(userId);
+        onData(thread);
       }
+    )
+    .subscribe();
 
-      onData(parseThread(snapshot.id, snapshot.data() as Omit<SupportChatThread, 'id'>));
-    },
-    (error) => {
-      console.error('Error subscribing support chat thread:', error);
-      if (onError) onError(error);
-    }
-  );
+  getSupportChatThread(userId).then(onData).catch(onError ?? console.error);
+
+  return () => { supabase.removeChannel(channel); };
 };
 
-const fetchThreads = async (constraints: QueryConstraint[], includeOrderBy: boolean) => {
-  const effectiveConstraints = includeOrderBy
-    ? [...constraints, orderBy('updatedAt', 'desc')]
-    : constraints;
-
-  const snapshot = await getDocs(query(collection(db, SUPPORT_CHATS_COLLECTION), ...effectiveConstraints));
-  const rows = snapshot.docs.map((threadDoc) =>
-    parseThread(threadDoc.id, threadDoc.data() as Omit<SupportChatThread, 'id'>)
-  );
-
-  if (!includeOrderBy) {
-    rows.sort((a, b) => getSortValue(b.updatedAt) - getSortValue(a.updatedAt));
-  }
-
-  return rows;
-};
-
-/**
- * Obtiene los hilos de chat para inbox de soporte (admin).
- */
 export const getSupportChatThreads = async (maxItems = 200): Promise<SupportChatThread[]> => {
-  const safeLimit = Math.min(Math.max(maxItems, 1), 500);
-  const constraints: QueryConstraint[] = [limit(safeLimit)];
+  const { data, error } = await supabase
+    .from('support_chats')
+    .select('*')
+    .order('updated_at', { ascending: false })
+    .limit(Math.min(maxItems, 500));
 
-  try {
-    return await fetchThreads(constraints, true).catch(async (error) => {
-      if (isIndexError(error)) {
-        return fetchThreads(constraints, false);
-      }
-      throw error;
-    });
-  } catch (error) {
-    console.error('Error getting support chat threads:', error);
-    throw error;
-  }
+  if (error) throw error;
+  return (data ?? []).map(rowToThread);
 };
 
-/**
- * Suscribe en tiempo real al inbox de chats (admin).
- */
 export const subscribeSupportChatThreads = (
   onData: (threads: SupportChatThread[]) => void,
   options?: { maxItems?: number; onError?: (error: unknown) => void }
 ): Unsubscribe => {
-  const safeLimit = Math.min(Math.max(options?.maxItems ?? 200, 1), 500);
-  const q = query(
-    collection(db, SUPPORT_CHATS_COLLECTION),
-    orderBy('updatedAt', 'desc'),
-    limit(safeLimit)
-  );
+  const channel = supabase
+    .channel('support_chat_threads')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'support_chats' },
+      async () => {
+        const threads = await getSupportChatThreads(options?.maxItems);
+        onData(threads);
+      }
+    )
+    .subscribe();
 
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const rows = snapshot.docs.map((threadDoc) =>
-        parseThread(threadDoc.id, threadDoc.data() as Omit<SupportChatThread, 'id'>)
-      );
-      onData(rows);
-    },
-    (error) => {
-      console.error('Error subscribing support chat threads:', error);
-      if (options?.onError) options.onError(error);
-    }
-  );
+  getSupportChatThreads(options?.maxItems).then(onData).catch(options?.onError ?? console.error);
+
+  return () => { supabase.removeChannel(channel); };
 };
 
-/**
- * Obtiene los mensajes del chat individual de un usuario.
- */
 export const getSupportChatMessages = async (userId: string, maxItems = 200): Promise<SupportChatMessage[]> => {
-  if (!userId?.trim()) {
-    throw new Error('userId es requerido para cargar mensajes de chat');
-  }
+  if (!userId?.trim()) throw new Error('userId es requerido para cargar mensajes de chat');
 
-  const safeLimit = Math.min(Math.max(maxItems, 1), 500);
-  const normalizedUserId = normalizeUserId(userId);
+  const { data: thread } = await supabase
+    .from('support_chats')
+    .select('id')
+    .eq('user_id', userId.trim())
+    .single();
 
-  try {
-    const messagesRef = buildMessagesCollectionRef(normalizedUserId);
-    const q = query(messagesRef, orderBy('createdAt', 'asc'), limit(safeLimit));
-    const snapshot = await getDocs(q);
+  if (!thread) return [];
 
-    return snapshot.docs.map((messageDoc) =>
-      parseMessage(messageDoc.id, messageDoc.data() as Omit<SupportChatMessage, 'id'>)
-    );
-  } catch (error) {
-    console.error('Error getting support chat messages with orderBy:', error);
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .select('*')
+    .eq('chat_id', thread.id)
+    .order('created_at', { ascending: true })
+    .limit(Math.min(maxItems, 500));
 
-    const fallbackSnapshot = await getDocs(
-      query(buildMessagesCollectionRef(normalizedUserId), limit(safeLimit))
-    );
-
-    return fallbackSnapshot.docs
-      .map((messageDoc) =>
-        parseMessage(messageDoc.id, messageDoc.data() as Omit<SupportChatMessage, 'id'>)
-      )
-      .sort((a, b) => toDate(a.createdAt).getTime() - toDate(b.createdAt).getTime());
-  }
+  if (error) throw error;
+  return (data ?? []).map(r => ({ ...rowToMessage(r), userId, userName: '' }));
 };
 
-/**
- * Suscribe en tiempo real a los mensajes de un chat individual.
- */
 export const subscribeSupportChatMessages = (
   userId: string,
   onData: (messages: SupportChatMessage[]) => void,
   options?: { maxItems?: number; onError?: (error: unknown) => void }
 ): Unsubscribe => {
-  if (!userId?.trim()) {
-    throw new Error('userId es requerido para suscribirse a mensajes de chat');
-  }
+  if (!userId?.trim()) throw new Error('userId es requerido para suscribirse a mensajes de chat');
 
-  const safeLimit = Math.min(Math.max(options?.maxItems ?? 200, 1), 500);
-  const q = query(
-    buildMessagesCollectionRef(normalizeUserId(userId)),
-    orderBy('createdAt', 'asc'),
-    limit(safeLimit)
-  );
+  let chatId: string | null = null;
+  let channel: ReturnType<typeof supabase.channel> | null = null;
 
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const rows = snapshot.docs.map((messageDoc) =>
-        parseMessage(messageDoc.id, messageDoc.data() as Omit<SupportChatMessage, 'id'>)
-      );
-      onData(rows);
-    },
-    (error) => {
-      console.error('Error subscribing support chat messages:', error);
-      if (options?.onError) options.onError(error);
-    }
-  );
+  supabase
+    .from('support_chats')
+    .select('id')
+    .eq('user_id', userId.trim())
+    .single()
+    .then(({ data }) => {
+      if (!data) return;
+      chatId = data.id;
+
+      channel = supabase
+        .channel(`chat_messages_${chatId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'chat_messages', filter: `chat_id=eq.${chatId}` },
+          async () => {
+            const msgs = await getSupportChatMessages(userId, options?.maxItems);
+            onData(msgs);
+          }
+        )
+        .subscribe();
+    });
+
+  getSupportChatMessages(userId, options?.maxItems).then(onData).catch(options?.onError ?? console.error);
+
+  return () => { if (channel) supabase.removeChannel(channel); };
 };
 
-/**
- * Envía un mensaje al chat individual del usuario.
- */
 export const sendSupportChatMessage = async (params: {
   userId: string;
   userName: string;
@@ -289,103 +192,74 @@ export const sendSupportChatMessage = async (params: {
   sender?: SupportChatSender;
   senderName?: string;
 }): Promise<string> => {
-  const normalizedUserId = params.userId?.trim();
-  const normalizedUserName = params.userName?.trim();
-  const normalizedSenderName = params.senderName?.trim();
-  const normalizedText = normalizeText(params.text || '');
-  const sender = params.sender || SupportChatSender.USER;
+  const userId = params.userId?.trim();
+  const userName = params.userName?.trim();
+  const text = params.text?.trim().replace(/\s+/g, ' ');
+  const sender = params.sender ?? SupportChatSender.USER;
 
-  if (!normalizedUserId) {
-    throw new Error('userId es requerido para enviar mensajes');
-  }
-  if (!normalizedUserName) {
-    throw new Error('userName es requerido para enviar mensajes');
-  }
-  if (!normalizedText) {
-    throw new Error('No se puede enviar un mensaje vacío');
-  }
+  if (!userId) throw new Error('userId es requerido para enviar mensajes');
+  if (!userName) throw new Error('userName es requerido para enviar mensajes');
+  if (!text) throw new Error('No se puede enviar un mensaje vacío');
 
-  try {
-    await ensureThread(normalizedUserId, normalizedUserName);
+  const chatId = await ensureThread(userId, userName);
 
-    const createdAt = Timestamp.now();
-    const messagePayload: Omit<SupportChatMessage, 'id'> = {
-      userId: normalizedUserId,
-      userName: normalizedUserName,
-      sender,
-      ...(normalizedSenderName ? { senderName: normalizedSenderName } : {}),
-      text: normalizedText,
-      createdAt
-    };
+  const { data, error } = await supabase.from('chat_messages').insert({
+    chat_id: chatId,
+    sender,
+    sender_name: params.senderName?.trim() ?? null,
+    text,
+    user_id: userId,
+    user_name: userName
+  }).select('id').single();
 
-    const messageRef = await addDoc(buildMessagesCollectionRef(normalizedUserId), messagePayload);
+  if (error) throw error;
 
-    const isUserMessage = sender === SupportChatSender.USER;
-    const updatePayload: Partial<SupportChatThread> = {
-      userId: normalizedUserId,
-      userName: normalizedUserName,
-      lastMessage: normalizedText.substring(0, 250),
-      lastSender: sender,
-      hasUnreadForAdmin: isUserMessage,
-      hasUnreadForUser: !isUserMessage,
-      lastMessageAt: createdAt,
-      updatedAt: createdAt,
-      ...(isUserMessage ? { userLastReadAt: createdAt } : { adminLastReadAt: createdAt })
-    };
+  const isUser = sender === SupportChatSender.USER;
+  await supabase.from('support_chats').update({
+    last_message: text.substring(0, 250),
+    last_sender: sender,
+    has_unread_for_admin: isUser,
+    has_unread_for_user: !isUser,
+    last_message_at: new Date().toISOString(),
+    ...(isUser ? { user_last_read_at: new Date().toISOString() } : { admin_last_read_at: new Date().toISOString() })
+  }).eq('user_id', userId);
 
-    await setDoc(buildThreadRef(normalizedUserId), updatePayload, { merge: true });
-
-    return messageRef.id;
-  } catch (error) {
-    console.error('Error sending support chat message:', error);
-    throw error;
-  }
+  return data.id;
 };
 
-/**
- * Marca como leído el chat para el usuario final.
- */
 export const markSupportChatAsReadByUser = async (userId: string): Promise<void> => {
   if (!userId?.trim()) return;
-
-  await setDoc(
-    buildThreadRef(normalizeUserId(userId)),
-    {
-      hasUnreadForUser: false,
-      userLastReadAt: Timestamp.now()
-    },
-    { merge: true }
-  );
+  await supabase.from('support_chats').update({
+    has_unread_for_user: false,
+    user_last_read_at: new Date().toISOString()
+  }).eq('user_id', userId.trim());
 };
 
-/**
- * Marca como leído el chat para soporte/admin.
- */
 export const markSupportChatAsReadByAdmin = async (userId: string): Promise<void> => {
   if (!userId?.trim()) return;
-
-  await setDoc(
-    buildThreadRef(normalizeUserId(userId)),
-    {
-      hasUnreadForAdmin: false,
-      adminLastReadAt: Timestamp.now()
-    },
-    { merge: true }
-  );
+  await supabase.from('support_chats').update({
+    has_unread_for_admin: false,
+    admin_last_read_at: new Date().toISOString()
+  }).eq('user_id', userId.trim());
 };
 
-/**
- * Obtiene cantidad de conversaciones con mensajes no leídos para soporte/admin.
- */
 export const getSupportChatUnreadCountForAdmin = async (maxItems = 500): Promise<number> => {
-  const threads = await getSupportChatThreads(maxItems);
-  return threads.filter((thread) => thread.hasUnreadForAdmin).length;
+  const { count, error } = await supabase
+    .from('support_chats')
+    .select('*', { count: 'exact', head: true })
+    .eq('has_unread_for_admin', true)
+    .limit(maxItems);
+
+  if (error) return 0;
+  return count ?? 0;
 };
 
-/**
- * Obtiene si el usuario tiene mensajes no leídos en su chat.
- */
 export const getSupportChatHasUnreadForUser = async (userId: string): Promise<boolean> => {
-  const thread = await getSupportChatThread(userId);
-  return Boolean(thread?.hasUnreadForUser);
+  const { data } = await supabase
+    .from('support_chats')
+    .select('has_unread_for_user')
+    .eq('user_id', userId)
+    .single();
+
+  return data?.has_unread_for_user ?? false;
 };

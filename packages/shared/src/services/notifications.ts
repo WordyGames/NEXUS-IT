@@ -1,404 +1,224 @@
+import { supabase } from '../config/supabase';
 import {
-  collection,
-  query,
-  where,
-  limit,
-  getDocs,
-  addDoc,
-  updateDoc,
-  doc,
-  deleteDoc,
-  Timestamp,
-  writeBatch
-} from 'firebase/firestore';
-import { db } from '../config/firebase';
-import {
-  Notification,
-  NotificationType,
-  Equipment,
-  Ticket,
-  Maintenance,
-  TicketStatus
+  Notification, NotificationType,
+  Equipment, Ticket, Maintenance, TicketStatus
 } from '../types';
 
-/**
- * Servicio de notificaciones inteligentes
- * Gestiona alertas de garantía, mantenimiento y cambios de tickets
- */
-
-const toDate = (value: any): Date => {
-  if (!value) return new Date(0);
-  if (value instanceof Date) return value;
-  if (typeof value === 'object' && typeof value.toDate === 'function') {
-    return value.toDate();
-  }
-  if (typeof value === 'object' && typeof value.seconds === 'number') {
-    return new Date(value.seconds * 1000);
-  }
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? new Date(0) : parsed;
+const toDate = (v: string | null | undefined): Date => {
+  if (!v) return new Date(0);
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? new Date(0) : d;
 };
 
-const WARRANTY_NOTIFICATION_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24h
-const MAINTENANCE_NOTIFICATION_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24h
-const STATUS_NOTIFICATION_COOLDOWN_MS = 10 * 60 * 1000; // 10m
-const COMMENT_NOTIFICATION_COOLDOWN_MS = 2 * 60 * 1000; // 2m
+const WARRANTY_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const MAINTENANCE_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const STATUS_COOLDOWN_MS = 10 * 60 * 1000;
+const COMMENT_COOLDOWN_MS = 2 * 60 * 1000;
 
-const hasRecentDuplicateNotification = async (params: {
+const rowToNotification = (row: any): Notification => ({
+  id: row.id,
+  userId: row.user_id,
+  type: row.type as NotificationType,
+  title: row.title,
+  message: row.message,
+  read: row.read,
+  dedupeKey: row.dedupe_key ?? undefined,
+  references: {
+    equipmentId: row.equipment_id ?? undefined,
+    ticketId: row.ticket_id ?? undefined,
+    maintenanceId: row.maintenance_id ?? undefined
+  },
+  createdAt: toDate(row.created_at),
+  expiresAt: toDate(row.expires_at)
+});
+
+const hasRecentDuplicate = async (params: {
   userId: string;
   type: NotificationType;
   dedupeKey: string;
   cooldownMs: number;
 }): Promise<boolean> => {
   const { userId, type, dedupeKey, cooldownMs } = params;
+  const since = new Date(Date.now() - cooldownMs).toISOString();
 
-  const q = query(
-    collection(db, 'notifications'),
-    where('userId', '==', userId),
-    where('type', '==', type),
-    limit(200)
-  );
+  const { data } = await supabase
+    .from('notifications')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('type', type)
+    .eq('dedupe_key', dedupeKey)
+    .gte('created_at', since)
+    .limit(1);
 
-  const snapshot = await getDocs(q);
-  const nowMs = Date.now();
-
-  return snapshot.docs.some((snapshotDoc) => {
-    const data = snapshotDoc.data() as Notification;
-    if ((data as any).dedupeKey !== dedupeKey) return false;
-
-    const createdAtMs = toDate(data.createdAt as any).getTime();
-    if (createdAtMs <= 0) return false;
-
-    return nowMs - createdAtMs < cooldownMs;
-  });
+  return (data?.length ?? 0) > 0;
 };
 
-// Obtener notificaciones del usuario
 export async function getUserNotifications(userId: string): Promise<Notification[]> {
-  try {
-    // Query sin orderBy para evitar necesidad de índice compuesto
-    const q = query(
-      collection(db, 'notifications'),
-      where('userId', '==', userId),
-      limit(100)
-    );
-    const snapshot = await getDocs(q);
-    const notifications = snapshot.docs.map(doc => ({
-      ...(doc.data() as Notification),
-      id: doc.id
-    }));
-    
-    // Ordenar en memoria en lugar de en Firestore
-    return notifications.sort((a, b) => {
-      const dateA = toDate(a.createdAt as any).getTime();
-      const dateB = toDate(b.createdAt as any).getTime();
-      return dateB - dateA; // desc
-    });
-  } catch (error) {
-    console.error('Error fetching notifications:', error);
-    return [];
-  }
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (error) return [];
+  return (data ?? []).map(rowToNotification);
 }
 
-// Obtener notificaciones no leídas
 export async function getUnreadNotifications(userId: string): Promise<number> {
-  try {
-    const q = query(
-      collection(db, 'notifications'),
-      where('userId', '==', userId),
-      where('read', '==', false)
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.size;
-  } catch (error) {
-    console.error('Error fetching unread count:', error);
-    return 0;
-  }
+  const { count, error } = await supabase
+    .from('notifications')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('read', false);
+
+  if (error) return 0;
+  return count ?? 0;
 }
 
-// Marcar notificación como leída
 export async function markNotificationAsRead(notificationId: string): Promise<void> {
-  try {
-    const notifRef = doc(db, 'notifications', notificationId);
-    await updateDoc(notifRef, { read: true });
-  } catch (error) {
-    console.error('Error marking notification as read:', error);
-  }
+  await supabase.from('notifications').update({ read: true }).eq('id', notificationId);
 }
 
-// Marcar todas como leídas
 export async function markAllAsRead(userId: string): Promise<void> {
-  try {
-    const q = query(
-      collection(db, 'notifications'),
-      where('userId', '==', userId),
-      where('read', '==', false)
-    );
-    const snapshot = await getDocs(q);
-    const batch = writeBatch(db);
-    
-    snapshot.docs.forEach(doc => {
-      batch.update(doc.ref, { read: true });
-    });
-    
-    await batch.commit();
-  } catch (error) {
-    console.error('Error marking all as read:', error);
-  }
+  await supabase
+    .from('notifications')
+    .update({ read: true })
+    .eq('user_id', userId)
+    .eq('read', false);
 }
 
-// Eliminar notificación
 export async function deleteNotification(notificationId: string): Promise<void> {
-  try {
-    await deleteDoc(doc(db, 'notifications', notificationId));
-  } catch (error) {
-    console.error('Error deleting notification:', error);
-  }
+  await supabase.from('notifications').delete().eq('id', notificationId);
 }
 
-// Crear notificación de garantía próxima a vencer (30 días)
 export async function createWarrantyExpiringNotification(
   equipment: Equipment,
   userId: string
 ): Promise<void> {
   if (!equipment.warrantyExpiration) return;
 
-  try {
-    const warrantyDate = new Date(equipment.warrantyExpiration as any);
-    const daysUntilExpiration = Math.floor(
-      (warrantyDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-    );
+  const warrantyDate = new Date(equipment.warrantyExpiration as any);
+  const days = Math.floor((warrantyDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  if (days > 30 || days <= 0) return;
 
-    if (daysUntilExpiration <= 30 && daysUntilExpiration > 0) {
-      const equipmentKey = equipment.id || `${equipment.company}:${equipment.name}`;
-      const warrantyKey = warrantyDate.toISOString().slice(0, 10);
-      const dedupeKey = `warranty:${equipmentKey}:${warrantyKey}`;
+  const dedupeKey = `warranty:${equipment.id}:${warrantyDate.toISOString().slice(0, 10)}`;
+  if (await hasRecentDuplicate({ userId, type: NotificationType.WARRANTY_EXPIRING, dedupeKey, cooldownMs: WARRANTY_COOLDOWN_MS })) return;
 
-      const isDuplicate = await hasRecentDuplicateNotification({
-        userId,
-        type: NotificationType.WARRANTY_EXPIRING,
-        dedupeKey,
-        cooldownMs: WARRANTY_NOTIFICATION_COOLDOWN_MS
-      });
-      if (isDuplicate) return;
-
-      await addDoc(collection(db, 'notifications'), {
-        userId,
-        type: NotificationType.WARRANTY_EXPIRING,
-        dedupeKey,
-        title: `⚠️ Garantía próxima a vencer`,
-        message: `El equipo "${equipment.name}" vence garantía en ${daysUntilExpiration} días (${warrantyDate.toLocaleDateString()})`,
-        read: false,
-        references: {
-          equipmentId: equipment.id
-        },
-        createdAt: Timestamp.now(),
-        expiresAt: Timestamp.fromDate(warrantyDate)
-      });
-    }
-  } catch (error) {
-    console.error('Error creating warranty notification:', error);
-  }
+  await supabase.from('notifications').insert({
+    user_id: userId,
+    type: NotificationType.WARRANTY_EXPIRING,
+    dedupe_key: dedupeKey,
+    title: '⚠️ Garantía próxima a vencer',
+    message: `El equipo "${equipment.name}" vence garantía en ${days} días (${warrantyDate.toLocaleDateString()})`,
+    read: false,
+    equipment_id: equipment.id,
+    expires_at: warrantyDate.toISOString()
+  });
 }
 
-// Crear notificación de mantenimiento próximo
 export async function createMaintenanceUpcomingNotification(
   maintenance: Maintenance,
   users: string[]
 ): Promise<void> {
   if (!maintenance.scheduledDate) return;
 
-  try {
-    const scheduledDate = new Date(maintenance.scheduledDate as any);
-    const daysUntilMaintenance = Math.floor(
-      (scheduledDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-    );
+  const scheduledDate = new Date(maintenance.scheduledDate as any);
+  const days = Math.floor((scheduledDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  if (days > 7 || days < 0) return;
 
-    // Notificar si es en los próximos 7 días
-    if (daysUntilMaintenance <= 7 && daysUntilMaintenance >= 0) {
-      const maintenanceDateKey = scheduledDate.toISOString().slice(0, 10);
-      for (const userId of users) {
-        const dedupeKey = `maintenance:${maintenance.id}:${maintenanceDateKey}`;
+  const dateKey = scheduledDate.toISOString().slice(0, 10);
+  for (const userId of users) {
+    const dedupeKey = `maintenance:${maintenance.id}:${dateKey}`;
+    if (await hasRecentDuplicate({ userId, type: NotificationType.MAINTENANCE_UPCOMING, dedupeKey, cooldownMs: MAINTENANCE_COOLDOWN_MS })) continue;
 
-        const isDuplicate = await hasRecentDuplicateNotification({
-          userId,
-          type: NotificationType.MAINTENANCE_UPCOMING,
-          dedupeKey,
-          cooldownMs: MAINTENANCE_NOTIFICATION_COOLDOWN_MS
-        });
-        if (isDuplicate) continue;
-
-        await addDoc(collection(db, 'notifications'), {
-          userId,
-          type: NotificationType.MAINTENANCE_UPCOMING,
-          dedupeKey,
-          title: `🔧 Mantenimiento próximo`,
-          message: `Mantenimiento programado en ${daysUntilMaintenance} días (${scheduledDate.toLocaleDateString()})`,
-          read: false,
-          references: {
-            maintenanceId: maintenance.id,
-            equipmentId: maintenance.equipmentId
-          },
-          createdAt: Timestamp.now(),
-          expiresAt: Timestamp.fromDate(scheduledDate)
-        });
-      }
-    }
-  } catch (error) {
-    console.error('Error creating maintenance notification:', error);
+    await supabase.from('notifications').insert({
+      user_id: userId,
+      type: NotificationType.MAINTENANCE_UPCOMING,
+      dedupe_key: dedupeKey,
+      title: '🔧 Mantenimiento próximo',
+      message: `Mantenimiento programado en ${days} días (${scheduledDate.toLocaleDateString()})`,
+      read: false,
+      maintenance_id: maintenance.id,
+      equipment_id: maintenance.equipmentId,
+      expires_at: scheduledDate.toISOString()
+    });
   }
 }
 
-// Crear notificación de cambio de estado de ticket
 export async function createTicketStatusChangeNotification(
   ticket: Ticket,
   previousStatus: TicketStatus,
   changedBy: string,
   changedByName: string
 ): Promise<void> {
-  try {
-    // Notificar al creador y al asignado si cambió de estado
-    const affectedUsers = new Set<string>();
-    if (ticket.createdBy) affectedUsers.add(ticket.createdBy);
-    if (ticket.assignedTo) affectedUsers.add(ticket.assignedTo);
+  const affected = new Set<string>();
+  if (ticket.createdBy) affected.add(ticket.createdBy);
+  if (ticket.assignedTo) affected.add(ticket.assignedTo);
+  affected.delete(changedBy);
 
-    // No notificar a quien hizo el cambio
-    affectedUsers.delete(changedBy);
+  for (const userId of affected) {
+    const dedupeKey = `ticket-status:${ticket.id}:${previousStatus}->${ticket.status}:${changedBy}`;
+    if (await hasRecentDuplicate({ userId, type: NotificationType.TICKET_STATUS_CHANGED, dedupeKey, cooldownMs: STATUS_COOLDOWN_MS })) continue;
 
-    for (const userId of affectedUsers) {
-      const dedupeKey = `ticket-status:${ticket.id}:${previousStatus}->${ticket.status}:${changedBy}`;
-
-      const isDuplicate = await hasRecentDuplicateNotification({
-        userId,
-        type: NotificationType.TICKET_STATUS_CHANGED,
-        dedupeKey,
-        cooldownMs: STATUS_NOTIFICATION_COOLDOWN_MS
-      });
-      if (isDuplicate) continue;
-
-      await addDoc(collection(db, 'notifications'), {
-        userId,
-        type: NotificationType.TICKET_STATUS_CHANGED,
-        dedupeKey,
-        title: `📌 Cambio de estado en ticket`,
-        message: `Ticket #${ticket.ticketNumber} cambió de "${previousStatus}" a "${ticket.status}" por ${changedByName}`,
-        read: false,
-        references: {
-          ticketId: ticket.id
-        },
-        createdAt: Timestamp.now(),
-        expiresAt: Timestamp.fromDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000))
-      });
-    }
-  } catch (error) {
-    console.error('Error creating status change notification:', error);
+    await supabase.from('notifications').insert({
+      user_id: userId,
+      type: NotificationType.TICKET_STATUS_CHANGED,
+      dedupe_key: dedupeKey,
+      title: '📌 Cambio de estado en ticket',
+      message: `Ticket #${ticket.ticketNumber} cambió de "${previousStatus}" a "${ticket.status}" por ${changedByName}`,
+      read: false,
+      ticket_id: ticket.id,
+      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    });
   }
 }
 
-// Crear notificación de comentario en ticket
 export async function createTicketCommentNotification(
   ticket: Ticket,
   commentedBy: string,
   commentedByName: string,
   excerpt: string
 ): Promise<void> {
-  try {
-    // Notificar a todos excepto quién comentó
-    const affectedUsers = new Set<string>();
-    if (ticket.createdBy) affectedUsers.add(ticket.createdBy);
-    if (ticket.assignedTo) affectedUsers.add(ticket.assignedTo);
-    affectedUsers.delete(commentedBy);
+  const affected = new Set<string>();
+  if (ticket.createdBy) affected.add(ticket.createdBy);
+  if (ticket.assignedTo) affected.add(ticket.assignedTo);
+  affected.delete(commentedBy);
 
-    for (const userId of affectedUsers) {
-      const normalizedExcerpt = excerpt.trim().toLowerCase().slice(0, 40);
-      const dedupeKey = `ticket-comment:${ticket.id}:${commentedBy}:${normalizedExcerpt}`;
+  for (const userId of affected) {
+    const dedupeKey = `ticket-comment:${ticket.id}:${commentedBy}:${excerpt.trim().toLowerCase().slice(0, 40)}`;
+    if (await hasRecentDuplicate({ userId, type: NotificationType.TICKET_COMMENTED, dedupeKey, cooldownMs: COMMENT_COOLDOWN_MS })) continue;
 
-      const isDuplicate = await hasRecentDuplicateNotification({
-        userId,
-        type: NotificationType.TICKET_COMMENTED,
-        dedupeKey,
-        cooldownMs: COMMENT_NOTIFICATION_COOLDOWN_MS
-      });
-      if (isDuplicate) continue;
-
-      await addDoc(collection(db, 'notifications'), {
-        userId,
-        type: NotificationType.TICKET_COMMENTED,
-        dedupeKey,
-        title: `💬 Nuevo comentario en ticket`,
-        message: `${commentedByName} comentó en #${ticket.ticketNumber}: "${excerpt.substring(0, 50)}..."`,
-        read: false,
-        references: {
-          ticketId: ticket.id
-        },
-        createdAt: Timestamp.now(),
-        expiresAt: Timestamp.fromDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000))
-      });
-    }
-  } catch (error) {
-    console.error('Error creating comment notification:', error);
-  }
-}
-
-// Limpiar notificaciones expiradas
-export async function cleanExpiredNotifications(): Promise<void> {
-  try {
-    const q = query(
-      collection(db, 'notifications'),
-      where('expiresAt', '<', Timestamp.now())
-    );
-    
-    const snapshot = await getDocs(q);
-    const batch = writeBatch(db);
-    
-    snapshot.docs.forEach(doc => {
-      batch.delete(doc.ref);
+    await supabase.from('notifications').insert({
+      user_id: userId,
+      type: NotificationType.TICKET_COMMENTED,
+      dedupe_key: dedupeKey,
+      title: '💬 Nuevo comentario en ticket',
+      message: `${commentedByName} comentó en #${ticket.ticketNumber}: "${excerpt.substring(0, 50)}..."`,
+      read: false,
+      ticket_id: ticket.id,
+      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
     });
-    
-    if (snapshot.size > 0) {
-      await batch.commit();
-    }
-  } catch (error) {
-    console.error('Error cleaning expired notifications:', error);
   }
 }
 
-// Obtener resumen de notificaciones para dashboard
-export async function getNotificationsSummary(userId: string) {
-  try {
-    const q = query(
-      collection(db, 'notifications'),
-      where('userId', '==', userId),
-      limit(100)
-    );
-    
-    const snapshot = await getDocs(q);
-    const notifications = snapshot.docs.map(doc => ({
-      ...(doc.data() as Notification),
-      id: doc.id
-    }));
+export async function cleanExpiredNotifications(): Promise<void> {
+  await supabase
+    .from('notifications')
+    .delete()
+    .lt('expires_at', new Date().toISOString());
+}
 
-    return {
-      total: notifications.length,
-      unread: notifications.filter(n => !n.read).length,
-      byType: {
-        warranty: notifications.filter(n => n.type === NotificationType.WARRANTY_EXPIRING).length,
-        maintenance: notifications.filter(n => n.type === NotificationType.MAINTENANCE_UPCOMING).length,
-        ticketStatus: notifications.filter(n => n.type === NotificationType.TICKET_STATUS_CHANGED).length,
-        ticketComment: notifications.filter(n => n.type === NotificationType.TICKET_COMMENTED).length
-      }
-    };
-  } catch (error) {
-    console.error('Error getting notifications summary:', error);
-    return {
-      total: 0,
-      unread: 0,
-      byType: {
-        warranty: 0,
-        maintenance: 0,
-        ticketStatus: 0,
-        ticketComment: 0
-      }
-    };
-  }
+export async function getNotificationsSummary(userId: string) {
+  const notifications = await getUserNotifications(userId);
+  return {
+    total: notifications.length,
+    unread: notifications.filter(n => !n.read).length,
+    byType: {
+      warranty: notifications.filter(n => n.type === NotificationType.WARRANTY_EXPIRING).length,
+      maintenance: notifications.filter(n => n.type === NotificationType.MAINTENANCE_UPCOMING).length,
+      ticketStatus: notifications.filter(n => n.type === NotificationType.TICKET_STATUS_CHANGED).length,
+      ticketComment: notifications.filter(n => n.type === NotificationType.TICKET_COMMENTED).length
+    }
+  };
 }

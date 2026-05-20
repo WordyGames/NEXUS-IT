@@ -1,213 +1,148 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  addDoc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  orderBy,
-  Timestamp,
-  QueryConstraint
-} from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { supabase } from '../config/supabase';
 import { Equipment, EquipmentFilters } from '../types';
 import { deleteFile, resolveAttachmentStoragePath } from './storage';
 
-const COLLECTION_NAME = 'equipment';
+const toDate = (v: string | null | undefined): Date | undefined => {
+  if (!v) return undefined;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? undefined : d;
+};
 
-/**
- * Obtiene todos los equipos con filtros opcionales
- */
+const rowToEquipment = (row: any): Equipment => ({
+  id: row.id,
+  name: row.name,
+  type: row.type,
+  company: row.company,
+  specs: row.specs ?? {},
+  location: row.location ?? '',
+  assignedTo: row.assigned_to ?? undefined,
+  status: row.status,
+  notes: row.notes ?? undefined,
+  attachments: row.attachments ?? [],
+  warrantyExpiration: toDate(row.warranty_expiration),
+  purchaseDate: toDate(row.purchase_date),
+  createdAt: toDate(row.created_at) ?? new Date(),
+  updatedAt: toDate(row.updated_at) ?? new Date(),
+  createdBy: row.created_by ?? ''
+});
+
 export const getEquipment = async (filters?: EquipmentFilters): Promise<Equipment[]> => {
-  try {
-    const constraints: QueryConstraint[] = [];
-    
-    if (filters?.company) {
-      constraints.push(where('company', '==', filters.company));
-    }
-    if (filters?.type) {
-      constraints.push(where('type', '==', filters.type));
-    }
-    if (filters?.status) {
-      constraints.push(where('status', '==', filters.status));
-    }
-    if (filters?.assignedTo) {
-      constraints.push(where('assignedTo', '==', filters.assignedTo));
-    }
-    
-    // NO usar orderBy en Firestore cuando hay filtros (evita requerir índices compuestos)
-    // Solo ordenar en Firestore si NO hay ningún filtro
-    const hasAnyFilter = filters?.company || filters?.type || filters?.status || filters?.assignedTo;
-    if (!hasAnyFilter) {
-      constraints.push(orderBy('createdAt', 'desc'));
-    }
-    
-    const q = query(collection(db, COLLECTION_NAME), ...constraints);
-    const querySnapshot = await getDocs(q);
-    
-    let equipment = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as Equipment[];
-    
-    // Si hay algún filtro, ordenar en el cliente
-    if (hasAnyFilter) {
-      equipment.sort((a, b) => {
-        const aTime = a.createdAt instanceof Timestamp ? a.createdAt.toMillis() : new Date(a.createdAt).getTime();
-        const bTime = b.createdAt instanceof Timestamp ? b.createdAt.toMillis() : new Date(b.createdAt).getTime();
-        return bTime - aTime; // Descendente
-      });
-    }
-    
-    // Filtro de búsqueda en cliente
-    if (filters?.search) {
-      const searchLower = filters.search.toLowerCase();
-      equipment = equipment.filter(eq => 
-        eq.name.toLowerCase().includes(searchLower) ||
-        eq.specs?.hostname?.toLowerCase().includes(searchLower) ||
-        eq.specs?.serialNumber?.toLowerCase().includes(searchLower) ||
-        eq.location.toLowerCase().includes(searchLower)
-      );
-    }
-    
-    return equipment;
-  } catch (error) {
-    console.error('Error getting equipment:', error);
-    throw error;
+  let q = supabase.from('equipment').select('*');
+
+  if (filters?.company) q = q.eq('company', filters.company);
+  if (filters?.type) q = q.eq('type', filters.type);
+  if (filters?.status) q = q.eq('status', filters.status);
+  if (filters?.assignedTo) q = q.eq('assigned_to', filters.assignedTo);
+
+  q = q.order('created_at', { ascending: false });
+
+  const { data, error } = await q;
+  if (error) throw error;
+
+  let equipment = (data ?? []).map(rowToEquipment);
+
+  if (filters?.search) {
+    const s = filters.search.toLowerCase();
+    equipment = equipment.filter(eq =>
+      eq.name.toLowerCase().includes(s) ||
+      eq.specs?.hostname?.toLowerCase().includes(s) ||
+      eq.specs?.serialNumber?.toLowerCase().includes(s) ||
+      (eq.location ?? '').toLowerCase().includes(s)
+    );
   }
+
+  return equipment;
 };
 
-/**
- * Obtiene un equipo por ID
- */
 export const getEquipmentById = async (id: string): Promise<Equipment | null> => {
-  try {
-    const docRef = doc(db, COLLECTION_NAME, id);
-    const docSnap = await getDoc(docRef);
-    
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() } as Equipment;
-    }
-    return null;
-  } catch (error) {
-    console.error('Error getting equipment by ID:', error);
-    throw error;
-  }
+  const { data, error } = await supabase
+    .from('equipment')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error || !data) return null;
+  return rowToEquipment(data);
 };
 
-/**
- * Crea un nuevo equipo
- */
 export const createEquipment = async (
   equipment: Omit<Equipment, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }
 ): Promise<string> => {
-  try {
-    const now = Timestamp.now();
-    const { id: providedId, ...equipmentData } = equipment;
+  const { id: providedId, ...rest } = equipment;
 
-    if (providedId) {
-      const docRef = doc(db, COLLECTION_NAME, providedId);
-      await setDoc(docRef, {
-        ...equipmentData,
-        createdAt: now,
-        updatedAt: now
-      });
-      return providedId;
-    }
+  const payload: any = {
+    name: rest.name,
+    type: rest.type,
+    company: rest.company,
+    specs: rest.specs ?? {},
+    location: rest.location,
+    assigned_to: rest.assignedTo ?? null,
+    status: rest.status,
+    notes: rest.notes ?? null,
+    attachments: rest.attachments ?? [],
+    warranty_expiration: rest.warrantyExpiration ? new Date(rest.warrantyExpiration as any).toISOString() : null,
+    purchase_date: rest.purchaseDate ? new Date(rest.purchaseDate as any).toISOString() : null,
+    created_by: rest.createdBy
+  };
 
-    const docRef = await addDoc(collection(db, COLLECTION_NAME), {
-      ...equipmentData,
-      createdAt: now,
-      updatedAt: now
-    });
-    return docRef.id;
-  } catch (error) {
-    console.error('Error creating equipment:', error);
-    throw error;
-  }
+  if (providedId) payload.id = providedId;
+
+  const { data, error } = await supabase.from('equipment').insert(payload).select('id').single();
+  if (error) throw error;
+  return data.id;
 };
 
-/**
- * Actualiza un equipo existente
- */
 export const updateEquipment = async (id: string, data: Partial<Equipment>): Promise<void> => {
-  try {
-    const docRef = doc(db, COLLECTION_NAME, id);
-    await updateDoc(docRef, {
-      ...data,
-      updatedAt: Timestamp.now()
-    });
-  } catch (error) {
-    console.error('Error updating equipment:', error);
-    throw error;
+  const updates: any = { updated_at: new Date().toISOString() };
+
+  if (data.name !== undefined) updates.name = data.name;
+  if (data.type !== undefined) updates.type = data.type;
+  if (data.company !== undefined) updates.company = data.company;
+  if (data.specs !== undefined) updates.specs = data.specs;
+  if (data.location !== undefined) updates.location = data.location;
+  if (data.assignedTo !== undefined) updates.assigned_to = data.assignedTo ?? null;
+  if (data.status !== undefined) updates.status = data.status;
+  if (data.notes !== undefined) updates.notes = data.notes ?? null;
+  if (data.attachments !== undefined) updates.attachments = data.attachments;
+  if (data.warrantyExpiration !== undefined) {
+    updates.warranty_expiration = data.warrantyExpiration
+      ? new Date(data.warrantyExpiration as any).toISOString()
+      : null;
   }
+  if (data.purchaseDate !== undefined) {
+    updates.purchase_date = data.purchaseDate ? new Date(data.purchaseDate as any).toISOString() : null;
+  }
+
+  const { error } = await supabase.from('equipment').update(updates).eq('id', id);
+  if (error) throw error;
 };
 
-/**
- * Elimina un equipo
- */
 export const deleteEquipment = async (id: string): Promise<void> => {
-  try {
-    const docRef = doc(db, COLLECTION_NAME, id);
-
-    // Limpiar adjuntos asociados en Storage antes de eliminar el documento
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      const equipment = docSnap.data() as Equipment;
-      const attachments = equipment.attachments || [];
-
-      if (attachments.length > 0) {
-        const deletions = attachments.map(async (attachment) => {
-          const storagePath = resolveAttachmentStoragePath(attachment);
-          if (!storagePath) return;
-          await deleteFile(storagePath);
-        });
-
-        const results = await Promise.allSettled(deletions);
-        const failedDeletes = results.filter((result) => result.status === 'rejected');
-
-        if (failedDeletes.length > 0) {
-          console.error(`Error deleting ${failedDeletes.length} equipment attachment(s) from storage`);
-        }
-      }
-    }
-
-    await deleteDoc(docRef);
-  } catch (error) {
-    console.error('Error deleting equipment:', error);
-    throw error;
+  const eq = await getEquipmentById(id);
+  if (eq?.attachments?.length) {
+    await Promise.allSettled(
+      eq.attachments.map(a => {
+        const p = resolveAttachmentStoragePath(a);
+        return p ? deleteFile(p) : Promise.resolve();
+      })
+    );
   }
+
+  const { error } = await supabase.from('equipment').delete().eq('id', id);
+  if (error) throw error;
 };
 
-/**
- * Obtiene estadísticas de equipos
- */
 export const getEquipmentStats = async () => {
-  try {
-    const equipment = await getEquipment();
-    
-    const byCompany: Record<string, number> = {};
-    const byStatus: Record<string, number> = {};
-    const byType: Record<string, number> = {};
-    
-    equipment.forEach(eq => {
-      byCompany[eq.company] = (byCompany[eq.company] || 0) + 1;
-      byStatus[eq.status] = (byStatus[eq.status] || 0) + 1;
-      byType[eq.type] = (byType[eq.type] || 0) + 1;
-    });
-    
-    return {
-      total: equipment.length,
-      byCompany,
-      byStatus,
-      byType
-    };
-  } catch (error) {
-    console.error('Error getting equipment stats:', error);
-    throw error;
-  }
+  const equipment = await getEquipment();
+  const byCompany: Record<string, number> = {};
+  const byStatus: Record<string, number> = {};
+  const byType: Record<string, number> = {};
+
+  equipment.forEach(eq => {
+    byCompany[eq.company] = (byCompany[eq.company] || 0) + 1;
+    byStatus[eq.status] = (byStatus[eq.status] || 0) + 1;
+    byType[eq.type] = (byType[eq.type] || 0) + 1;
+  });
+
+  return { total: equipment.length, byCompany, byStatus, byType };
 };
