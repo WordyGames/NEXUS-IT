@@ -64,30 +64,31 @@ interface StatCardProps {
 }
 
 const statColors = {
-  blue:   { bg: 'bg-blue-50   dark:bg-blue-900/30',   text: 'text-blue-600   dark:text-blue-400',   ring: 'ring-blue-100   dark:ring-blue-800' },
-  green:  { bg: 'bg-green-50  dark:bg-green-900/30',  text: 'text-green-600  dark:text-green-400',  ring: 'ring-green-100  dark:ring-green-800' },
-  yellow: { bg: 'bg-yellow-50 dark:bg-yellow-900/30', text: 'text-yellow-600 dark:text-yellow-400', ring: 'ring-yellow-100 dark:ring-yellow-800' },
-  red:    { bg: 'bg-red-50    dark:bg-red-900/30',    text: 'text-red-600    dark:text-red-400',    ring: 'ring-red-100    dark:ring-red-800' },
-  purple: { bg: 'bg-purple-50 dark:bg-purple-900/30', text: 'text-purple-600 dark:text-purple-400', ring: 'ring-purple-100 dark:ring-purple-800' },
-  cyan:   { bg: 'bg-cyan-50   dark:bg-cyan-900/30',   text: 'text-cyan-600   dark:text-cyan-400',   ring: 'ring-cyan-100   dark:ring-cyan-800' },
-  slate:  { bg: 'bg-slate-100 dark:bg-slate-700',     text: 'text-slate-500  dark:text-slate-400',  ring: 'ring-slate-200  dark:ring-slate-600' },
+  blue:   { bg: 'bg-gradient-to-br from-blue-50 to-blue-100/60   dark:from-blue-900/30 dark:to-blue-900/10',   text: 'text-blue-600   dark:text-blue-400',   ring: 'ring-blue-200/60   dark:ring-blue-700/40',   bar: 'bg-gradient-to-r from-blue-500 to-indigo-500' },
+  green:  { bg: 'bg-gradient-to-br from-green-50 to-green-100/60  dark:from-green-900/30 dark:to-green-900/10',  text: 'text-green-600  dark:text-green-400',  ring: 'ring-green-200/60  dark:ring-green-700/40',  bar: 'bg-gradient-to-r from-green-500 to-emerald-500' },
+  yellow: { bg: 'bg-gradient-to-br from-yellow-50 to-amber-100/60 dark:from-yellow-900/30 dark:to-yellow-900/10', text: 'text-yellow-600 dark:text-yellow-400', ring: 'ring-yellow-200/60 dark:ring-yellow-700/40', bar: 'bg-gradient-to-r from-yellow-500 to-amber-500' },
+  red:    { bg: 'bg-gradient-to-br from-red-50 to-rose-100/60     dark:from-red-900/30 dark:to-red-900/10',     text: 'text-red-600    dark:text-red-400',    ring: 'ring-red-200/60    dark:ring-red-700/40',    bar: 'bg-gradient-to-r from-red-500 to-rose-500' },
+  purple: { bg: 'bg-gradient-to-br from-purple-50 to-violet-100/60 dark:from-purple-900/30 dark:to-purple-900/10', text: 'text-purple-600 dark:text-purple-400', ring: 'ring-purple-200/60 dark:ring-purple-700/40', bar: 'bg-gradient-to-r from-purple-500 to-violet-500' },
+  cyan:   { bg: 'bg-gradient-to-br from-cyan-50 to-sky-100/60     dark:from-cyan-900/30 dark:to-cyan-900/10',   text: 'text-cyan-600   dark:text-cyan-400',   ring: 'ring-cyan-200/60   dark:ring-cyan-700/40',   bar: 'bg-gradient-to-r from-cyan-500 to-sky-500' },
+  slate:  { bg: 'bg-slate-100 dark:bg-slate-700',                                                                text: 'text-slate-500  dark:text-slate-400',  ring: 'ring-slate-200/60  dark:ring-slate-600/40',  bar: 'bg-gradient-to-r from-slate-400 to-slate-500' },
 };
 
 export const StatCard: React.FC<StatCardProps> = ({ label, value, icon, color = 'blue', trend }) => {
   const c = statColors[color];
   return (
-    <Card className="flex items-center gap-4">
+    <Card className="relative overflow-hidden flex items-center gap-4 pt-5">
+      <div className={`absolute top-0 left-0 right-0 h-0.5 ${c.bar}`} />
       {icon && (
-        <div className={`w-12 h-12 rounded-xl ${c.bg} ring-1 ${c.ring} flex items-center justify-center flex-shrink-0 ${c.text}`}>
+        <div className={`w-13 h-13 w-[52px] h-[52px] rounded-2xl ${c.bg} ring-1 ${c.ring} flex items-center justify-center flex-shrink-0 ${c.text} shadow-sm`}>
           {icon}
         </div>
       )}
       <div className="min-w-0">
-        <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{value}</p>
+        <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 tabular-nums">{value}</p>
         <p className="text-sm text-slate-500 dark:text-slate-400 truncate">{label}</p>
         {trend && (
-          <p className={`text-xs mt-0.5 ${trend.value >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-            {trend.value >= 0 ? '+' : ''}{trend.value}% {trend.label}
+          <p className={`text-xs mt-0.5 font-medium ${trend.value >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+            {trend.value >= 0 ? '↑' : '↓'} {Math.abs(trend.value)}% {trend.label}
           </p>
         )}
       </div>

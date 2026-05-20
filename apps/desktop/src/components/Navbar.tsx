@@ -55,7 +55,7 @@ const Navbar = () => {
   const btnNeutral = `${btnBase} bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-800 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200`;
 
   return (
-    <header className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-6 h-[60px] flex items-center justify-between flex-shrink-0 transition-colors">
+    <header className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border-b border-slate-100 dark:border-slate-800 px-6 h-[60px] flex items-center justify-between flex-shrink-0 transition-colors sticky top-0 z-30">
 
       {/* Left: greeting */}
       <div className="flex items-center gap-2">

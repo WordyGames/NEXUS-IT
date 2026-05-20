@@ -116,13 +116,13 @@ const normalizePermissionDependencies = (
 // ── Shared sub-components ────────────────────────────────────────────────────
 
 const Modal: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
     {children}
   </div>
 );
 
 const ModalBox: React.FC<{ children: React.ReactNode; wide?: boolean }> = ({ children, wide }) => (
-  <div className={`bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full ${wide ? 'max-w-4xl max-h-[90vh] overflow-y-auto' : 'max-w-md'} p-6`}>
+  <div className={`bg-white dark:bg-slate-800 rounded-2xl shadow-modal w-full ${wide ? 'max-w-4xl max-h-[90vh] overflow-y-auto' : 'max-w-md'} p-6 animate-bounce-in`}>
     {children}
   </div>
 );
@@ -574,14 +574,14 @@ const Users = () => {
                 <input type="text" placeholder="Nombre y apellidos" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className={inputCls} required />
               </Field>
               <Field label="Empresa" required>
-                <select value={formData.company} onChange={(e) => setFormData({ ...formData, company: e.target.value as Company })} className={inputCls} required>
+                <select title="Empresa" value={formData.company} onChange={(e) => setFormData({ ...formData, company: e.target.value as Company })} className={inputCls} required>
                   <option value={Company.ESPECIAS_NATURALES}>Especias Naturales del Norte</option>
                   <option value={Company.GRUPO_AMEX}>Grupo AMEX</option>
                   <option value={Company.EQUIPOS_OSENAL}>Equipos OSENAL</option>
                 </select>
               </Field>
               <Field label="Rol" required>
-                <select value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })} className={inputCls} required>
+                <select title="Rol" value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })} className={inputCls} required>
                   <option value={UserRole.USER}>Usuario</option>
                   <option value={UserRole.ADMIN}>Administrador</option>
                 </select>
@@ -611,29 +611,29 @@ const Users = () => {
             <ModalTitle>Editar Usuario</ModalTitle>
             <form onSubmit={handleUpdateUser} className="space-y-4">
               <Field label="Usuario" required>
-                <input type="text" value={editFormData.username} onChange={(e) => setEditFormData({ ...editFormData, username: e.target.value })} className={inputCls} required />
+                <input type="text" placeholder="ej. juan.perez" value={editFormData.username} onChange={(e) => setEditFormData({ ...editFormData, username: e.target.value })} className={inputCls} required />
               </Field>
               <Field label="Nombre Completo" required>
-                <input type="text" value={editFormData.name} onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })} className={inputCls} required />
+                <input type="text" placeholder="Nombre y apellidos" value={editFormData.name} onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })} className={inputCls} required />
               </Field>
               <Field label="Empresa" required>
-                <select value={editFormData.company} onChange={(e) => setEditFormData({ ...editFormData, company: e.target.value as Company })} className={inputCls} required>
+                <select title="Empresa" value={editFormData.company} onChange={(e) => setEditFormData({ ...editFormData, company: e.target.value as Company })} className={inputCls} required>
                   <option value={Company.ESPECIAS_NATURALES}>Especias Naturales del Norte</option>
                   <option value={Company.GRUPO_AMEX}>Grupo AMEX</option>
                   <option value={Company.EQUIPOS_OSENAL}>Equipos OSENAL</option>
                 </select>
               </Field>
               <Field label="Departamento">
-                <input type="text" value={editFormData.department} onChange={(e) => setEditFormData({ ...editFormData, department: e.target.value })} className={inputCls} />
+                <input type="text" placeholder="Departamento (opcional)" value={editFormData.department} onChange={(e) => setEditFormData({ ...editFormData, department: e.target.value })} className={inputCls} />
               </Field>
               <Field label="Teléfono" required>
-                <input type="tel" value={editFormData.phone} onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })} className={inputCls} required />
+                <input type="tel" placeholder="10 dígitos" value={editFormData.phone} onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })} className={inputCls} required />
               </Field>
               <Field label="Correo electrónico">
-                <input type="email" value={editFormData.email} onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })} className={inputCls} />
+                <input type="email" placeholder="correo@empresa.com (opcional)" value={editFormData.email} onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })} className={inputCls} />
               </Field>
               <Field label="Estado">
-                <select value={editFormData.isActive ? 'active' : 'inactive'} onChange={(e) => setEditFormData({ ...editFormData, isActive: e.target.value === 'active' })} className={inputCls}>
+                <select title="Estado" value={editFormData.isActive ? 'active' : 'inactive'} onChange={(e) => setEditFormData({ ...editFormData, isActive: e.target.value === 'active' })} className={inputCls}>
                   <option value="active">Activo</option>
                   <option value="inactive">Inactivo</option>
                 </select>
@@ -693,6 +693,7 @@ const Users = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
               <Field label="Rol base">
                 <select
+                  title="Rol base"
                   value={permissionRole}
                   onChange={(e) => {
                     const nextRole = e.target.value as UserRole;
