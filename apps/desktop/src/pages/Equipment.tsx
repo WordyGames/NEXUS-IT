@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { usePagination } from '../hooks/usePagination';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Equipment as EquipmentType,
@@ -37,7 +38,6 @@ const Equipment = () => {
   const [selectedEquipmentForQR, setSelectedEquipmentForQR] = useState<EquipmentType | null>(null);
   const [filters, setFilters] = useState<EquipmentFilters>({});
   const [searchInput, setSearchInput] = useState('');
-  const [page, setPage] = useState(1);
   const isFirstLoadRef = useRef(true);
 
   // Debounce search input → filters.search (300 ms)
@@ -90,8 +90,7 @@ const Equipment = () => {
     });
   }, [equipment, filters.search, usersById]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredEquipment.length / PAGE_SIZE));
-  const paginatedEquipment = filteredEquipment.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const { page, setPage, paginated: paginatedEquipment, totalPages } = usePagination(filteredEquipment, PAGE_SIZE);
 
   const getAssignedUserLabel = (eq: EquipmentType): string => {
     if (!eq.assignedTo) return 'Sin asignar';

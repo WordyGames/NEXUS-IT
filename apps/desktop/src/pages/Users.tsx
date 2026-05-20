@@ -5,14 +5,15 @@ import {
   UserPermission,
   Company,
   getDefaultPermissionsForRole,
-  resolveUserPermissions,
-  getPermissionOverrides,
   getUsers,
   createUser,
   updateUser,
   changePassword,
   deleteUser
 } from '@nexus-it/shared';
+import { usePagination } from '../hooks/usePagination';
+import { useModal } from '../hooks/useModal';
+import PermissionEditor from '../components/PermissionEditor';
 import { useAuth } from '../contexts/AuthContext';
 import { useUiFeedback } from '../contexts/UiFeedbackContext';
 import {
@@ -34,84 +35,6 @@ import {
 import { Button, Badge, Spinner, Card, EmptyState, Input, Select } from '../components/ui';
 
 const PAGE_SIZE = 20;
-
-const permissionLabels: Record<UserPermission, string> = {
-  [UserPermission.DASHBOARD_ADMIN]: 'Acceso a panel admin',
-  [UserPermission.EQUIPMENT_VIEW]: 'Ver equipos',
-  [UserPermission.EQUIPMENT_MANAGE]: 'Crear/editar/eliminar equipos',
-  [UserPermission.MAINTENANCES_VIEW]: 'Ver mantenimientos',
-  [UserPermission.MAINTENANCES_MANAGE]: 'Crear/editar/eliminar mantenimientos',
-  [UserPermission.REPORTS_VIEW]: 'Ver reportes',
-  [UserPermission.WARRANTY_VIEW]: 'Ver reporte de garantías',
-  [UserPermission.USERS_VIEW]: 'Ver módulo de usuarios',
-  [UserPermission.USERS_MANAGE]: 'Administrar usuarios y permisos',
-  [UserPermission.SETTINGS_VIEW]: 'Ver configuración',
-  [UserPermission.TICKETS_VIEW]: 'Ver tickets',
-  [UserPermission.TICKETS_VIEW_ALL]: 'Ver tickets de todos',
-  [UserPermission.TICKETS_CHANGE_STATUS]: 'Cambiar estado de tickets',
-  [UserPermission.NOTIFICATIONS_VIEW]: 'Ver notificaciones'
-};
-
-const permissionGroups: Array<{ title: string; permissions: UserPermission[] }> = [
-  {
-    title: 'Acceso general',
-    permissions: [
-      UserPermission.DASHBOARD_ADMIN,
-      UserPermission.SETTINGS_VIEW,
-      UserPermission.NOTIFICATIONS_VIEW
-    ]
-  },
-  {
-    title: 'Equipos y mantenimientos',
-    permissions: [
-      UserPermission.EQUIPMENT_VIEW,
-      UserPermission.EQUIPMENT_MANAGE,
-      UserPermission.MAINTENANCES_VIEW,
-      UserPermission.MAINTENANCES_MANAGE,
-      UserPermission.WARRANTY_VIEW
-    ]
-  },
-  {
-    title: 'Tickets',
-    permissions: [
-      UserPermission.TICKETS_VIEW,
-      UserPermission.TICKETS_VIEW_ALL,
-      UserPermission.TICKETS_CHANGE_STATUS
-    ]
-  },
-  {
-    title: 'Administración',
-    permissions: [
-      UserPermission.REPORTS_VIEW,
-      UserPermission.USERS_VIEW,
-      UserPermission.USERS_MANAGE
-    ]
-  }
-];
-
-const normalizePermissionDependencies = (
-  values: Record<UserPermission, boolean>
-): Record<UserPermission, boolean> => {
-  const normalized = { ...values };
-
-  if (normalized[UserPermission.EQUIPMENT_MANAGE]) normalized[UserPermission.EQUIPMENT_VIEW] = true;
-  if (!normalized[UserPermission.EQUIPMENT_VIEW]) normalized[UserPermission.EQUIPMENT_MANAGE] = false;
-
-  if (normalized[UserPermission.MAINTENANCES_MANAGE]) normalized[UserPermission.MAINTENANCES_VIEW] = true;
-  if (!normalized[UserPermission.MAINTENANCES_VIEW]) normalized[UserPermission.MAINTENANCES_MANAGE] = false;
-
-  if (normalized[UserPermission.TICKETS_VIEW_ALL] || normalized[UserPermission.TICKETS_CHANGE_STATUS])
-    normalized[UserPermission.TICKETS_VIEW] = true;
-  if (!normalized[UserPermission.TICKETS_VIEW]) {
-    normalized[UserPermission.TICKETS_VIEW_ALL] = false;
-    normalized[UserPermission.TICKETS_CHANGE_STATUS] = false;
-  }
-
-  if (normalized[UserPermission.USERS_MANAGE]) normalized[UserPermission.USERS_VIEW] = true;
-  if (!normalized[UserPermission.USERS_VIEW]) normalized[UserPermission.USERS_MANAGE] = false;
-
-  return normalized;
-};
 
 // ── Shared sub-components ────────────────────────────────────────────────────
 
@@ -152,7 +75,7 @@ const companyBadge = (company: Company) => {
     [Company.EQUIPOS_OSENAL]:     { color: 'purple', label: 'Equipos OSENAL' },
   };
   const entry = map[company];
-  if (!entry) return <Badge color="slate">{company}</Badge>;
+  if (!entry) return <Badge color="gray">{company}</Badge>;
   return <Badge color={entry.color}>{entry.label}</Badge>;
 };
 
@@ -162,12 +85,11 @@ const Users = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
+  const createModal      = useModal();
+  const editModal        = useModal();
+  const passwordModal    = useModal();
+  const permissionsModal = useModal();
   const [showPassword, setShowPassword] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
@@ -189,10 +111,6 @@ const Users = () => {
 
   const [newPassword, setNewPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
-  const [permissionRole, setPermissionRole] = useState<UserRole>(UserRole.USER);
-  const [permissionValues, setPermissionValues] = useState<Record<UserPermission, boolean>>(
-    getDefaultPermissionsForRole(UserRole.USER)
-  );
 
   useEffect(() => {
     if (!canViewUsers) return;
@@ -226,8 +144,7 @@ const Users = () => {
     );
   }, [users, search]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const { page, setPage, paginated, totalPages } = usePagination(filtered, PAGE_SIZE);
 
   const handleSearch = (val: string) => { setSearch(val); setPage(1); };
 
@@ -235,7 +152,7 @@ const Users = () => {
 
   const resetForm = () => setFormData({ username: '', password: '', name: '', company: Company.ESPECIAS_NATURALES, role: UserRole.USER, department: '', phone: '', email: '' });
   const resetEditForm = () => setEditFormData({ username: '', name: '', company: Company.ESPECIAS_NATURALES, department: '', phone: '', email: '', isActive: true });
-  const closeEditModal = () => { setShowEditModal(false); setSelectedUser(null); resetEditForm(); };
+  const closeEditModal = () => { editModal.close(); setSelectedUser(null); resetEditForm(); };
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -263,7 +180,7 @@ const Users = () => {
         createdAt: new Date() as any, updatedAt: new Date() as any,
       };
       setUsers((prev) => [...prev, optimistic]);
-      setShowCreateModal(false);
+      createModal.close();
       resetForm();
       showToast({ type: 'success', title: 'Usuario creado', message: 'El usuario se creó correctamente' });
       syncUsers();
@@ -309,7 +226,7 @@ const Users = () => {
     if (newPassword.trim().length < 6) return showToast({ type: 'warning', title: 'Contraseña inválida', message: 'La contraseña debe tener al menos 6 caracteres' });
     try {
       await changePassword(selectedUser.id, newPassword.trim());
-      setShowPasswordModal(false);
+      passwordModal.close();
       setNewPassword('');
       setSelectedUser(null);
       showToast({ type: 'success', title: 'Contraseña actualizada', message: 'La contraseña se actualizó correctamente' });
@@ -359,38 +276,20 @@ const Users = () => {
   const handleOpenEditModal = (user: User) => {
     setSelectedUser(user);
     setEditFormData({ username: user.username, name: user.name, company: user.company, department: user.department || '', phone: user.phone || '', email: user.email || '', isActive: user.isActive });
-    setShowEditModal(true);
+    editModal.open();
   };
 
   const handleOpenPermissionsModal = (user: User) => {
     setSelectedUser(user);
-    setPermissionRole(user.role);
-    setPermissionValues(normalizePermissionDependencies(resolveUserPermissions(user)));
-    setShowPermissionsModal(true);
+    permissionsModal.open();
   };
 
-  const handlePermissionToggle = (permission: UserPermission, enabled: boolean) => {
-    setPermissionValues((prev) => normalizePermissionDependencies({ ...prev, [permission]: enabled }));
-  };
-
-  const handleApplyRoleDefaults = () => {
-    setPermissionValues(normalizePermissionDependencies(getDefaultPermissionsForRole(permissionRole)));
-  };
-
-  const handleSavePermissions = async () => {
+  const handleSavePermissions = async (patch: { role: UserRole; permissions: Record<string, boolean> }) => {
     if (!selectedUser) return;
-    if (selectedUser.id === userData?.id) {
-      if (!permissionValues[UserPermission.USERS_MANAGE])
-        return showToast({ type: 'warning', title: 'Operación no permitida', message: 'No puedes quitarte el permiso para administrar usuarios' });
-      if (!permissionValues[UserPermission.DASHBOARD_ADMIN])
-        return showToast({ type: 'warning', title: 'Operación no permitida', message: 'No puedes quitarte el acceso al panel admin mientras editas tu propio perfil' });
-    }
-    const normalized = normalizePermissionDependencies(permissionValues);
-    const patch = { role: permissionRole, permissions: getPermissionOverrides(permissionRole, normalized) };
     const snapshot = users;
     setUsers((prev) => prev.map((usr) => usr.id === selectedUser.id ? { ...usr, ...patch } : usr));
     if (selectedUser.id === userData?.id) void refreshUser();
-    setShowPermissionsModal(false);
+    permissionsModal.close();
     setSelectedUser(null);
     showToast({ type: 'success', title: 'Permisos actualizados', message: 'Los permisos del usuario se guardaron correctamente' });
     try {
@@ -431,7 +330,7 @@ const Users = () => {
           </p>
         </div>
         {canManageUsers && (
-          <Button variant="primary" iconLeft={<UserPlus size={15} />} onClick={() => setShowCreateModal(true)}>
+          <Button variant="primary" iconLeft={<UserPlus size={15} />} onClick={createModal.open}>
             Crear Usuario
           </Button>
         )}
@@ -506,7 +405,7 @@ const Users = () => {
                           <ActionBtn title="Editar permisos" color="indigo" onClick={() => handleOpenPermissionsModal(user)}>
                             <Settings2 size={15} />
                           </ActionBtn>
-                          <ActionBtn title="Cambiar contraseña" color="blue" onClick={() => { setSelectedUser(user); setShowPasswordModal(true); }}>
+                          <ActionBtn title="Cambiar contraseña" color="blue" onClick={() => { setSelectedUser(user); passwordModal.open(); }}>
                             <Lock size={15} />
                           </ActionBtn>
                           <ActionBtn
@@ -554,7 +453,7 @@ const Users = () => {
       )}
 
       {/* ── Create User Modal ──────────────────────────────────────────────────── */}
-      {showCreateModal && (
+      {createModal.isOpen && (
         <Modal>
           <ModalBox>
             <ModalTitle>Crear Nuevo Usuario</ModalTitle>
@@ -597,7 +496,7 @@ const Users = () => {
               </Field>
               <div className="flex gap-2 pt-2">
                 <Button type="submit" variant="primary" className="flex-1">Crear Usuario</Button>
-                <Button type="button" variant="secondary" className="flex-1" onClick={() => { setShowCreateModal(false); resetForm(); }}>Cancelar</Button>
+                <Button type="button" variant="secondary" className="flex-1" onClick={() => { createModal.close(); resetForm(); }}>Cancelar</Button>
               </div>
             </form>
           </ModalBox>
@@ -605,7 +504,7 @@ const Users = () => {
       )}
 
       {/* ── Edit User Modal ───────────────────────────────────────────────────── */}
-      {showEditModal && selectedUser && (
+      {editModal.isOpen && selectedUser && (
         <Modal>
           <ModalBox>
             <ModalTitle>Editar Usuario</ModalTitle>
@@ -648,7 +547,7 @@ const Users = () => {
       )}
 
       {/* ── Change Password Modal ─────────────────────────────────────────────── */}
-      {showPasswordModal && selectedUser && (
+      {passwordModal.isOpen && selectedUser && (
         <Modal>
           <ModalBox>
             <ModalTitle>Cambiar Contraseña</ModalTitle>
@@ -674,7 +573,7 @@ const Users = () => {
               </Field>
               <div className="flex gap-2 pt-2">
                 <Button type="submit" variant="primary" className="flex-1">Cambiar Contraseña</Button>
-                <Button type="button" variant="secondary" className="flex-1" onClick={() => { setShowPasswordModal(false); setNewPassword(''); setSelectedUser(null); }}>Cancelar</Button>
+                <Button type="button" variant="secondary" className="flex-1" onClick={() => { passwordModal.close(); setNewPassword(''); setSelectedUser(null); }}>Cancelar</Button>
               </div>
             </form>
           </ModalBox>
@@ -682,62 +581,17 @@ const Users = () => {
       )}
 
       {/* ── Permissions Modal ─────────────────────────────────────────────────── */}
-      {showPermissionsModal && selectedUser && (
+      {permissionsModal.isOpen && selectedUser && (
         <Modal>
           <ModalBox wide>
             <ModalTitle>Permisos de Perfil</ModalTitle>
-            <p className="text-sm text-slate-500 dark:text-slate-400 -mt-2 mb-5">
-              {selectedUser.name} <span className="text-slate-400">(@{selectedUser.username})</span>
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
-              <Field label="Rol base">
-                <select
-                  title="Rol base"
-                  value={permissionRole}
-                  onChange={(e) => {
-                    const nextRole = e.target.value as UserRole;
-                    setPermissionRole(nextRole);
-                    setPermissionValues(normalizePermissionDependencies(getDefaultPermissionsForRole(nextRole)));
-                  }}
-                  className={inputCls}
-                >
-                  <option value={UserRole.USER}>Usuario</option>
-                  <option value={UserRole.ADMIN}>Administrador</option>
-                </select>
-              </Field>
-              <div className="md:col-span-2 flex items-end">
-                <Button type="button" variant="secondary" onClick={handleApplyRoleDefaults}>
-                  Restablecer permisos por rol
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {permissionGroups.map((group) => (
-                <div key={group.title} className="border border-slate-100 dark:border-slate-700 rounded-xl p-4">
-                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">{group.title}</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {group.permissions.map((permission) => (
-                      <label key={permission} className="flex items-center gap-2.5 text-sm text-slate-600 dark:text-slate-300 cursor-pointer hover:text-slate-800 dark:hover:text-slate-100 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(permissionValues[permission])}
-                          onChange={(e) => handlePermissionToggle(permission, e.target.checked)}
-                          className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
-                        />
-                        {permissionLabels[permission]}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-2 pt-5">
-              <Button type="button" variant="primary" className="flex-1" onClick={handleSavePermissions}>Guardar Permisos</Button>
-              <Button type="button" variant="secondary" className="flex-1" onClick={() => { setShowPermissionsModal(false); setSelectedUser(null); }}>Cancelar</Button>
-            </div>
+            <PermissionEditor
+              user={selectedUser}
+              currentUserId={userData?.id}
+              onClose={() => { permissionsModal.close(); setSelectedUser(null); }}
+              onSave={handleSavePermissions}
+              onSelfEditError={(msg) => showToast({ type: 'warning', title: 'Operación no permitida', message: msg })}
+            />
           </ModalBox>
         </Modal>
       )}

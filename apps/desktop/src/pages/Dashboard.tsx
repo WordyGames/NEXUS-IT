@@ -21,14 +21,24 @@ import {
   Ticket
 } from '@nexus-it/shared';
 import CompanyCard from '../components/CompanyCard';
+import DashboardUserView from '../components/DashboardUserView';
+import DashboardCharts from '../components/DashboardCharts';
 import { AlertTriangle, Calendar, Clock, AlertCircle, Monitor, ClipboardList } from 'lucide-react';
 import { toDate, getTicketSortValue } from '../utils/dateUtils';
-import { Spinner, StatCard, Card, EmptyState, ticketStatusBadge, priorityBadge } from '../components/ui';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { Spinner, StatCard, Card } from '../components/ui';
 
 interface Stats {
-  equipment: any;
-  tickets: any;
+  equipment: {
+    total: number;
+    byCompany: Record<string, number>;
+    byStatus: Record<string, number>;
+  };
+  tickets: {
+    total: number;
+    byStatus: Record<string, number>;
+    byPriority: Record<string, number>;
+    averageResolutionTime: number;
+  };
 }
 
 interface WarrantyAlert {
@@ -334,83 +344,14 @@ const Dashboard = () => {
 
   if (loading) return <Spinner size="xl" label="Cargando dashboard..." className="h-64 justify-center" />;
 
-  // Dashboard para usuarios normales (solo Tickets)
   if (!canViewAdminDashboard) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800 mb-1">Mi Panel</h1>
-            <p className="text-sm text-slate-500">{userData?.company} · Mis equipos y tickets</p>
-          </div>
-          <span className="px-3 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-xs font-semibold">v2.5</span>
-        </div>
-
-        {/* Equipos Asignados */}
-        <div>
-          <h2 className="text-lg font-semibold text-slate-800 mb-3">Mis Equipos</h2>
-          {userEquipment.length === 0 ? (
-            <EmptyState
-              title="Sin equipos asignados"
-              description="No tienes equipos asignados aún. Contacta al administrador."
-              icon={<Monitor size={28} />}
-            />
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {userEquipment.map((eq) => (
-                <Card key={eq.id} padding="sm">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-semibold text-slate-800 text-sm">{eq.name}</h3>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      eq.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'
-                    }`}>
-                      {eq.status}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500">Tipo: <span className="capitalize font-medium text-slate-700">{eq.type}</span></p>
-                  <p className="text-xs text-slate-500">Ubicación: <span className="text-slate-700">{eq.location}</span></p>
-                  {eq.specs?.cpu && (
-                    <p className="text-xs text-slate-400 mt-1.5">CPU: {eq.specs.cpu}</p>
-                  )}
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Estadísticas Básicas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <StatCard label="Mis Equipos" value={userEquipment.length} icon={<Monitor size={22} />}      color="blue"   />
-          <StatCard label="Mis Tickets" value={userTicketsCount}     icon={<ClipboardList size={22} />} color="purple" />
-        </div>
-
-        {/* Tickets Recientes */}
-        {recentTickets.length > 0 && (
-          <div>
-            <h2 className="text-lg font-semibold text-slate-800 mb-3">Tickets Recientes</h2>
-            <Card padding="none">
-              <div className="divide-y divide-slate-100">
-                {recentTickets.map((ticket) => (
-                  <div key={ticket.id} className="p-4 hover:bg-slate-50 transition-colors">
-                    <div className="flex items-start gap-2 mb-1">
-                      <span className="font-semibold text-slate-700 text-sm">#{ticket.ticketNumber}</span>
-                      {ticketStatusBadge(ticket.status)}
-                      {priorityBadge(ticket.priority)}
-                    </div>
-                    <p className="text-sm font-medium text-slate-800">{ticket.subject}</p>
-                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{ticket.description}</p>
-                    <p className="text-xs text-slate-400 mt-1.5">
-                      {ticket.createdAt && new Date(ticket.createdAt.seconds * 1000).toLocaleDateString('es-MX', {
-                        year: 'numeric', month: 'short', day: 'numeric'
-                      })}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
-        )}
-      </div>
+      <DashboardUserView
+        userData={userData}
+        userEquipment={userEquipment}
+        userTicketsCount={userTicketsCount}
+        recentTickets={recentTickets}
+      />
     );
   }
 
@@ -638,167 +579,15 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Gráficas */}
+      {/* Gráficas + Estado de Equipos */}
       {canViewAdminDashboard && (
-        <div>
-          <h2 className="text-lg font-semibold text-slate-800 mb-3">Análisis y Tendencias</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Gráfica de Pie - Equipos por Compañía */}
-            <Card>
-              <h3 className="text-sm font-semibold text-slate-700 mb-4">
-                Equipos por Compañía
-              </h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={Object.entries(stats?.equipment.byCompany || {}).map(([name, value]) => ({
-                      name: name.split(' ').slice(0, 2).join(' '), // Acortar nombres largos
-                      value
-                    }))}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => percent ? `${name}: ${(percent * 100).toFixed(0)}%` : name}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {Object.keys(stats?.equipment.byCompany || {}).map((_, index) => {
-                      const colors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6'];
-                      return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
-                    })}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </Card>
-
-            {/* Gráfica de Barras - Tickets por Estado */}
-            <Card>
-              <h3 className="text-sm font-semibold text-slate-700 mb-4">
-                Tickets por Estado
-              </h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart
-                  data={Object.entries(stats?.tickets.byStatus || {}).map(([name, value]) => ({
-                    estado: name,
-                    cantidad: value
-                  }))}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="estado" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="cantidad" fill="#3b82f6" />
-                </BarChart>
-              </ResponsiveContainer>
-            </Card>
-
-            {/* Gráfica de Barras - Tickets por Prioridad */}
-            <Card>
-              <h3 className="text-sm font-semibold text-slate-700 mb-4">
-                Tickets por Prioridad
-              </h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart
-                  data={Object.entries(stats?.tickets.byPriority || {}).map(([name, value]) => ({
-                    prioridad: name,
-                    cantidad: value
-                  }))}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="prioridad" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="cantidad" fill="#10b981" />
-                </BarChart>
-              </ResponsiveContainer>
-            </Card>
-
-            {/* Gráfica de Pie - Estados de Equipos */}
-            <Card>
-              <h3 className="text-sm font-semibold text-slate-700 mb-4">
-                Estados de Equipos
-              </h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={Object.entries(stats?.equipment.byStatus || {}).map(([name, value]) => ({
-                      name,
-                      value
-                    }))}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => percent ? `${name}: ${(percent * 100).toFixed(0)}%` : name}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {Object.keys(stats?.equipment.byStatus || {}).map((status, index) => {
-                      const colors = {
-                        active: '#10b981',
-                        inactive: '#6b7280',
-                        maintenance: '#f59e0b',
-                        retired: '#ef4444'
-                      };
-                      return <Cell key={`cell-${index}`} fill={colors[status as keyof typeof colors] || '#3b82f6'} />;
-                    })}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </Card>
-
-            {/* Gráfica de Barras - Equipos por Tipo */}
-            <Card>
-              <h3 className="text-sm font-semibold text-slate-700 mb-4">
-                Equipos por Tipo
-              </h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart
-                  data={Object.entries(equipmentByType).map(([name, value]) => ({
-                    tipo: name,
-                    cantidad: value
-                  }))}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="tipo" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="cantidad" fill="#8b5cf6" />
-                </BarChart>
-              </ResponsiveContainer>
-            </Card>
-          </div>
-        </div>
-      )}
-
-      {/* Solo para Admin: Estado de Equipos */}
-      {canViewAdminDashboard && (
-        <div>
-          <h2 className="text-lg font-semibold text-slate-800 mb-3">Estado de Equipos</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {Object.entries(stats?.equipment.byStatus || {}).map(([status, count]) => {
-              const colorMap: Record<string, 'green' | 'slate' | 'yellow' | 'red' | 'blue'> = {
-                active: 'green', inactive: 'slate', maintenance: 'yellow', retired: 'red'
-              };
-              return (
-                <StatCard
-                  key={status}
-                  label={status.charAt(0).toUpperCase() + status.slice(1)}
-                  value={count as number}
-                  color={colorMap[status] ?? 'blue'}
-                />
-              );
-            })}
-          </div>
-        </div>
+        <DashboardCharts
+          equipmentByCompany={stats?.equipment.byCompany ?? {}}
+          equipmentByStatus={stats?.equipment.byStatus ?? {}}
+          equipmentByType={equipmentByType}
+          ticketsByStatus={stats?.tickets.byStatus ?? {}}
+          ticketsByPriority={stats?.tickets.byPriority ?? {}}
+        />
       )}
     </div>
   );
