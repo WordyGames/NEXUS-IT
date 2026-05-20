@@ -160,24 +160,42 @@ export const subscribeSupportChatMessages = (
   if (!userId?.trim()) throw new Error('userId es requerido para suscribirse a mensajes de chat');
 
   const uid = userId.trim();
+  let cancelled = false;
+  let channel: ReturnType<typeof supabase.channel> | null = null;
 
-  // Use user_id filter directly — synchronous setup, no async race condition
-  const channel = freshChannel(`chat_messages_user_${uid}`)
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'chat_messages', filter: `user_id=eq.${uid}` },
-      async () => {
-        const msgs = await getSupportChatMessages(uid, options?.maxItems);
-        onData(msgs);
-      }
-    )
-    .subscribe();
+  void (async () => {
+    try {
+      const { data } = await supabase
+        .from('support_chats')
+        .select('id')
+        .eq('user_id', uid)
+        .single();
+
+      if (cancelled || !data) return;
+
+      channel = freshChannel(`chat_messages_${data.id}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `chat_id=eq.${data.id}` },
+          async () => {
+            const msgs = await getSupportChatMessages(uid, options?.maxItems);
+            onData(msgs);
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      (options?.onError ?? console.error)(err);
+    }
+  })();
 
   getSupportChatMessages(uid, options?.maxItems)
     .then(onData)
     .catch(options?.onError ?? console.error);
 
-  return () => { supabase.removeChannel(channel); };
+  return () => {
+    cancelled = true;
+    if (channel) supabase.removeChannel(channel);
+  };
 };
 
 export const sendSupportChatMessage = async (params: {
