@@ -320,8 +320,8 @@ export interface Notification {
 
 // Chat de soporte individual por usuario
 export enum SupportChatSender {
-  USER = 'user',
-  AGENT = 'agent'
+  USER  = 'user',
+  AGENT = 'admin'
 }
 
 export interface SupportChatMessage {
