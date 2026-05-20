@@ -210,6 +210,8 @@ const Users = () => {
     }
   };
 
+  const syncUsers = () => { getUsers().then(setUsers).catch(() => {}); };
+
   // ── Filtering + pagination ──────────────────────────────────────────────────
 
   const filtered = useMemo(() => {
@@ -251,11 +253,20 @@ const Users = () => {
     if (em && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return showToast({ type: 'warning', title: 'Correo inválido', message: 'Captura un correo válido o deja el campo vacío' });
 
     try {
-      await createUser(u, formData.password.trim(), n, formData.company, formData.role, d, p, d, em);
+      const id = await createUser(u, formData.password.trim(), n, formData.company, formData.role, d, p, d, em);
+      const optimistic: User = {
+        id, username: u, password: '', name: n,
+        company: formData.company, role: formData.role,
+        permissions: getDefaultPermissionsForRole(formData.role),
+        department: d, position: d, phone: p, email: em,
+        isActive: true,
+        createdAt: new Date() as any, updatedAt: new Date() as any,
+      };
+      setUsers((prev) => [...prev, optimistic]);
       setShowCreateModal(false);
       resetForm();
-      await loadUsers();
       showToast({ type: 'success', title: 'Usuario creado', message: 'El usuario se creó correctamente' });
+      syncUsers();
     } catch (error: any) {
       showToast({ type: 'error', title: 'Error al crear usuario', message: error.message || 'No se pudo crear el usuario' });
     }
@@ -275,16 +286,19 @@ const Users = () => {
     if (p.length < 8) return showToast({ type: 'warning', title: 'Teléfono inválido', message: 'Captura un teléfono válido para registrar la cuenta' });
     if (em && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return showToast({ type: 'warning', title: 'Correo inválido', message: 'Captura un correo válido o deja el campo vacío' });
 
+    const patch = {
+      username: u, name: n, company: editFormData.company,
+      department: editFormData.department.trim(), phone: p, email: em, isActive: editFormData.isActive,
+    };
+    const snapshot = users;
+    setUsers((prev) => prev.map((usr) => usr.id === selectedUser.id ? { ...usr, ...patch } : usr));
+    if (selectedUser.id === userData?.id) void refreshUser();
+    closeEditModal();
+    showToast({ type: 'success', title: 'Usuario actualizado', message: 'Los datos del usuario se guardaron correctamente' });
     try {
-      await updateUser(selectedUser.id, {
-        username: u, name: n, company: editFormData.company,
-        department: editFormData.department.trim(), phone: p, email: em, isActive: editFormData.isActive
-      });
-      await loadUsers();
-      if (selectedUser.id === userData?.id) await refreshUser();
-      closeEditModal();
-      showToast({ type: 'success', title: 'Usuario actualizado', message: 'Los datos del usuario se guardaron correctamente' });
+      await updateUser(selectedUser.id, patch);
     } catch (error: any) {
+      setUsers(snapshot);
       showToast({ type: 'error', title: 'Error al actualizar usuario', message: error.message || 'No se pudo actualizar el usuario' });
     }
   };
@@ -306,11 +320,13 @@ const Users = () => {
 
   const handleToggleActive = async (user: User) => {
     if (!canManageUsers) return;
+    const snapshot = users;
+    setUsers((prev) => prev.map((u2) => u2.id === user.id ? { ...u2, isActive: !user.isActive } : u2));
+    showToast({ type: 'success', title: user.isActive ? 'Usuario desactivado' : 'Usuario activado', message: `${user.name} fue ${user.isActive ? 'desactivado' : 'activado'} correctamente` });
     try {
       await updateUser(user.id, { isActive: !user.isActive });
-      await loadUsers();
-      showToast({ type: 'success', title: user.isActive ? 'Usuario desactivado' : 'Usuario activado', message: `${user.name} fue ${user.isActive ? 'desactivado' : 'activado'} correctamente` });
     } catch (error: any) {
+      setUsers(snapshot);
       showToast({ type: 'error', title: 'Error al actualizar usuario', message: error.message || 'No se pudo actualizar el usuario' });
     }
   };
@@ -329,11 +345,13 @@ const Users = () => {
       intent: 'danger'
     });
     if (!accepted) return;
+    const snapshot = users;
+    setUsers((prev) => prev.filter((u2) => u2.id !== user.id));
+    showToast({ type: 'success', title: 'Usuario eliminado', message: `Se eliminó a ${user.name} correctamente` });
     try {
       await deleteUser(user.id);
-      await loadUsers();
-      showToast({ type: 'success', title: 'Usuario eliminado', message: `Se eliminó a ${user.name} correctamente` });
     } catch (error: any) {
+      setUsers(snapshot);
       showToast({ type: 'error', title: 'Error al eliminar usuario', message: error.message || 'No se pudo eliminar el usuario' });
     }
   };
@@ -367,15 +385,18 @@ const Users = () => {
       if (!permissionValues[UserPermission.DASHBOARD_ADMIN])
         return showToast({ type: 'warning', title: 'Operación no permitida', message: 'No puedes quitarte el acceso al panel admin mientras editas tu propio perfil' });
     }
+    const normalized = normalizePermissionDependencies(permissionValues);
+    const patch = { role: permissionRole, permissions: getPermissionOverrides(permissionRole, normalized) };
+    const snapshot = users;
+    setUsers((prev) => prev.map((usr) => usr.id === selectedUser.id ? { ...usr, ...patch } : usr));
+    if (selectedUser.id === userData?.id) void refreshUser();
+    setShowPermissionsModal(false);
+    setSelectedUser(null);
+    showToast({ type: 'success', title: 'Permisos actualizados', message: 'Los permisos del usuario se guardaron correctamente' });
     try {
-      const normalized = normalizePermissionDependencies(permissionValues);
-      await updateUser(selectedUser.id, { role: permissionRole, permissions: getPermissionOverrides(permissionRole, normalized) });
-      await loadUsers();
-      if (selectedUser.id === userData?.id) await refreshUser();
-      setShowPermissionsModal(false);
-      setSelectedUser(null);
-      showToast({ type: 'success', title: 'Permisos actualizados', message: 'Los permisos del usuario se guardaron correctamente' });
+      await updateUser(selectedUser.id, patch);
     } catch (error: any) {
+      setUsers(snapshot);
       showToast({ type: 'error', title: 'Error al guardar permisos', message: error.message || 'No se pudieron guardar los permisos' });
     }
   };

@@ -99,8 +99,8 @@ const Maintenances = () => {
     } catch { /* silent */ }
   }, [companyFilter, statusFilter, typeFilter, searchTerm]);
 
-  const loadMaintenances = async () => {
-    setLoading(true);
+  const loadMaintenances = async (blocking = true) => {
+    if (blocking) setLoading(true);
     try {
       const filters: any = {};
       if (companyFilter) filters.company = companyFilter;
@@ -123,9 +123,11 @@ const Maintenances = () => {
     } catch (error) {
       console.error('Error loading maintenances:', error);
     } finally {
-      setLoading(false);
+      if (blocking) setLoading(false);
     }
   };
+
+  const syncMaintenances = () => { void loadMaintenances(false); };
 
   const handleCreate = async (data: Omit<Maintenance, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
     try {
@@ -134,9 +136,9 @@ const Maintenances = () => {
       if (email) {
         await sendMaintenanceSavedEmail({ recipientEmail: email, maintenanceId: id, equipmentName: data.equipmentName, company: data.company, title: data.title, scheduledDate: toDate(data.scheduledDate).toISOString(), assignedToName: data.assignedToName, createdByName: data.createdByName }).catch(console.error);
       }
-      await loadMaintenances();
       setShowForm(false);
       const created = await getMaintenanceById(id);
+      syncMaintenances();
       if (created) { setJustCreated(created); setShowStatusEditor(true); }
       showToast({ type: 'success', title: 'Mantenimiento creado', message: 'Se guardó correctamente' });
       return id;
@@ -150,9 +152,9 @@ const Maintenances = () => {
     if (!selected) throw new Error('Nada seleccionado');
     try {
       await updateMaintenance(selected.id, data as any);
-      await loadMaintenances();
       setShowForm(false); setSelected(undefined);
       showToast({ type: 'success', title: 'Actualizado', message: 'Cambios guardados' });
+      syncMaintenances();
       return selected.id;
     } catch (error) {
       showToast({ type: 'error', title: 'Error al actualizar', message: 'No se pudieron guardar los cambios' });
@@ -162,10 +164,17 @@ const Maintenances = () => {
 
   const handleDelete = async (id: string) => {
     if (!await confirm({ title: 'Eliminar mantenimiento', message: '¿Seguro? Esta acción no se puede deshacer.', confirmText: 'Eliminar', cancelText: 'Cancelar', intent: 'danger' })) return;
+    const snapshotM = maintenances;
+    const snapshotU = upcoming;
+    const snapshotO = overdue;
+    setMaintenances((prev) => prev.filter((m) => m.id !== id));
+    setUpcoming((prev) => prev.filter((m) => m.id !== id));
+    setOverdue((prev) => prev.filter((m) => m.id !== id));
+    showToast({ type: 'success', title: 'Eliminado', message: 'Mantenimiento eliminado' });
     try {
-      await deleteMaintenance(id); await loadMaintenances();
-      showToast({ type: 'success', title: 'Eliminado', message: 'Mantenimiento eliminado' });
+      await deleteMaintenance(id);
     } catch {
+      setMaintenances(snapshotM); setUpcoming(snapshotU); setOverdue(snapshotO);
       showToast({ type: 'error', title: 'Error', message: 'No se pudo eliminar' });
     }
   };
