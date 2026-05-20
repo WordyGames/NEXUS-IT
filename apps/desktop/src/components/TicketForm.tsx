@@ -1,15 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { 
-  Ticket, 
-  TicketPriority, 
-  Company, 
+import React, { useEffect, useState } from 'react';
+import {
+  Ticket,
+  TicketPriority,
+  Company,
   UserPermission,
   Attachment,
-  deleteFile,
-  resolveAttachmentStoragePath
 } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
 import { useUiFeedback } from '../contexts/UiFeedbackContext';
+import { useAttachmentManager } from '../hooks/useAttachmentManager';
 import FileUpload from './FileUpload';
 
 interface TicketFormProps {
@@ -27,22 +26,14 @@ const generateEntityId = (existingId?: string): string => {
   return `ticket-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 };
 
-const getAttachmentKey = (attachment: Attachment): string => {
-  return attachment.storagePath || attachment.url || attachment.id;
-};
-
 const TicketForm = ({ ticket, onSubmit, onCancel, userName }: TicketFormProps) => {
   const { userData, hasPermission } = useAuth();
   const { showToast } = useUiFeedback();
   const canViewAllTickets = hasPermission(UserPermission.TICKETS_VIEW_ALL);
   const [loading, setLoading] = useState(false);
-  const [attachments, setAttachments] = useState<Attachment[]>(ticket?.attachments || []);
-  const [pendingDeleteAttachments, setPendingDeleteAttachments] = useState<Attachment[]>([]);
+  const { attachments, handleAttachmentsChange, cancelCleanup, flushPendingDeletes } =
+    useAttachmentManager(ticket?.attachments || []);
   const [entityId] = useState<string>(() => generateEntityId(ticket?.id));
-  const initialAttachmentKeys = useMemo(
-    () => new Set((ticket?.attachments || []).map(getAttachmentKey)),
-    [ticket?.attachments]
-  );
   const [formData, setFormData] = useState({
     title: ticket?.title || '',
     description: ticket?.description || '',
@@ -57,59 +48,8 @@ const TicketForm = ({ ticket, onSubmit, onCancel, userName }: TicketFormProps) =
     }
   }, [ticket, userData?.company, canViewAllTickets]);
 
-  const isInitialAttachment = (attachment: Attachment): boolean => {
-    return initialAttachmentKeys.has(getAttachmentKey(attachment));
-  };
-
-  const cleanupAttachmentsFromStorage = async (attachmentsToDelete: Attachment[]) => {
-    if (attachmentsToDelete.length === 0) return;
-
-    const deletions = attachmentsToDelete.map(async (attachment) => {
-      const storagePath = resolveAttachmentStoragePath(attachment);
-      if (!storagePath) return;
-      await deleteFile(storagePath);
-    });
-
-    const results = await Promise.allSettled(deletions);
-    const failedDeletes = results.filter((result) => result.status === 'rejected');
-
-    if (failedDeletes.length > 0) {
-      console.error(`Error deleting ${failedDeletes.length} ticket attachment(s) from storage`);
-    }
-  };
-
-  const handleAttachmentsChange = (nextAttachments: Attachment[]) => {
-    const removedAttachments = attachments.filter((current) => (
-      !nextAttachments.some((next) => getAttachmentKey(next) === getAttachmentKey(current))
-    ));
-
-    setAttachments(nextAttachments);
-
-    if (removedAttachments.length === 0) return;
-
-    const persistedAttachments = removedAttachments.filter(isInitialAttachment);
-    const transientAttachments = removedAttachments.filter((attachment) => !isInitialAttachment(attachment));
-
-    if (persistedAttachments.length > 0) {
-      setPendingDeleteAttachments((prev) => {
-        const byKey = new Map<string, Attachment>(
-          prev.map((attachment) => [getAttachmentKey(attachment), attachment])
-        );
-        persistedAttachments.forEach((attachment) => {
-          byKey.set(getAttachmentKey(attachment), attachment);
-        });
-        return Array.from(byKey.values());
-      });
-    }
-
-    if (transientAttachments.length > 0) {
-      void cleanupAttachmentsFromStorage(transientAttachments);
-    }
-  };
-
   const handleCancel = async () => {
-    const transientAttachments = attachments.filter((attachment) => !isInitialAttachment(attachment));
-    await cleanupAttachmentsFromStorage(transientAttachments);
+    await cancelCleanup();
     onCancel();
   };
 
@@ -150,7 +90,7 @@ const TicketForm = ({ ticket, onSubmit, onCancel, userName }: TicketFormProps) =
       }
 
       await onSubmit(submitData);
-      await cleanupAttachmentsFromStorage(pendingDeleteAttachments);
+      await flushPendingDeletes();
     } finally {
       setLoading(false);
     }

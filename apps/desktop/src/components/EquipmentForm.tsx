@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Equipment, 
-  Company, 
-  getUsers, 
+  Equipment,
+  Company,
+  getUsers,
   User,
   triggerEquipmentNotifications,
   uploadFile,
@@ -10,11 +10,10 @@ import {
   validateFile,
   formatFileSize,
   Attachment,
-  deleteFile,
-  resolveAttachmentStoragePath
 } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
 import { useUiFeedback } from '../contexts/UiFeedbackContext';
+import { useAttachmentManager } from '../hooks/useAttachmentManager';
 import { Upload, X } from 'lucide-react';
 
 interface EquipmentFormProps {
@@ -46,10 +45,6 @@ const generateEntityId = (existingId?: string): string => {
   return `equipment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 };
 
-const getAttachmentKey = (attachment: Attachment): string => {
-  return attachment.storagePath || attachment.url || attachment.id;
-};
-
 const SERIAL_NUMBER_REGEX = /^[A-Za-z0-9._/-]+$/;
 
 const sanitizeText = (value: string): string => value.trim();
@@ -62,14 +57,10 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
   const [detecting, setDetecting] = useState(false);
   const [isPortableMode, setIsPortableMode] = useState(false);
   const [autoDetectAttempted, setAutoDetectAttempted] = useState(false);
-  const [attachments, setAttachments] = useState<Attachment[]>(equipment?.attachments || []);
-  const [pendingDeleteAttachments, setPendingDeleteAttachments] = useState<Attachment[]>([]);
+  const { attachments, setAttachments, handleAttachmentsChange, cancelCleanup, flushPendingDeletes } =
+    useAttachmentManager(equipment?.attachments || []);
   const [uploading, setUploading] = useState(false);
   const [entityId] = useState<string>(() => generateEntityId(equipment?.id));
-  const initialAttachmentKeys = useMemo(
-    () => new Set((equipment?.attachments || []).map(getAttachmentKey)),
-    [equipment?.attachments]
-  );
   const [formData, setFormData] = useState({
     company: equipment?.company || Company.GRUPO_AMEX,
     name: equipment?.name || '',
@@ -122,26 +113,6 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
       setUsers(data);
     } catch (error) {
       console.error('Error loading users:', error);
-    }
-  };
-
-  const isInitialAttachment = (attachment: Attachment): boolean => {
-    return initialAttachmentKeys.has(getAttachmentKey(attachment));
-  };
-
-  const cleanupAttachmentsFromStorage = async (attachmentsToDelete: Attachment[]) => {
-    if (attachmentsToDelete.length === 0) return;
-
-    const deletions = attachmentsToDelete.map(async (attachment) => {
-      const storagePath = resolveAttachmentStoragePath(attachment);
-      if (!storagePath) return;
-      await deleteFile(storagePath);
-    });
-
-    const results = await Promise.allSettled(deletions);
-    const failedDeletes = results.filter((result) => result.status === 'rejected');
-    if (failedDeletes.length > 0) {
-      console.error(`Error deleting ${failedDeletes.length} equipment attachment(s) from storage`);
     }
   };
 
@@ -262,29 +233,10 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
     }
   };
 
-  const handleRemovePhoto = async () => {
-    if (attachments.length === 0) return;
-
-    const [attachmentToRemove] = attachments;
-    setAttachments([]);
-
-    if (isInitialAttachment(attachmentToRemove)) {
-      setPendingDeleteAttachments((prev) => {
-        const key = getAttachmentKey(attachmentToRemove);
-        if (prev.some((attachment) => getAttachmentKey(attachment) === key)) {
-          return prev;
-        }
-        return [...prev, attachmentToRemove];
-      });
-      return;
-    }
-
-    await cleanupAttachmentsFromStorage([attachmentToRemove]);
-  };
+  const handleRemovePhoto = () => handleAttachmentsChange([]);
 
   const handleCancel = async () => {
-    const transientAttachments = attachments.filter((attachment) => !isInitialAttachment(attachment));
-    await cleanupAttachmentsFromStorage(transientAttachments);
+    await cancelCleanup();
     onCancel();
   };
 
@@ -424,7 +376,7 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
         await triggerEquipmentNotifications(equipmentData);
       }
 
-      await cleanupAttachmentsFromStorage(pendingDeleteAttachments);
+      await flushPendingDeletes();
     } finally {
       setLoading(false);
     }

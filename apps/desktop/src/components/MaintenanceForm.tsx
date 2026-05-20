@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import {
   Maintenance,
@@ -11,11 +11,10 @@ import {
   getEquipment,
   getUsers,
   triggerMaintenanceNotifications,
-  deleteFile,
-  resolveAttachmentStoragePath
 } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
 import { useUiFeedback } from '../contexts/UiFeedbackContext';
+import { useAttachmentManager } from '../hooks/useAttachmentManager';
 import FileUpload from './FileUpload';
 
 interface MaintenanceFormProps {
@@ -30,10 +29,6 @@ const generateEntityId = (existingId?: string): string => {
     return globalThis.crypto.randomUUID();
   }
   return `maintenance-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-};
-
-const getAttachmentKey = (attachment: Attachment): string => {
-  return attachment.storagePath || attachment.url || attachment.id;
 };
 
 const generateTaskId = (): string => {
@@ -93,12 +88,8 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
   const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
   const [usersList, setUsersList] = useState<User[]>([]);
   const [entityId] = useState<string>(() => generateEntityId(initialData?.id));
-  const [attachments, setAttachments] = useState<Attachment[]>(initialData?.attachments || []);
-  const [pendingDeleteAttachments, setPendingDeleteAttachments] = useState<Attachment[]>([]);
-  const initialAttachmentKeys = useMemo(
-    () => new Set((initialData?.attachments || []).map(getAttachmentKey)),
-    [initialData?.attachments]
-  );
+  const { attachments, handleAttachmentsChange, cancelCleanup, flushPendingDeletes } =
+    useAttachmentManager(initialData?.attachments || []);
 
   const [equipmentId, setEquipmentId] = useState(initialData?.equipmentId || '');
   const [type, setType] = useState<MaintenanceType>(initialData?.type || MaintenanceType.PREVENTIVO);
@@ -142,57 +133,8 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
     return assignedUser ? assignedUser.name : 'Usuario no disponible';
   };
 
-  const isInitialAttachment = (attachment: Attachment): boolean => {
-    return initialAttachmentKeys.has(getAttachmentKey(attachment));
-  };
-
-  const cleanupAttachmentsFromStorage = async (attachmentsToDelete: Attachment[]) => {
-    if (attachmentsToDelete.length === 0) return;
-
-    const deletions = attachmentsToDelete.map(async (attachment) => {
-      const storagePath = resolveAttachmentStoragePath(attachment);
-      if (!storagePath) return;
-      await deleteFile(storagePath);
-    });
-
-    const results = await Promise.allSettled(deletions);
-    const failedDeletes = results.filter((result) => result.status === 'rejected');
-
-    if (failedDeletes.length > 0) {
-      console.error(`Error deleting ${failedDeletes.length} maintenance attachment(s) from storage`);
-    }
-  };
-
-  const handleAttachmentsChange = (nextAttachments: Attachment[]) => {
-    const removedAttachments = attachments.filter((current) => (
-      !nextAttachments.some((next) => getAttachmentKey(next) === getAttachmentKey(current))
-    ));
-
-    setAttachments(nextAttachments);
-    if (removedAttachments.length === 0) return;
-
-    const persistedAttachments = removedAttachments.filter(isInitialAttachment);
-    const transientAttachments = removedAttachments.filter((attachment) => !isInitialAttachment(attachment));
-
-    if (persistedAttachments.length > 0) {
-      setPendingDeleteAttachments((prev) => {
-        const byKey = new Map<string, Attachment>(prev.map((attachment) => [getAttachmentKey(attachment), attachment]));
-        nextAttachments.forEach((attachment) => byKey.delete(getAttachmentKey(attachment)));
-        persistedAttachments.forEach((attachment) => {
-          byKey.set(getAttachmentKey(attachment), attachment);
-        });
-        return Array.from(byKey.values());
-      });
-    }
-
-    if (transientAttachments.length > 0) {
-      void cleanupAttachmentsFromStorage(transientAttachments);
-    }
-  };
-
   const handleCancel = async () => {
-    const transientAttachments = attachments.filter((attachment) => !isInitialAttachment(attachment));
-    await cleanupAttachmentsFromStorage(transientAttachments);
+    await cancelCleanup();
     onClose();
   };
 
@@ -312,8 +254,7 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
 
       const persistedId = (await onSubmit(maintenanceData)) || initialData?.id || entityId;
 
-      await cleanupAttachmentsFromStorage(pendingDeleteAttachments);
-      setPendingDeleteAttachments([]);
+      await flushPendingDeletes();
 
       const maintenanceForNotification: Maintenance = {
         ...maintenanceData,
