@@ -48,13 +48,12 @@ const Chat: React.FC = () => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
 
     return threads.filter((thread) => {
+      if (!thread.lastMessage) return false;
       const matchesUnread = !showUnreadOnly || thread.hasUnreadForAdmin;
 
-      if (!normalizedSearch) {
-        return matchesUnread;
-      }
+      if (!normalizedSearch) return matchesUnread;
 
-      const searchTarget = `${thread.userName} ${thread.lastMessage || ''}`.toLowerCase();
+      const searchTarget = `${thread.userName} ${thread.lastMessage}`.toLowerCase();
       return matchesUnread && searchTarget.includes(normalizedSearch);
     });
   }, [threads, searchQuery, showUnreadOnly]);
