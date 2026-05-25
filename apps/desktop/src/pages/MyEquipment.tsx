@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Computer, Smartphone, Printer, Network, HardDrive, MonitorIcon, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { Equipment, getEquipment } from '@nexus-it/shared';
+import { Equipment, getEquipment, subscribeEquipmentChanges } from '@nexus-it/shared';
 import { toDate } from '../utils/dateUtils';
 import { Spinner, Card, EmptyState, Badge } from '../components/ui';
 
@@ -30,20 +30,41 @@ const MyEquipment = () => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => { loadEquipment(); }, [userData?.id]);
-
-  const loadEquipment = async () => {
+  const loadEquipment = useCallback(async (blocking = true) => {
     if (!userData?.id) { setEquipment([]); setLoading(false); return; }
     try {
-      setLoading(true);
+      if (blocking) {
+        setLoading(true);
+      }
       setLoadError(null);
       setEquipment(await getEquipment({ assignedTo: userData.id }));
     } catch {
       setLoadError('No se pudieron cargar tus equipos. Intenta de nuevo.');
     } finally {
-      setLoading(false);
+      if (blocking) {
+        setLoading(false);
+      }
     }
-  };
+  }, [userData?.id]);
+
+  useEffect(() => { void loadEquipment(); }, [loadEquipment]);
+
+  useEffect(() => {
+    if (!userData?.id) return;
+
+    const unsubscribe = subscribeEquipmentChanges(
+      async () => {
+        await loadEquipment(false);
+      },
+      {
+        onError: (error) => {
+          console.error('Error subscribing to my equipment changes:', error);
+        }
+      }
+    );
+
+    return unsubscribe;
+  }, [loadEquipment, userData?.id]);
 
   const getSerial = (eq: Equipment): string => {
     const s = eq.specs as Equipment['specs'] & { seria?: string };
@@ -69,7 +90,7 @@ const MyEquipment = () => {
             <p className="text-sm text-red-700 dark:text-red-300">{loadError}</p>
             <button
               type="button"
-              onClick={loadEquipment}
+              onClick={() => { void loadEquipment(); }}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
             >
               <RefreshCw size={12} />

@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   TouchableOpacity
 } from 'react-native';
-import { getEquipment, Equipment } from '@nexus-it/shared';
+import { getEquipment, Equipment, subscribeEquipmentChanges } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
 
 const EquipmentScreen = ({ navigation }: any) => {
@@ -19,9 +19,28 @@ const EquipmentScreen = ({ navigation }: any) => {
     void loadEquipment();
   }, [isAdmin, userData?.id]);
 
-  const loadEquipment = async () => {
+  useEffect(() => {
+    if (!userData?.id) return;
+
+    const unsubscribe = subscribeEquipmentChanges(
+      async () => {
+        await loadEquipment(false);
+      },
+      {
+        onError: (error) => {
+          console.error('Error subscribing to mobile equipment changes:', error);
+        }
+      }
+    );
+
+    return unsubscribe;
+  }, [isAdmin, userData?.id]);
+
+  const loadEquipment = async (blocking = true) => {
     try {
-      setLoading(true);
+      if (blocking) {
+        setLoading(true);
+      }
       if (!userData?.id) {
         setEquipment([]);
         return;
@@ -32,7 +51,9 @@ const EquipmentScreen = ({ navigation }: any) => {
     } catch (error) {
       console.error('Error loading equipment:', error);
     } finally {
-      setLoading(false);
+      if (blocking) {
+        setLoading(false);
+      }
     }
   };
 

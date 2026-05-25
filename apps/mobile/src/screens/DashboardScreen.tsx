@@ -17,6 +17,7 @@ import {
   getTicketStats,
   getTickets,
   getPendingTimeConfirmationMaintenancesForUser,
+  subscribeEquipmentChanges,
   subscribeSupportChatThread,
   subscribeSupportChatThreads
 } from '@nexus-it/shared';
@@ -36,6 +37,23 @@ const DashboardScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     void loadStats();
+  }, [canSeeGlobalDashboard, userData?.id, userData?.username, userData?.name]);
+
+  useEffect(() => {
+    if (!userData?.id) return;
+
+    const unsubscribe = subscribeEquipmentChanges(
+      async () => {
+        await loadStats(false);
+      },
+      {
+        onError: (error) => {
+          console.error('Error subscribing to mobile dashboard equipment changes:', error);
+        }
+      }
+    );
+
+    return unsubscribe;
   }, [canSeeGlobalDashboard, userData?.id, userData?.username, userData?.name]);
 
   useEffect(() => {
@@ -139,8 +157,12 @@ const DashboardScreen = ({ navigation }: any) => {
     return merged;
   };
 
-  const loadStats = async () => {
+  const loadStats = async (blocking = true) => {
     try {
+      if (blocking) {
+        setLoading(true);
+      }
+
       if (canSeeGlobalDashboard) {
         const [equipmentStats, ticketStats] = await Promise.all([
           getEquipmentStats(),
@@ -169,7 +191,9 @@ const DashboardScreen = ({ navigation }: any) => {
     } catch (error) {
       console.error('Error loading stats:', error);
     } finally {
-      setLoading(false);
+      if (blocking) {
+        setLoading(false);
+      }
     }
   };
 

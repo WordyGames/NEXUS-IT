@@ -8,6 +8,7 @@ import {
   getEquipmentStats, 
   getTicketStats, 
   getEquipment,
+  subscribeEquipmentChanges,
   getTickets,
   getUpcomingMaintenances,
   getOverdueMaintenances,
@@ -70,7 +71,7 @@ const Dashboard = () => {
     { name: Company.EQUIPOS_OSENAL, color: 'equipos-osenal' }
   ];
 
-  const loadUserTickets = async () => {
+  const loadUserTickets = useCallback(async () => {
     if (!userData) return [] as Ticket[];
 
     const queries: Promise<Ticket[]>[] = [];
@@ -102,7 +103,7 @@ const Dashboard = () => {
 
     merged.sort((a, b) => getTicketSortValue(b) - getTicketSortValue(a));
     return merged;
-  };
+  }, [userData]);
 
   const getMaintenanceUrgency = (maintenance: Maintenance) => {
     const maintenanceDate = toDate(maintenance.scheduledDate);
@@ -273,74 +274,86 @@ const Dashboard = () => {
     }
   };
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [equipmentStats, ticketStats] = await Promise.all([
-          getEquipmentStats(),
-          getTicketStats()
-        ]);
+  const loadData = useCallback(async (blocking = true) => {
+    try {
+      if (blocking) {
+        setLoading(true);
+      }
 
-        setStats({
-          equipment: equipmentStats,
-          tickets: ticketStats
+      const [equipmentStats, ticketStats] = await Promise.all([
+        getEquipmentStats(),
+        getTicketStats()
+      ]);
+
+      setStats({
+        equipment: equipmentStats,
+        tickets: ticketStats
+      });
+
+      if (!canViewAdminDashboard && userData?.id) {
+        const allEquipment = await getEquipment({ assignedTo: userData.id });
+        setUserEquipment(allEquipment);
+
+        const userTickets = await loadUserTickets();
+        setUserTicketsCount(userTickets.length);
+        setRecentTickets(userTickets.slice(0, 5));
+      }
+
+      if (canViewAdminDashboard) {
+        await refreshAdminOperationalData();
+
+        const allEquipment = await getEquipment({});
+        const today = new Date();
+        const thirtyDaysLater = new Date();
+        thirtyDaysLater.setDate(today.getDate() + 30);
+
+        let expired = 0;
+        let expiringSoon = 0;
+        const typeCount: Record<string, number> = {};
+
+        allEquipment.forEach((eq: Equipment) => {
+          typeCount[eq.type] = (typeCount[eq.type] || 0) + 1;
+
+          if (eq.warrantyExpiration) {
+            const warrantyDate = toDate(eq.warrantyExpiration);
+            if (warrantyDate < today) {
+              expired++;
+            } else if (warrantyDate <= thirtyDaysLater) {
+              expiringSoon++;
+            }
+          }
         });
 
-        // Cargar equipos asignados al usuario actual
-        if (!canViewAdminDashboard && userData?.id) {
-          const allEquipment = await getEquipment({ assignedTo: userData.id });
-          setUserEquipment(allEquipment);
-          
-          // Cargar tickets del usuario
-          const userTickets = await loadUserTickets();
-          setUserTicketsCount(userTickets.length);
-          
-          // Obtener los 5 tickets más recientes
-          const sortedTickets = userTickets.slice(0, 5);
-          setRecentTickets(sortedTickets);
-        }
-
-        // Cargar alertas de mantenimiento y garantías para admin
-        if (canViewAdminDashboard) {
-          await refreshAdminOperationalData();
-
-          // Calcular alertas de garantías
-          const allEquipment = await getEquipment({});
-          const today = new Date();
-          const thirtyDaysLater = new Date();
-          thirtyDaysLater.setDate(today.getDate() + 30);
-
-          let expired = 0;
-          let expiringSoon = 0;
-          const typeCount: Record<string, number> = {};
-
-          allEquipment.forEach((eq: Equipment) => {
-            // Contar por tipo
-            typeCount[eq.type] = (typeCount[eq.type] || 0) + 1;
-
-            // Alertas de garantía
-            if (eq.warrantyExpiration) {
-              const warrantyDate = toDate(eq.warrantyExpiration);
-              if (warrantyDate < today) {
-                expired++;
-              } else if (warrantyDate <= thirtyDaysLater) {
-                expiringSoon++;
-              }
-            }
-          });
-
-          setWarrantyAlerts({ expired, expiringSoon });
-          setEquipmentByType(typeCount);
-        }
-      } catch (error) {
-        console.error('Error loading data:', error);
-      } finally {
+        setWarrantyAlerts({ expired, expiringSoon });
+        setEquipmentByType(typeCount);
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      if (blocking) {
         setLoading(false);
       }
-    };
+    }
+  }, [canViewAdminDashboard, userData, loadUserTickets, refreshAdminOperationalData]);
 
-    loadData();
-  }, [canViewAdminDashboard, userData, refreshAdminOperationalData]);
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeEquipmentChanges(
+      async () => {
+        await loadData(false);
+      },
+      {
+        onError: (error) => {
+          console.error('Error subscribing to dashboard equipment changes:', error);
+        }
+      }
+    );
+
+    return unsubscribe;
+  }, [loadData]);
 
   if (loading) return <Spinner size="xl" label="Cargando dashboard..." className="h-64 justify-center" />;
 
