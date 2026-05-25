@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   capitalize,
+  generateUuid,
   generateTicketNumber,
   getCompanyColor,
   getInitials,
   isValidEmail,
+  isValidUuid,
   truncate,
 } from './helpers';
 
@@ -39,5 +41,12 @@ describe('helpers utils', () => {
   it('extrae iniciales de un nombre', () => {
     expect(getInitials('Luis Solis')).toBe('LS');
     expect(getInitials('Nexus')).toBe('N');
+  });
+
+  it('genera UUIDs válidos y detecta formatos inválidos', () => {
+    const uuid = generateUuid();
+
+    expect(isValidUuid(uuid)).toBe(true);
+    expect(isValidUuid('equipment-123')).toBe(false);
   });
 });

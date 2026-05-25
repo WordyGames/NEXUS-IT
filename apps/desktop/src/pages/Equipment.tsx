@@ -25,6 +25,27 @@ import { Spinner, Card, Button, EmptyState } from '../components/ui';
 
 const PAGE_SIZE = 24;
 
+const getErrorMessage = (error: unknown): string => {
+  if (error && typeof error === 'object') {
+    const errorMessage = 'message' in error && typeof error.message === 'string' ? error.message.trim() : '';
+    const errorDetails = 'details' in error && typeof error.details === 'string' ? error.details.trim() : '';
+
+    if (errorMessage && errorDetails && !errorMessage.includes(errorDetails)) {
+      return `${errorMessage} (${errorDetails})`;
+    }
+
+    if (errorMessage) {
+      return errorMessage;
+    }
+  }
+
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+
+  return 'No se pudo guardar el equipo';
+};
+
 const Equipment = () => {
   const { userData, hasPermission } = useAuth();
   const { showToast, confirm } = useUiFeedback();
@@ -278,7 +299,7 @@ const Equipment = () => {
       showToast({
         type: 'error',
         title: 'Error al guardar equipo',
-        message: 'No se pudo guardar el equipo'
+        message: getErrorMessage(error)
       });
       throw error;
     }

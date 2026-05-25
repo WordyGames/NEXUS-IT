@@ -10,6 +10,7 @@ import {
   validateFile,
   formatFileSize,
   Attachment,
+  generateUuid,
 } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
 import { useUiFeedback } from '../contexts/UiFeedbackContext';
@@ -39,10 +40,7 @@ const formatDateForInput = (date: any): string => {
 
 const generateEntityId = (existingId?: string): string => {
   if (existingId) return existingId;
-  if (typeof globalThis.crypto?.randomUUID === 'function') {
-    return globalThis.crypto.randomUUID();
-  }
-  return `equipment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return generateUuid();
 };
 
 const SERIAL_NUMBER_REGEX = /^[A-Za-z0-9._/-]+$/;

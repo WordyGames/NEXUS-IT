@@ -1,6 +1,7 @@
 import { supabase } from '../config/supabase';
 import { Equipment, EquipmentFilters } from '../types';
 import { deleteFile, resolveAttachmentStoragePath } from './storage';
+import { isValidUuid } from '../utils/helpers';
 
 export type EquipmentChangesUnsubscribe = () => void;
 
@@ -91,7 +92,9 @@ export const createEquipment = async (
     created_by: rest.createdBy
   };
 
-  if (providedId) payload.id = providedId;
+  if (providedId && isValidUuid(providedId)) {
+    payload.id = providedId;
+  }
 
   const { data, error } = await supabase.from('equipment').insert(payload).select('id').single();
   if (error) throw error;
