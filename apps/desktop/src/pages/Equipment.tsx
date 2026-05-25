@@ -11,7 +11,8 @@ import {
   deleteEquipment,
   EquipmentFilters,
   getUsers,
-  User
+  User,
+  subscribeEquipmentChanges
 } from '@nexus-it/shared';
 import EquipmentCard from '../components/EquipmentCard';
 import EquipmentForm from '../components/EquipmentForm';
@@ -103,6 +104,21 @@ const Equipment = () => {
 
   useEffect(() => {
     void loadEquipment(isFirstLoadRef.current);
+  }, [filters.company, filters.type, filters.status, filters.assignedTo]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeEquipmentChanges(
+      async () => {
+        await loadEquipment(false);
+      },
+      {
+        onError: (error) => {
+          console.error('Error subscribing to equipment changes:', error);
+        }
+      }
+    );
+
+    return unsubscribe;
   }, [filters.company, filters.type, filters.status, filters.assignedTo]);
 
   const loadUsers = async () => {

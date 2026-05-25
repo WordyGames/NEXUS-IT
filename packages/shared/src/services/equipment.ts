@@ -2,11 +2,17 @@ import { supabase } from '../config/supabase';
 import { Equipment, EquipmentFilters } from '../types';
 import { deleteFile, resolveAttachmentStoragePath } from './storage';
 
+export type EquipmentChangesUnsubscribe = () => void;
+
 const toDate = (v: string | null | undefined): Date | undefined => {
   if (!v) return undefined;
   const d = new Date(v);
   return isNaN(d.getTime()) ? undefined : d;
 };
+
+const createEquipmentChannelName = (): string => (
+  `equipment_changes_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+);
 
 const rowToEquipment = (row: any): Equipment => ({
   id: row.id,
@@ -145,4 +151,34 @@ export const getEquipmentStats = async () => {
   });
 
   return { total: equipment.length, byCompany, byStatus, byType };
+};
+
+export const subscribeEquipmentChanges = (
+  onChange: () => void | Promise<void>,
+  options?: {
+    onError?: (error: unknown) => void;
+  }
+): EquipmentChangesUnsubscribe => {
+  const handleError = options?.onError ?? console.error;
+
+  const channel = supabase
+    .channel(createEquipmentChannelName())
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'equipment' },
+      () => {
+        void Promise.resolve()
+          .then(() => onChange())
+          .catch(handleError);
+      }
+    )
+    .subscribe((status) => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        handleError(new Error(`La suscripcion realtime de equipos fallo con estado ${status}`));
+      }
+    });
+
+  return () => {
+    void supabase.removeChannel(channel);
+  };
 };
