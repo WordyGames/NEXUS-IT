@@ -149,7 +149,7 @@ export const getSupportChatMessages = async (userId: string, maxItems = 200): Pr
     .limit(Math.min(maxItems, 500));
 
   if (error) throw error;
-  return (data ?? []).map(r => ({ ...rowToMessage(r), userId, userName: '' }));
+  return (data ?? []).map(r => rowToMessage(r));
 };
 
 export const subscribeSupportChatMessages = (

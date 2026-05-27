@@ -8,6 +8,7 @@ import {
   Company,
   UserPermission,
   getTickets,
+  getTicketById,
   createTicket,
 } from '@nexus-it/shared';
 import TicketForm from '../components/TicketForm';
@@ -108,14 +109,23 @@ const Tickets = () => {
     }
   };
 
-  const handleOpenDetail = (ticket: Ticket) => {
-    setSelectedTicket(ticket);
+  const handleOpenDetail = async (ticket: Ticket) => {
+    const full = await getTicketById(ticket.id);
+    setSelectedTicket(full ?? ticket);
     setShowDetail(true);
   };
 
   const handleCloseDetail = () => {
     setShowDetail(false);
     setSelectedTicket(null);
+  };
+
+  const handleTicketUpdate = async () => {
+    await loadTickets();
+    if (selectedTicket) {
+      const refreshed = await getTicketById(selectedTicket.id);
+      if (refreshed) setSelectedTicket(refreshed);
+    }
   };
 
   if (loading) return <Spinner size="xl" label="Cargando tickets..." className="h-64 justify-center" />;
@@ -237,7 +247,7 @@ const Tickets = () => {
         <TicketDetail
           ticket={selectedTicket}
           onClose={handleCloseDetail}
-          onUpdate={loadTickets}
+          onUpdate={handleTicketUpdate}
           currentUserId={userData?.id || ''}
           currentUserName={userData?.name || 'Usuario'}
           canChangeStatus={canChangeTicketStatus}

@@ -9,12 +9,6 @@ import {
   getUnreadNotifications,
   NotificationType,
   Notification,
-  Equipment,
-  getEquipmentById,
-  getTicketById,
-  getMaintenanceById,
-  Ticket,
-  Maintenance
 } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
 import { toDate } from '../utils/dateUtils';
@@ -38,30 +32,17 @@ export const NotificationsPage: React.FC = () => {
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [loading, setLoading] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [relatedData, setRelatedData] = useState<Record<string, Equipment | Ticket | Maintenance | null>>({});
 
   const loadNotifications = async () => {
     if (!userData?.id) return;
     setLoading(true);
     try {
-      const notifs = await getUserNotifications(userData.id);
+      const [notifs, count] = await Promise.all([
+        getUserNotifications(userData.id),
+        getUnreadNotifications(userData.id),
+      ]);
       setNotifications(notifs);
-      setUnreadCount(await getUnreadNotifications(userData.id));
-
-      const related: Record<string, Equipment | Ticket | Maintenance | null> = {};
-      for (const notif of notifs) {
-        const { equipmentId, ticketId, maintenanceId } = notif.references ?? {};
-        if (equipmentId && !(equipmentId in related)) {
-          try { related[equipmentId] = await getEquipmentById(equipmentId); } catch { related[equipmentId] = null; }
-        }
-        if (ticketId && !(ticketId in related)) {
-          try { related[ticketId] = await getTicketById(ticketId); } catch { related[ticketId] = null; }
-        }
-        if (maintenanceId && !(maintenanceId in related)) {
-          try { related[maintenanceId] = await getMaintenanceById(maintenanceId); } catch { related[maintenanceId] = null; }
-        }
-      }
-      setRelatedData(related);
+      setUnreadCount(count);
     } catch (error) {
       console.error('Error loading notifications:', error);
     } finally {

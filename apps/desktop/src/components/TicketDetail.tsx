@@ -165,8 +165,8 @@ const TicketDetail = ({ ticket, onClose, onUpdate, currentUserId, currentUserNam
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
                   {ticket.ticketNumber}
                 </h2>
-                <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusColors[ticket.status]}`}>
-                  {getStatusLabel(ticket.status)}
+                <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusColors[newStatus]}`}>
+                  {getStatusLabel(newStatus)}
                 </span>
                 <span className={`px-3 py-1 text-xs font-medium rounded-full ${priorityColors[ticket.priority]}`}>
                   Prioridad: {getPriorityLabel(ticket.priority)}
@@ -216,9 +216,9 @@ const TicketDetail = ({ ticket, onClose, onUpdate, currentUserId, currentUserNam
                   <button
                     key={status}
                     onClick={() => handleChangeStatus(status)}
-                    disabled={loading || status === ticket.status}
+                    disabled={loading || status === newStatus}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition
-                      ${status === ticket.status 
+                      ${status === newStatus
                         ? statusColors[status] + ' cursor-not-allowed'
                         : 'bg-gray-100 hover:bg-gray-200 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white'
                       }

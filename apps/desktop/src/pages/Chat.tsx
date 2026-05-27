@@ -1,4 +1,5 @@
 import React, { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { playNotificationSound } from '../utils/notificationPrefs';
 import {
   markSupportChatAsReadByAdmin,
   markSupportChatAsReadByUser,
@@ -40,6 +41,7 @@ const Chat: React.FC = () => {
   const [sending, setSending] = useState(false);
   const [text, setText] = useState('');
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const prevMessageCountRef = useRef<number>(0);
 
   const canUseChat = useMemo(() => Boolean(userData?.id && userData?.name), [userData?.id, userData?.name]);
 
@@ -117,12 +119,22 @@ const Chat: React.FC = () => {
     }
 
     setLoading(true);
+    prevMessageCountRef.current = 0;
 
     const unsubscribe = subscribeSupportChatMessages(
       activeChatUserId,
       (rows) => {
+        const prevCount = prevMessageCountRef.current;
+        prevMessageCountRef.current = rows.length;
         setMessages(rows);
         setLoading(false);
+
+        // Play sound when a new message from the other party arrives
+        if (rows.length > prevCount && prevCount > 0) {
+          const incomingSender = isAdminInboxMode ? SupportChatSender.USER : SupportChatSender.AGENT;
+          const hasNewIncoming = rows.slice(prevCount).some(m => m.sender === incomingSender);
+          if (hasNewIncoming) playNotificationSound('default');
+        }
 
         if (isAdminInboxMode) {
           void markSupportChatAsReadByAdmin(activeChatUserId);
