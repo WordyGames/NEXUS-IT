@@ -38,8 +38,8 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   
-  // Ajustar márgenes según la empresa para mejor alineación
-  const margin = equipment.company === Company.ESPECIAS_NATURALES ? 30 : 20;
+  // Ajustar márgenes según la empresa para mejor alineación y evitar superposición con franjas decorativas
+  const margin = equipment.company === Company.ESPECIAS_NATURALES ? 40 : 20;
   let yPos = margin;
   const compactLayout = {
     sectionTitleGap: 8,
@@ -52,8 +52,13 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   const backgroundImage = COMPANY_BACKGROUNDS[equipment.company];
   if (backgroundImage) {
     try {
+      // Reducir opacidad para LIUMAQ para hacer el fondo más claro
+      if (equipment.company === Company.EQUIPOS_OSENAL) {
+        doc.setGlobalAlpha(0.15);
+      }
       // Agregar imagen de fondo (cubre toda la página)
       doc.addImage(backgroundImage, 'PNG', 0, 0, pageWidth, pageHeight);
+      doc.setGlobalAlpha(1.0); // Restaurar opacidad
     } catch (error) {
       console.error('[Carta PDF] Error al agregar imagen de fondo:', error);
     }
@@ -97,7 +102,6 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
 
   addField('Nombre', employee.name || 'N/A');
   addField('Puesto', employee.position || employee.department || 'N/A');
-  addField('Empresa', equipment.company);
 
   yPos += compactLayout.sectionGap;
 

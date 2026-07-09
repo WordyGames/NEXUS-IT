@@ -105,7 +105,7 @@ const buildHtml = (
     employeeSignatureDataUri
   } = options;
   const colors = COMPANY_COLORS[equipment.company];
-  const margin = equipment.company === Company.ESPECIAS_NATURALES ? 30 : 20;
+  const margin = equipment.company === Company.ESPECIAS_NATURALES ? 40 : 20;
 
   const conditionsList = CONDITIONS.map((condition, index) => (
     `<li><span class="num">${index + 1}.</span> ${escapeHtml(condition)}</li>`
@@ -167,6 +167,7 @@ const buildHtml = (
           height: 279mm;
           object-fit: cover;
           z-index: 0;
+          opacity: ${equipment.company === Company.EQUIPOS_OSENAL ? 0.15 : 1};
         }
         .header {
           position: absolute;
@@ -318,7 +319,6 @@ const buildHtml = (
             <table class="info">
               ${field('Nombre', employee.name || 'N/A')}
               ${field('Puesto', employee.position || employee.department || 'N/A')}
-              ${field('Empresa', equipment.company || 'N/A')}
             </table>
           </div>
 

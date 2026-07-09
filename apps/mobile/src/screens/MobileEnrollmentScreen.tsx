@@ -108,13 +108,19 @@ const MobileEnrollmentScreen = () => {
     const assignedPhone = assignedUser?.phone?.trim() || '';
     if (!assignedPhone) return;
 
-    setForm((prev) => ({
-      ...prev,
-      specs: {
-        ...prev.specs,
-        phoneNumber: assignedPhone
+    setForm((prev) => {
+      if (prev.specs.phoneNumber === assignedPhone) {
+        return prev;
       }
-    }));
+
+      return {
+        ...prev,
+        specs: {
+          ...prev.specs,
+          phoneNumber: assignedPhone
+        }
+      };
+    });
   }, [form.assignedTo, users]);
 
   const activeUsers = useMemo(
