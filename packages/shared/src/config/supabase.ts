@@ -1,10 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
+import { requireEnv } from './env';
 
-const SUPABASE_URL = 'https://iwnbscekenptumanpjcs.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3bmJzY2VrZW5wdHVtYW5wamNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzg2OTQsImV4cCI6MjA5NDg1NDY5NH0.7-YjXYAEXmkKGENNAWc99kplFrq7L8fQbPg1M0AhtNQ';
-
-const supabaseUrl = SUPABASE_URL;
-const supabaseAnonKey = SUPABASE_ANON_KEY;
+// Las credenciales se leen desde variables de entorno (nunca hardcodeadas).
+// Vite (desktop): VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
+// Expo (mobile):  EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY
+const supabaseUrl = requireEnv('Supabase URL', 'VITE_SUPABASE_URL', 'EXPO_PUBLIC_SUPABASE_URL');
+const supabaseAnonKey = requireEnv('Supabase anon key', 'VITE_SUPABASE_ANON_KEY', 'EXPO_PUBLIC_SUPABASE_ANON_KEY');
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {

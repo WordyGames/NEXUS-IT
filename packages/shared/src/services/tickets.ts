@@ -81,9 +81,14 @@ export const getTickets = async (filters?: TicketFilters): Promise<Ticket[]> => 
   return tickets;
 };
 
-export const getTicketById = async (id: string): Promise<Ticket | null> => {
+export const getTicketById = async (id: string, company?: string): Promise<Ticket | null> => {
+  // Filtro multi-tenant: si se provee company, restringe al tenant.
+  // La proteccion REAL debe venir de RLS en Supabase (ver supabase/migrations).
+  let ticketQuery = supabase.from('tickets').select('*').eq('id', id);
+  if (company) ticketQuery = ticketQuery.eq('company', company);
+
   const [ticketResult, commentsResult] = await Promise.all([
-    supabase.from('tickets').select('*').eq('id', id).single(),
+    ticketQuery.single(),
     supabase.from('ticket_comments').select('*').eq('ticket_id', id).order('created_at', { ascending: true })
   ]);
 
@@ -121,7 +126,7 @@ export const createTicket = async (
   return data.id;
 };
 
-export const updateTicket = async (id: string, data: Partial<Ticket>): Promise<void> => {
+export const updateTicket = async (id: string, data: Partial<Ticket>, company?: string): Promise<void> => {
   const updates: any = { updated_at: new Date().toISOString() };
 
   if (data.title !== undefined) updates.title = data.title;
@@ -143,12 +148,15 @@ export const updateTicket = async (id: string, data: Partial<Ticket>): Promise<v
   if (data.resolvedAt !== undefined) updates.resolved_at = data.resolvedAt ? new Date(data.resolvedAt as any).toISOString() : null;
   if (data.closedAt !== undefined) updates.closed_at = data.closedAt ? new Date(data.closedAt as any).toISOString() : null;
 
-  const { error } = await supabase.from('tickets').update(updates).eq('id', id);
+  // Filtro multi-tenant en la mutacion. La proteccion real es RLS en Supabase.
+  let uq = supabase.from('tickets').update(updates).eq('id', id);
+  if (company) uq = uq.eq('company', company);
+  const { error } = await uq;
   if (error) throw error;
 };
 
-export const deleteTicket = async (id: string): Promise<void> => {
-  const ticket = await getTicketById(id);
+export const deleteTicket = async (id: string, company?: string): Promise<void> => {
+  const ticket = await getTicketById(id, company);
   if (ticket) {
     const allAttachments = [
       ...(ticket.attachments ?? []),
@@ -162,7 +170,9 @@ export const deleteTicket = async (id: string): Promise<void> => {
     );
   }
 
-  const { error } = await supabase.from('tickets').delete().eq('id', id);
+  let dq = supabase.from('tickets').delete().eq('id', id);
+  if (company) dq = dq.eq('company', company);
+  const { error } = await dq;
   if (error) throw error;
 };
 

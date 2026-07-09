@@ -3,15 +3,18 @@ import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import type { Analytics } from 'firebase/analytics';
+import { readEnv } from './env';
 
+// Config de Firebase leida desde variables de entorno (nunca hardcodeada).
+// Vite (desktop): VITE_FIREBASE_*  |  Expo (mobile): EXPO_PUBLIC_FIREBASE_*
 const firebaseConfig = {
-  apiKey: "AIzaSyBWOjYAajcHeWZ44fkNNngLoRP-Up8EhJg",
-  authDomain: "nexus-it-e8568.firebaseapp.com",
-  projectId: "nexus-it-e8568",
-  storageBucket: "nexus-it-e8568.firebasestorage.app",
-  messagingSenderId: "915769148490",
-  appId: "1:915769148490:web:e72918686ca03c9256d2b3",
-  measurementId: "G-JTWE0302CT"
+  apiKey: readEnv('VITE_FIREBASE_API_KEY', 'EXPO_PUBLIC_FIREBASE_API_KEY'),
+  authDomain: readEnv('VITE_FIREBASE_AUTH_DOMAIN', 'EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN'),
+  projectId: readEnv('VITE_FIREBASE_PROJECT_ID', 'EXPO_PUBLIC_FIREBASE_PROJECT_ID'),
+  storageBucket: readEnv('VITE_FIREBASE_STORAGE_BUCKET', 'EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET'),
+  messagingSenderId: readEnv('VITE_FIREBASE_MESSAGING_SENDER_ID', 'EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID'),
+  appId: readEnv('VITE_FIREBASE_APP_ID', 'EXPO_PUBLIC_FIREBASE_APP_ID'),
+  measurementId: readEnv('VITE_FIREBASE_MEASUREMENT_ID', 'EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID')
 };
 
 // Initialize Firebase
@@ -27,7 +30,7 @@ if (!getApps().length) {
   auth = getAuth(app);
   db = getFirestore(app);
   storage = getStorage(app);
-  
+
   // Analytics solo funciona en navegador web.
   if (isBrowserRuntime) {
     try {

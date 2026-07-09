@@ -61,12 +61,13 @@ export const getEquipment = async (filters?: EquipmentFilters): Promise<Equipmen
   return equipment;
 };
 
-export const getEquipmentById = async (id: string): Promise<Equipment | null> => {
-  const { data, error } = await supabase
-    .from('equipment')
-    .select('*')
-    .eq('id', id)
-    .single();
+export const getEquipmentById = async (id: string, company?: string): Promise<Equipment | null> => {
+  // Filtro multi-tenant: si se provee company, restringe al tenant.
+  // La proteccion REAL debe venir de RLS en Supabase (ver supabase/migrations).
+  let q = supabase.from('equipment').select('*').eq('id', id);
+  if (company) q = q.eq('company', company);
+
+  const { data, error } = await q.single();
 
   if (error || !data) return null;
   return rowToEquipment(data);
@@ -101,7 +102,7 @@ export const createEquipment = async (
   return data.id;
 };
 
-export const updateEquipment = async (id: string, data: Partial<Equipment>): Promise<void> => {
+export const updateEquipment = async (id: string, data: Partial<Equipment>, company?: string): Promise<void> => {
   const updates: any = { updated_at: new Date().toISOString() };
 
   if (data.name !== undefined) updates.name = data.name;
@@ -122,12 +123,15 @@ export const updateEquipment = async (id: string, data: Partial<Equipment>): Pro
     updates.purchase_date = data.purchaseDate ? new Date(data.purchaseDate as any).toISOString() : null;
   }
 
-  const { error } = await supabase.from('equipment').update(updates).eq('id', id);
+  // Filtro multi-tenant en la mutacion. La proteccion real es RLS en Supabase.
+  let uq = supabase.from('equipment').update(updates).eq('id', id);
+  if (company) uq = uq.eq('company', company);
+  const { error } = await uq;
   if (error) throw error;
 };
 
-export const deleteEquipment = async (id: string): Promise<void> => {
-  const eq = await getEquipmentById(id);
+export const deleteEquipment = async (id: string, company?: string): Promise<void> => {
+  const eq = await getEquipmentById(id, company);
   if (eq?.attachments?.length) {
     await Promise.allSettled(
       eq.attachments.map(a => {
@@ -137,7 +141,9 @@ export const deleteEquipment = async (id: string): Promise<void> => {
     );
   }
 
-  const { error } = await supabase.from('equipment').delete().eq('id', id);
+  let dq = supabase.from('equipment').delete().eq('id', id);
+  if (company) dq = dq.eq('company', company);
+  const { error } = await dq;
   if (error) throw error;
 };
 
