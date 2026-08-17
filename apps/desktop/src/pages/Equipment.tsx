@@ -11,6 +11,7 @@ import {
   deleteEquipment,
   EquipmentFilters,
   getUsers,
+  getUserById,
   User,
   subscribeEquipmentChanges,
   createEquipmentLoan,
@@ -233,8 +234,10 @@ const Equipment = () => {
         return;
       }
 
-      // Cargar información del usuario asignado
-      const assignedUser = users.find(u => u.id === eq.assignedTo);
+      // Cargar información actualizada del usuario asignado directamente de la BD
+      // (no del arreglo `users` en memoria, que puede estar desactualizado si el
+      // puesto/departamento se editó en otra pantalla sin recargar Equipos).
+      const assignedUser = await getUserById(eq.assignedTo);
 
       if (!assignedUser) {
         showToast({
@@ -251,7 +254,7 @@ const Equipment = () => {
         const activeLoan = await getActiveLoanForEquipment(eq.id);
         if (activeLoan) {
           const previousAssignedUser = activeLoan.previousAssignedTo
-            ? users.find((u) => u.id === activeLoan.previousAssignedTo)
+            ? await getUserById(activeLoan.previousAssignedTo)
             : undefined;
           loanInfo = {
             startDate: activeLoan.loanDate,
@@ -293,13 +296,13 @@ const Equipment = () => {
   const handleConfirmLoan = async ({ borrowerId, days, notes }: { borrowerId: string; days: number; notes?: string }) => {
     if (!loanTarget) return;
 
-    const borrower = users.find((u) => u.id === borrowerId);
+    const borrower = await getUserById(borrowerId);
     if (!borrower) {
       showToast({ type: 'error', title: 'Usuario no encontrado', message: 'Selecciona un usuario válido' });
       return;
     }
 
-    const previousAssignedUser = loanTarget.assignedTo ? users.find((u) => u.id === loanTarget.assignedTo) : undefined;
+    const previousAssignedUser = loanTarget.assignedTo ? await getUserById(loanTarget.assignedTo) : undefined;
 
     const loan = await createEquipmentLoan({
       equipmentId: loanTarget.id,
@@ -363,11 +366,11 @@ const Equipment = () => {
     equipmentSnapshot: EquipmentType,
     pendingLoan: { borrowerId: string; days: number; notes?: string }
   ) => {
-    const borrower = users.find((u) => u.id === pendingLoan.borrowerId);
+    const borrower = await getUserById(pendingLoan.borrowerId);
     if (!borrower) return;
 
     const previousAssignedUser = equipmentSnapshot.assignedTo
-      ? users.find((u) => u.id === equipmentSnapshot.assignedTo)
+      ? await getUserById(equipmentSnapshot.assignedTo)
       : undefined;
 
     const loan = await createEquipmentLoan({

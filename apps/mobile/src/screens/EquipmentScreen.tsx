@@ -17,6 +17,7 @@ import {
   UserPermission,
   subscribeEquipmentChanges,
   getUsers,
+  getUserById,
   createEquipmentLoan,
   getActiveLoanForEquipment,
   returnEquipmentLoan
@@ -135,15 +136,18 @@ const EquipmentScreen = ({ navigation }: any) => {
 
     setLoanSubmitting(true);
     try {
+      // Traer datos actualizados directo de la BD (no del arreglo `users` en
+      // memoria) para que la carta refleje puesto/departamento recién editados.
+      const freshBorrower = (await getUserById(borrower.id)) || borrower;
       const previousAssignedUser = loanTarget.assignedTo
-        ? users.find((u) => u.id === loanTarget.assignedTo)
+        ? await getUserById(loanTarget.assignedTo)
         : undefined;
 
       const loan = await createEquipmentLoan({
         equipmentId: loanTarget.id,
         company: loanTarget.company,
-        borrowerId: borrower.id,
-        borrowerName: borrower.name,
+        borrowerId: freshBorrower.id,
+        borrowerName: freshBorrower.name,
         days,
         notes: loanNotes.trim() || undefined,
         generatedBy: userData?.id,
@@ -151,7 +155,7 @@ const EquipmentScreen = ({ navigation }: any) => {
       });
 
       await generateCartaResponsivaMobile({
-        employee: borrower,
+        employee: freshBorrower,
         equipment: loanTarget,
         generatedBy: userData?.name || 'Sistema',
         notes: loanNotes.trim() || undefined,
