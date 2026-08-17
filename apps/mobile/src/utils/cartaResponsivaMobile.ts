@@ -4,11 +4,20 @@ import * as Sharing from 'expo-sharing';
 import { Asset } from 'expo-asset';
 import { Company, Equipment, User } from '@nexus-it/shared';
 
+interface CartaResponsivaLoanInfo {
+  startDate: Date;
+  dueDate: Date;
+  days: number;
+  previousAssignedToName?: string;
+}
+
 interface CartaResponsivaData {
   employee: User;
   equipment: Equipment;
   generatedBy: string;
   notes?: string;
+  /** Si se provee, la carta se genera como PRESTAMO TEMPORAL (por dias) en vez de asignacion permanente. */
+  loan?: CartaResponsivaLoanInfo;
 }
 
 interface GenerateCartaResponsivaMobileOptions {
@@ -40,6 +49,17 @@ const CONDITIONS = [
   'El equipo es propiedad de la empresa y debe ser utilizado únicamente para actividades laborales.',
   'Cualquier software adicional deberá ser autorizado por el departamento de TI.',
   'Cualquier daño o pérdida del equipo será responsabilidad del empleado, por lo cual asumirá el costo del reemplazo o reparación.'
+];
+
+const buildLoanConditions = (loan: CartaResponsivaLoanInfo): string[] => [
+  'El empleado se compromete a cuidar y usar adecuadamente el equipo prestado.',
+  'Cualquier daño, pérdida o robo deberá ser reportado inmediatamente al departamento de TI.',
+  `El equipo deberá devolverse a más tardar el ${toDateString(loan.dueDate)} (${loan.days} día${loan.days !== 1 ? 's' : ''} de préstamo).`,
+  'No se permite el uso del equipo para fines personales sin autorización expresa.',
+  'El equipo es propiedad de la empresa y debe ser utilizado únicamente para actividades laborales.',
+  'Cualquier software adicional deberá ser autorizado por el departamento de TI.',
+  'Cualquier daño o pérdida del equipo durante el período de préstamo será responsabilidad del empleado, por lo cual asumirá el costo del reemplazo o reparación.',
+  'La no devolución del equipo en la fecha indicada se considerará uso no autorizado del bien de la empresa.'
 ];
 
 const escapeHtml = (value: string): string => (
@@ -97,7 +117,7 @@ const buildHtml = (
     employeeSignatureDataUri: string | null;
   }
 ): string => {
-  const { employee, equipment, generatedBy } = data;
+  const { employee, equipment, generatedBy, loan } = data;
   const {
     backgroundDataUri,
     dateString,
@@ -107,9 +127,21 @@ const buildHtml = (
   const colors = COMPANY_COLORS[equipment.company];
   const margin = equipment.company === Company.ESPECIAS_NATURALES ? 40 : 20;
 
-  const conditionsList = CONDITIONS.map((condition, index) => (
+  const conditionsList = (loan ? buildLoanConditions(loan) : CONDITIONS).map((condition, index) => (
     `<li><span class="num">${index + 1}.</span> ${escapeHtml(condition)}</li>`
   )).join('');
+
+  const loanSection = loan ? `
+    <div class="section">
+      <h3 class="section-title">DATOS DEL PRÉSTAMO</h3>
+      <table class="info">
+        ${field('Inicio', toDateString(loan.startDate))}
+        ${field('Devolución', toDateString(loan.dueDate))}
+        ${field('Duración', `${loan.days} día${loan.days !== 1 ? 's' : ''}`)}
+        ${loan.previousAssignedToName ? field('Asignado habitual', loan.previousAssignedToName) : ''}
+      </table>
+    </div>
+  ` : '';
 
   const googleAccountForNotes = equipment.specs.googleAccountEmail?.trim() || '________________________';
   const googlePasswordForNotes = equipment.specs.googleAccountPassword?.trim() || '________________________';
@@ -310,7 +342,7 @@ const buildHtml = (
 
         <div class="header">
           <h1>CARTA RESPONSIVA</h1>
-          <h2>EQUIPO DE CÓMPUTO</h2>
+          <h2>${loan ? 'EQUIPO DE CÓMPUTO · PRÉSTAMO TEMPORAL' : 'EQUIPO DE CÓMPUTO'}</h2>
         </div>
 
         <div class="content">
@@ -338,6 +370,8 @@ const buildHtml = (
               ${field('Hostname', equipment.specs.hostname || 'N/A')}
             </table>
           </div>
+
+          ${loanSection}
 
           <div class="section">
             <h3 class="section-title">CONDICIONES Y RESPONSABILIDADES</h3>

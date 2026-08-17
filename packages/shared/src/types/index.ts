@@ -40,9 +40,50 @@ export interface Equipment {
   status: 'active' | 'inactive' | 'maintenance' | 'retired';
   notes?: string;
   attachments?: Attachment[]; // Fotos o documentos del equipo
+  onLoan?: boolean; // true mientras el equipo esta prestado temporalmente a alguien distinto de su dueño habitual
+  loanDueDate?: Date | Timestamp; // fecha en que debe devolverse el prestamo activo (si onLoan)
   createdAt: Date | Timestamp;
   updatedAt: Date | Timestamp;
   createdBy: string;
+}
+
+// Prestamo temporal de equipo (carta responsiva "por dias")
+export interface EquipmentLoan {
+  id: string;
+  equipmentId: string;
+  company: Company;
+  borrowerId?: string;
+  borrowerName: string;
+  previousAssignedTo?: string;
+  previousAssignedToName?: string;
+  loanDate: Date;
+  dueDate: Date;
+  days: number;
+  returnedAt?: Date;
+  status: 'active' | 'returned' | 'cancelled';
+  notes?: string;
+  generatedBy?: string;
+  generatedByName?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface EquipmentLoanFilters {
+  company?: Company;
+  equipmentId?: string;
+  borrowerId?: string;
+  status?: EquipmentLoan['status'];
+}
+
+export interface CreateEquipmentLoanInput {
+  equipmentId: string;
+  company: Company;
+  borrowerId?: string;
+  borrowerName: string;
+  days: number;
+  notes?: string;
+  generatedBy?: string;
+  generatedByName?: string;
 }
 
 // Specs técnicas de equipos

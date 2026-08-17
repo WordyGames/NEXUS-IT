@@ -26,6 +26,8 @@ const rowToEquipment = (row: any): Equipment => ({
   status: row.status,
   notes: row.notes ?? undefined,
   attachments: row.attachments ?? [],
+  onLoan: row.on_loan ?? false,
+  loanDueDate: toDate(row.loan_due_date),
   warrantyExpiration: toDate(row.warranty_expiration),
   purchaseDate: toDate(row.purchase_date),
   createdAt: toDate(row.created_at) ?? new Date(),
@@ -111,6 +113,15 @@ export const updateEquipment = async (id: string, data: Partial<Equipment>, comp
   if (data.specs !== undefined) updates.specs = data.specs;
   if (data.location !== undefined) updates.location = data.location;
   if (data.assignedTo !== undefined) updates.assigned_to = data.assignedTo ?? null;
+  if (data.onLoan !== undefined) {
+    updates.on_loan = data.onLoan;
+    // Al cerrar un prestamo (onLoan: false) siempre limpiamos la fecha de devolucion,
+    // aunque no se pase loanDueDate explicitamente.
+    if (!data.onLoan) updates.loan_due_date = null;
+  }
+  if (data.loanDueDate !== undefined) {
+    updates.loan_due_date = data.loanDueDate ? new Date(data.loanDueDate as any).toISOString().slice(0, 10) : null;
+  }
   if (data.status !== undefined) updates.status = data.status;
   if (data.notes !== undefined) updates.notes = data.notes ?? null;
   if (data.attachments !== undefined) updates.attachments = data.attachments;

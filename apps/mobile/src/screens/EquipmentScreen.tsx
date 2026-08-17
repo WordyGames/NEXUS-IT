@@ -7,17 +7,18 @@ import {
   ActivityIndicator,
   TouchableOpacity
 } from 'react-native';
-import { getEquipment, Equipment, subscribeEquipmentChanges } from '@nexus-it/shared';
+import { getEquipment, Equipment, UserPermission, subscribeEquipmentChanges } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
 
 const EquipmentScreen = ({ navigation }: any) => {
-  const { userData, isAdmin } = useAuth();
+  const { userData, isAdmin, hasPermission } = useAuth();
+  const canManageEquipment = isAdmin || hasPermission(UserPermission.EQUIPMENT_MANAGE);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     void loadEquipment();
-  }, [isAdmin, userData?.id]);
+  }, [canManageEquipment, userData?.id]);
 
   useEffect(() => {
     if (!userData?.id) return;
@@ -34,7 +35,7 @@ const EquipmentScreen = ({ navigation }: any) => {
     );
 
     return unsubscribe;
-  }, [isAdmin, userData?.id]);
+  }, [canManageEquipment, userData?.id]);
 
   const loadEquipment = async (blocking = true) => {
     try {
@@ -46,7 +47,7 @@ const EquipmentScreen = ({ navigation }: any) => {
         return;
       }
 
-      const data = await getEquipment(isAdmin ? undefined : { assignedTo: userData.id });
+      const data = await getEquipment(canManageEquipment ? undefined : { assignedTo: userData.id });
       setEquipment(data);
     } catch (error) {
       console.error('Error loading equipment:', error);
@@ -92,15 +93,15 @@ const EquipmentScreen = ({ navigation }: any) => {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.title}>{isAdmin ? 'Equipos' : 'Mis Equipos'}</Text>
+        <Text style={styles.title}>{canManageEquipment ? 'Equipos' : 'Mis Equipos'}</Text>
         <Text style={styles.subtitle}>
-          {isAdmin
+          {canManageEquipment
             ? 'Gestión global de inventario'
             : `Equipos asignados a ${userData?.name || 'usuario'}`}
         </Text>
       </View>
 
-      {isAdmin && (
+      {canManageEquipment && (
         <TouchableOpacity
           style={styles.enrollButton}
           onPress={() => navigation.navigate('MobileEnrollment')}
@@ -112,10 +113,10 @@ const EquipmentScreen = ({ navigation }: any) => {
       {equipment.length === 0 ? (
         <View style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>
-            {isAdmin ? 'No hay equipos registrados' : 'No tienes equipos asignados'}
+            {canManageEquipment ? 'No hay equipos registrados' : 'No tienes equipos asignados'}
           </Text>
           <Text style={styles.emptyText}>
-            {isAdmin
+            {canManageEquipment
               ? 'Registra el primer equipo para comenzar el inventario.'
               : 'Contacta al administrador para solicitar equipos.'}
           </Text>
@@ -144,6 +145,12 @@ const EquipmentScreen = ({ navigation }: any) => {
             {eq.warrantyExpiration && (
               <Text style={styles.warrantyText}>
                 Garantía vence: {getDateFromTimestamp(eq.warrantyExpiration)}
+              </Text>
+            )}
+
+            {eq.onLoan && eq.loanDueDate && (
+              <Text style={styles.loanText}>
+                Préstamo temporal · vence {getDateFromTimestamp(eq.loanDueDate)}
               </Text>
             )}
           </View>
@@ -249,6 +256,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 12,
     color: '#6b7280'
+  },
+  loanText: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#b45309'
   },
   emptyCard: {
     backgroundColor: '#eff6ff',

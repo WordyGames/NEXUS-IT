@@ -6,12 +6,24 @@ import amexBg from '../assets/carta-backgrounds/amex.png';
 import aromataBg from '../assets/carta-backgrounds/aromata.png';
 import liumaqBg from '../assets/carta-backgrounds/liumaq.png';
 
+interface CartaResponsivaLoanInfo {
+  startDate: Date;
+  dueDate: Date;
+  days: number;
+  previousAssignedToName?: string;
+}
+
 interface CartaResponsivaData {
   employee: User;
   equipment: Equipment;
   generatedBy: string;
   notes?: string;
+  /** Si se provee, la carta se genera como PRESTAMO TEMPORAL (por dias) en vez de asignacion permanente. */
+  loan?: CartaResponsivaLoanInfo;
 }
+
+const formatDate = (date: Date): string =>
+  date.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
 const COMPANY_COLORS = {
   [Company.ESPECIAS_NATURALES]: { primary: '#2E7D32', secondary: '#66BB6A' },
@@ -26,7 +38,7 @@ const COMPANY_BACKGROUNDS = {
 };
 
 export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Promise<void> => {
-  const { employee, equipment, generatedBy } = data;
+  const { employee, equipment, generatedBy, loan } = data;
   const colors = COMPANY_COLORS[equipment.company];
 
   const doc = new jsPDF({
@@ -65,12 +77,14 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   }
 
   // ===== ENCABEZADO =====
+  // El titulo se mantiene corto para no encimarse con el logo del fondo;
+  // la leyenda de "prestamo temporal" va en el subtitulo, mas chico.
   doc.setFontSize(18);
   doc.setTextColor(colors.primary);
   doc.text('CARTA RESPONSIVA', pageWidth / 2, 12, { align: 'center' });
 
-  doc.setFontSize(10);
-  doc.text('EQUIPO DE CÓMPUTO', pageWidth / 2, 20, { align: 'center' });
+  doc.setFontSize(9);
+  doc.text(loan ? 'EQUIPO DE CÓMPUTO · PRÉSTAMO TEMPORAL' : 'EQUIPO DE CÓMPUTO', pageWidth / 2, 20, { align: 'center' });
 
   yPos = 35;
 
@@ -124,20 +138,47 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
 
   yPos += compactLayout.sectionGap;
 
+  // ===== DATOS DEL PRÉSTAMO (solo si es prestamo temporal) =====
+  if (loan) {
+    addSectionTitle('DATOS DEL PRÉSTAMO');
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+
+    addField('Inicio', formatDate(loan.startDate));
+    addField('Devolución', formatDate(loan.dueDate));
+    addField('Duración', `${loan.days} día${loan.days !== 1 ? 's' : ''}`);
+    if (loan.previousAssignedToName) {
+      addField('Asignado habitual', loan.previousAssignedToName);
+    }
+
+    yPos += compactLayout.sectionGap;
+  }
+
   // ===== CONDICIONES Y RESPONSABILIDADES =====
   addSectionTitle('CONDICIONES Y RESPONSABILIDADES');
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(8.5);
 
-  const conditions = [
-    'El empleado se compromete a cuidar y usar adecuadamente el equipo asignado.',
-    'Cualquier daño, pérdida o robo deberá ser reportado inmediatamente al departamento de TI.',
-    'El equipo debe ser devuelto en las mismas condiciones al término de la relación laboral.',
-    'No se permite el uso del equipo para fines personales sin autorización expresa.',
-    'El equipo es propiedad de la empresa y debe ser utilizado únicamente para actividades laborales.',
-    'Cualquier software adicional deberá ser autorizado por el departamento de TI.',
-    'Cualquier daño o pérdida del equipo será responsabilidad del empleado, por lo cual asumirá el costo del reemplazo o reparación.'
-  ];
+  const conditions = loan
+    ? [
+        'El empleado se compromete a cuidar y usar adecuadamente el equipo prestado.',
+        'Cualquier daño, pérdida o robo deberá ser reportado inmediatamente al departamento de TI.',
+        `El equipo deberá devolverse a más tardar el ${formatDate(loan.dueDate)} (${loan.days} día${loan.days !== 1 ? 's' : ''} de préstamo).`,
+        'No se permite el uso del equipo para fines personales sin autorización expresa.',
+        'El equipo es propiedad de la empresa y debe ser utilizado únicamente para actividades laborales.',
+        'Cualquier software adicional deberá ser autorizado por el departamento de TI.',
+        'Cualquier daño o pérdida del equipo durante el período de préstamo será responsabilidad del empleado, por lo cual asumirá el costo del reemplazo o reparación.',
+        'La no devolución del equipo en la fecha indicada se considerará uso no autorizado del bien de la empresa.'
+      ]
+    : [
+        'El empleado se compromete a cuidar y usar adecuadamente el equipo asignado.',
+        'Cualquier daño, pérdida o robo deberá ser reportado inmediatamente al departamento de TI.',
+        'El equipo debe ser devuelto en las mismas condiciones al término de la relación laboral.',
+        'No se permite el uso del equipo para fines personales sin autorización expresa.',
+        'El equipo es propiedad de la empresa y debe ser utilizado únicamente para actividades laborales.',
+        'Cualquier software adicional deberá ser autorizado por el departamento de TI.',
+        'Cualquier daño o pérdida del equipo será responsabilidad del empleado, por lo cual asumirá el costo del reemplazo o reparación.'
+      ];
 
   conditions.forEach((condition, index) => {
     const lines = doc.splitTextToSize(`${index + 1}. ${condition}`, pageWidth - 2 * margin - 10);
@@ -189,15 +230,11 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   // ===== PIE DE PÁGINA =====
   doc.setFontSize(8);
   doc.setTextColor(128, 128, 128);
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('es-MX', { 
-    year: 'numeric', 
-    month: '2-digit', 
-    day: '2-digit' 
-  });
+  const dateStr = formatDate(new Date());
   doc.text(`Generado: ${dateStr}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
 
   // Guardar PDF
-  const fileName = `Carta_Responsiva_${employee.name?.replace(/\s+/g, '_')}_${dateStr.replace(/\//g, '-')}.pdf`;
+  const fileSuffix = loan ? `Prestamo_${formatDate(loan.dueDate).replace(/\//g, '-')}` : dateStr.replace(/\//g, '-');
+  const fileName = `Carta_Responsiva_${employee.name?.replace(/\s+/g, '_')}_${fileSuffix}.pdf`;
   doc.save(fileName);
 };

@@ -4,6 +4,7 @@ export * from './utils/helpers';
 export * from './utils/permissions';
 export * from './utils/runtimeLogger';
 export * from './services/equipment';
+export * from './services/equipmentLoans';
 export * from './services/tickets';
 export * from './services/users';
 export * from './services/maintenance';

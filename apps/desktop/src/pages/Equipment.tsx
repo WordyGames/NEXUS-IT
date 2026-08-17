@@ -12,11 +12,15 @@ import {
   EquipmentFilters,
   getUsers,
   User,
-  subscribeEquipmentChanges
+  subscribeEquipmentChanges,
+  createEquipmentLoan,
+  getActiveLoanForEquipment,
+  returnEquipmentLoan
 } from '@nexus-it/shared';
 import EquipmentCard from '../components/EquipmentCard';
 import EquipmentForm from '../components/EquipmentForm';
 import EquipmentQRCode from '../components/EquipmentQRCode';
+import EquipmentLoanModal from '../components/EquipmentLoanModal';
 import { Download, Plus, Monitor, ChevronLeft, ChevronRight } from 'lucide-react';
 import { exportEquipmentToExcel } from '../utils/exportToExcel';
 import { generateCartaResponsivaPDF } from '../utils/cartaResponsivaPDF';
@@ -58,6 +62,7 @@ const Equipment = () => {
   const [editingEquipment, setEditingEquipment] = useState<EquipmentType | null>(null);
   const [showQRModal, setShowQRModal] = useState(false);
   const [selectedEquipmentForQR, setSelectedEquipmentForQR] = useState<EquipmentType | null>(null);
+  const [loanTarget, setLoanTarget] = useState<EquipmentType | null>(null);
   const [filters, setFilters] = useState<EquipmentFilters>({});
   const [searchInput, setSearchInput] = useState('');
   const isFirstLoadRef = useRef(true);
@@ -263,6 +268,78 @@ const Equipment = () => {
     }
   };
 
+  const handleOpenLoan = (eq: EquipmentType) => {
+    setLoanTarget(eq);
+  };
+
+  const handleConfirmLoan = async ({ borrowerId, days, notes }: { borrowerId: string; days: number; notes?: string }) => {
+    if (!loanTarget) return;
+
+    const borrower = users.find((u) => u.id === borrowerId);
+    if (!borrower) {
+      showToast({ type: 'error', title: 'Usuario no encontrado', message: 'Selecciona un usuario válido' });
+      return;
+    }
+
+    const previousAssignedUser = loanTarget.assignedTo ? users.find((u) => u.id === loanTarget.assignedTo) : undefined;
+
+    const loan = await createEquipmentLoan({
+      equipmentId: loanTarget.id,
+      company: loanTarget.company,
+      borrowerId: borrower.id,
+      borrowerName: borrower.name,
+      days,
+      notes,
+      generatedBy: userData?.id,
+      generatedByName: userData?.name || 'Sistema'
+    });
+
+    await generateCartaResponsivaPDF({
+      employee: borrower,
+      equipment: loanTarget,
+      generatedBy: userData?.name || 'Sistema',
+      notes,
+      loan: {
+        startDate: loan.loanDate,
+        dueDate: loan.dueDate,
+        days: loan.days,
+        previousAssignedToName: previousAssignedUser?.name
+      }
+    });
+
+    setLoanTarget(null);
+    await loadEquipment(false);
+    showToast({
+      type: 'success',
+      title: 'Préstamo registrado',
+      message: `Carta responsiva de préstamo generada para ${borrower.name}`
+    });
+  };
+
+  const handleReturnLoan = async (eq: EquipmentType) => {
+    const accepted = await confirm({
+      title: 'Registrar devolución',
+      message: `¿Confirmas que "${eq.name}" fue devuelto? Se restaurará la asignación anterior.`,
+      confirmText: 'Confirmar devolución',
+      cancelText: 'Cancelar'
+    });
+    if (!accepted) return;
+
+    try {
+      const activeLoan = await getActiveLoanForEquipment(eq.id);
+      if (!activeLoan) {
+        showToast({ type: 'warning', title: 'Sin préstamo activo', message: 'Este equipo no tiene un préstamo activo registrado' });
+        return;
+      }
+      await returnEquipmentLoan(activeLoan.id);
+      await loadEquipment(false);
+      showToast({ type: 'success', title: 'Devolución registrada', message: 'El equipo volvió a su asignación anterior' });
+    } catch (error) {
+      console.error('Error returning loan:', error);
+      showToast({ type: 'error', title: 'Error al registrar devolución', message: 'No se pudo registrar la devolución' });
+    }
+  };
+
   const handleSubmit = async (data: any): Promise<string> => {
     try {
       if (editingEquipment) {
@@ -422,6 +499,8 @@ const Equipment = () => {
                 onDelete={() => handleDelete(eq.id)}
                 onShowQR={() => handleShowQR(eq)}
                 onGenerateCarta={() => handleGenerateCarta(eq)}
+                onLoan={canManageEquipment ? () => handleOpenLoan(eq) : undefined}
+                onReturnLoan={canManageEquipment ? () => handleReturnLoan(eq) : undefined}
                 canEdit={canManageEquipment}
               />
             ))}
@@ -455,6 +534,16 @@ const Equipment = () => {
             setShowForm(false);
             setEditingEquipment(null);
           }}
+        />
+      )}
+
+      {/* Modal de Préstamo */}
+      {loanTarget && (
+        <EquipmentLoanModal
+          equipment={loanTarget}
+          users={users}
+          onConfirm={handleConfirmLoan}
+          onCancel={() => setLoanTarget(null)}
         />
       )}
 

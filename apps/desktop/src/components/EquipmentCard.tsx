@@ -1,6 +1,6 @@
 import React from 'react';
 import { Equipment } from '@nexus-it/shared';
-import { QrCode, FileText } from 'lucide-react';
+import { QrCode, FileText, CalendarClock, Undo2 } from 'lucide-react';
 import styles from './EquipmentCard.module.css';
 
 const getCompanyTagVariant = (company: string) => {
@@ -18,6 +18,8 @@ interface EquipmentCardProps {
   onDelete: () => void;
   onShowQR: () => void;
   onGenerateCarta: () => void;
+  onLoan?: () => void;
+  onReturnLoan?: () => void;
   canEdit: boolean;
 }
 
@@ -28,6 +30,8 @@ const EquipmentCard = ({
   onDelete,
   onShowQR,
   onGenerateCarta,
+  onLoan,
+  onReturnLoan,
   canEdit
 }: EquipmentCardProps) => {
   const statusColors: Record<string, string> = {
@@ -62,6 +66,18 @@ const EquipmentCard = ({
     if (daysLeft < 0) return { text: 'Expirada', color: 'text-red-600' };
     if (daysLeft < 30) return { text: `${daysLeft} días`, color: 'text-orange-600' };
     return { text: `${daysLeft} días`, color: 'text-green-600' };
+  };
+
+  const getLoanStatus = (): { text: string; color: string } => {
+    if (!equipment.loanDueDate) return { text: 'Sin fecha', color: 'text-gray-500' };
+    const now = new Date();
+    const due = toDate(equipment.loanDueDate);
+    const daysLeft = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysLeft < 0) return { text: `vencido hace ${Math.abs(daysLeft)} día${Math.abs(daysLeft) !== 1 ? 's' : ''}`, color: 'text-red-600' };
+    if (daysLeft === 0) return { text: 'vence hoy', color: 'text-orange-600' };
+    if (daysLeft <= 3) return { text: `${daysLeft} día${daysLeft !== 1 ? 's' : ''} restantes`, color: 'text-orange-600' };
+    return { text: `${daysLeft} días restantes`, color: 'text-blue-600' };
   };
 
   return (
@@ -131,6 +147,14 @@ const EquipmentCard = ({
           <span className="text-gray-500 dark:text-gray-400 w-24">Asignado:</span>
           <span className="text-gray-800 dark:text-white">{assignedToLabel || 'Sin asignar'}</span>
         </div>
+        {equipment.onLoan && (
+          <div className="flex items-center text-sm">
+            <span className="text-gray-500 dark:text-gray-400 w-24">Préstamo:</span>
+            <span className={`font-semibold ${getLoanStatus().color}`}>
+              Vence {formatDate(equipment.loanDueDate)} <span className="text-xs ml-1">({getLoanStatus().text})</span>
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Warranty Info */}
@@ -168,6 +192,24 @@ const EquipmentCard = ({
         >
           <FileText size={16} />
         </button>
+        {canEdit && onLoan && !equipment.onLoan && (
+          <button
+            onClick={onLoan}
+            className="px-3 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded text-sm transition-colors flex items-center gap-1"
+            title="Prestar equipo por días"
+          >
+            <CalendarClock size={16} />
+          </button>
+        )}
+        {canEdit && onReturnLoan && equipment.onLoan && (
+          <button
+            onClick={onReturnLoan}
+            className="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded text-sm transition-colors flex items-center gap-1"
+            title="Registrar devolución del préstamo"
+          >
+            <Undo2 size={16} />
+          </button>
+        )}
         {canEdit && (
           <>
             <button
