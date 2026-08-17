@@ -203,9 +203,13 @@ const Users = () => {
     if (p.length < 8) return showToast({ type: 'warning', title: 'Teléfono inválido', message: 'Captura un teléfono válido para registrar la cuenta' });
     if (em && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return showToast({ type: 'warning', title: 'Correo inválido', message: 'Captura un correo válido o deja el campo vacío' });
 
+    const editedDepartment = editFormData.department.trim();
     const patch = {
       username: u, name: n, company: editFormData.company,
-      department: editFormData.department.trim(), phone: p, email: em, isActive: editFormData.isActive,
+      // El campo "Departamento" del formulario también se usa como "Puesto" en
+      // la carta responsiva (se guardan iguales al crear el usuario), así que
+      // hay que mantenerlos sincronizados también al editar.
+      department: editedDepartment, position: editedDepartment, phone: p, email: em, isActive: editFormData.isActive,
     };
     const snapshot = users;
     setUsers((prev) => prev.map((usr) => usr.id === selectedUser.id ? { ...usr, ...patch } : usr));
