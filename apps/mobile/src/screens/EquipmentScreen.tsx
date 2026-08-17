@@ -5,20 +5,46 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  TouchableOpacity
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Alert
 } from 'react-native';
-import { getEquipment, Equipment, UserPermission, subscribeEquipmentChanges } from '@nexus-it/shared';
+import {
+  getEquipment,
+  Equipment,
+  User,
+  UserPermission,
+  subscribeEquipmentChanges,
+  getUsers,
+  createEquipmentLoan,
+  getActiveLoanForEquipment,
+  returnEquipmentLoan
+} from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
+import { generateCartaResponsivaMobile } from '../utils/cartaResponsivaMobile';
 
 const EquipmentScreen = ({ navigation }: any) => {
   const { userData, isAdmin, hasPermission } = useAuth();
   const canManageEquipment = isAdmin || hasPermission(UserPermission.EQUIPMENT_MANAGE);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loanTarget, setLoanTarget] = useState<Equipment | null>(null);
+  const [loanBorrowerId, setLoanBorrowerId] = useState('');
+  const [loanDays, setLoanDays] = useState('30');
+  const [loanNotes, setLoanNotes] = useState('');
+  const [loanSubmitting, setLoanSubmitting] = useState(false);
+  const [returningId, setReturningId] = useState<string | null>(null);
 
   useEffect(() => {
     void loadEquipment();
   }, [canManageEquipment, userData?.id]);
+
+  useEffect(() => {
+    if (!canManageEquipment) return;
+    void getUsers().then(setUsers).catch((error) => console.error('Error loading users:', error));
+  }, [canManageEquipment]);
 
   useEffect(() => {
     if (!userData?.id) return;
@@ -80,6 +106,101 @@ const EquipmentScreen = ({ navigation }: any) => {
     if (status === 'active') return styles.badgeActive;
     if (status === 'maintenance') return styles.badgeMaintenance;
     return styles.badgeInactive;
+  };
+
+  const openLoanModal = (eq: Equipment) => {
+    setLoanTarget(eq);
+    setLoanBorrowerId(eq.assignedTo || '');
+    setLoanDays('30');
+    setLoanNotes('');
+  };
+
+  const closeLoanModal = () => {
+    setLoanTarget(null);
+  };
+
+  const handleConfirmLoan = async () => {
+    if (!loanTarget) return;
+    const days = Number(loanDays);
+    const borrower = users.find((u) => u.id === loanBorrowerId);
+
+    if (!borrower) {
+      Alert.alert('Falta el usuario', 'Selecciona a quién se le presta el equipo');
+      return;
+    }
+    if (!days || days <= 0) {
+      Alert.alert('Duración inválida', 'La duración debe ser al menos 1 día');
+      return;
+    }
+
+    setLoanSubmitting(true);
+    try {
+      const previousAssignedUser = loanTarget.assignedTo
+        ? users.find((u) => u.id === loanTarget.assignedTo)
+        : undefined;
+
+      const loan = await createEquipmentLoan({
+        equipmentId: loanTarget.id,
+        company: loanTarget.company,
+        borrowerId: borrower.id,
+        borrowerName: borrower.name,
+        days,
+        notes: loanNotes.trim() || undefined,
+        generatedBy: userData?.id,
+        generatedByName: userData?.name || 'Sistema'
+      });
+
+      await generateCartaResponsivaMobile({
+        employee: borrower,
+        equipment: loanTarget,
+        generatedBy: userData?.name || 'Sistema',
+        notes: loanNotes.trim() || undefined,
+        loan: {
+          startDate: loan.loanDate,
+          dueDate: loan.dueDate,
+          days: loan.days,
+          previousAssignedToName: previousAssignedUser?.name
+        }
+      });
+
+      closeLoanModal();
+      await loadEquipment(false);
+    } catch (error) {
+      console.error('Error creating loan:', error);
+      Alert.alert('Error', 'No se pudo registrar el préstamo');
+    } finally {
+      setLoanSubmitting(false);
+    }
+  };
+
+  const handleReturnLoan = (eq: Equipment) => {
+    Alert.alert(
+      'Registrar devolución',
+      `¿Confirmas que "${eq.name}" fue devuelto? Se restaurará la asignación anterior.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Confirmar',
+          onPress: async () => {
+            setReturningId(eq.id);
+            try {
+              const activeLoan = await getActiveLoanForEquipment(eq.id);
+              if (!activeLoan) {
+                Alert.alert('Sin préstamo activo', 'Este equipo no tiene un préstamo activo registrado');
+                return;
+              }
+              await returnEquipmentLoan(activeLoan.id);
+              await loadEquipment(false);
+            } catch (error) {
+              console.error('Error returning loan:', error);
+              Alert.alert('Error', 'No se pudo registrar la devolución');
+            } finally {
+              setReturningId(null);
+            }
+          }
+        }
+      ]
+    );
   };
 
   if (loading) {
@@ -153,9 +274,94 @@ const EquipmentScreen = ({ navigation }: any) => {
                 Préstamo temporal · vence {getDateFromTimestamp(eq.loanDueDate)}
               </Text>
             )}
+
+            {canManageEquipment && (
+              <View style={styles.loanActions}>
+                {!eq.onLoan ? (
+                  <TouchableOpacity style={styles.loanButton} onPress={() => openLoanModal(eq)}>
+                    <Text style={styles.loanButtonText}>Prestar por días</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.returnButton, returningId === eq.id && styles.buttonDisabled]}
+                    onPress={() => handleReturnLoan(eq)}
+                    disabled={returningId === eq.id}
+                  >
+                    <Text style={styles.returnButtonText}>
+                      {returningId === eq.id ? 'Registrando...' : 'Registrar devolución'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
           </View>
         ))
       )}
+
+      <Modal visible={!!loanTarget} animationType="slide" transparent onRequestClose={closeLoanModal}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Prestar equipo por días</Text>
+            {loanTarget && (
+              <Text style={styles.modalSubtitle}>
+                {loanTarget.name} · se generará la carta responsiva de préstamo
+              </Text>
+            )}
+
+            <Text style={styles.label}>Prestar a</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.assigneeRow}>
+              {users.map((user) => (
+                <TouchableOpacity
+                  key={user.id}
+                  style={[styles.userChip, loanBorrowerId === user.id && styles.userChipSelected]}
+                  onPress={() => setLoanBorrowerId(user.id)}
+                >
+                  <Text style={[styles.userChipText, loanBorrowerId === user.id && styles.userChipTextSelected]}>
+                    {user.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={styles.label}>Duración (días)</Text>
+            <TextInput
+              style={styles.input}
+              value={loanDays}
+              onChangeText={setLoanDays}
+              keyboardType="number-pad"
+              placeholder="30"
+            />
+
+            <Text style={styles.label}>Notas (opcional)</Text>
+            <TextInput
+              style={[styles.input, styles.notesInput]}
+              value={loanNotes}
+              onChangeText={setLoanNotes}
+              placeholder="Observaciones adicionales"
+              multiline
+            />
+
+            <View style={styles.modalActionsRow}>
+              <TouchableOpacity
+                style={[styles.secondaryButton, loanSubmitting && styles.buttonDisabled]}
+                onPress={closeLoanModal}
+                disabled={loanSubmitting}
+              >
+                <Text style={styles.secondaryButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.primaryButtonModal, loanSubmitting && styles.buttonDisabled]}
+                onPress={handleConfirmLoan}
+                disabled={loanSubmitting}
+              >
+                <Text style={styles.primaryButtonText}>
+                  {loanSubmitting ? 'Generando...' : 'Prestar y generar carta'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -262,6 +468,130 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#b45309'
+  },
+  loanActions: {
+    marginTop: 10,
+    flexDirection: 'row'
+  },
+  loanButton: {
+    backgroundColor: '#4f46e5',
+    borderRadius: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 14
+  },
+  loanButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  returnButton: {
+    backgroundColor: '#d97706',
+    borderRadius: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 14
+  },
+  returnButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  buttonDisabled: {
+    opacity: 0.5
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 18
+  },
+  modalCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    padding: 18
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginBottom: 12
+  },
+  label: {
+    fontSize: 13,
+    color: '#374151',
+    marginBottom: 6,
+    marginTop: 4
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+    marginBottom: 8
+  },
+  notesInput: {
+    minHeight: 70,
+    textAlignVertical: 'top'
+  },
+  assigneeRow: {
+    marginBottom: 10
+  },
+  userChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    backgroundColor: '#ffffff',
+    marginRight: 8
+  },
+  userChipSelected: {
+    borderColor: '#1d4ed8',
+    backgroundColor: '#dbeafe'
+  },
+  userChipText: {
+    fontSize: 12,
+    color: '#374151'
+  },
+  userChipTextSelected: {
+    color: '#1e3a8a',
+    fontWeight: '700'
+  },
+  modalActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8
+  },
+  secondaryButton: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#1d4ed8',
+    paddingVertical: 10,
+    alignItems: 'center'
+  },
+  secondaryButtonText: {
+    color: '#1d4ed8',
+    fontWeight: '600',
+    fontSize: 13
+  },
+  primaryButtonModal: {
+    flex: 1,
+    backgroundColor: '#1d4ed8',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center'
+  },
+  primaryButtonText: {
+    color: '#ffffff',
+    fontWeight: '700',
+    fontSize: 13
   },
   emptyCard: {
     backgroundColor: '#eff6ff',
