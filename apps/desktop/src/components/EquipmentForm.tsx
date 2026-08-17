@@ -59,6 +59,9 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
     useAttachmentManager(equipment?.attachments || []);
   const [uploading, setUploading] = useState(false);
   const [entityId] = useState<string>(() => generateEntityId(equipment?.id));
+  const [assignMode, setAssignMode] = useState<'permanent' | 'loan'>('permanent');
+  const [loanDays, setLoanDays] = useState<number>(30);
+  const [loanNotes, setLoanNotes] = useState('');
   const [formData, setFormData] = useState({
     company: equipment?.company || Company.GRUPO_AMEX,
     name: equipment?.name || '',
@@ -340,6 +343,17 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
       return;
     }
 
+    const wantsLoan = assignMode === 'loan' && Boolean(formData.assignedTo) && !equipment?.onLoan;
+
+    if (wantsLoan && (!Number.isFinite(loanDays) || loanDays <= 0)) {
+      showToast({
+        type: 'warning',
+        title: 'Días de préstamo inválidos',
+        message: 'Captura cuántos días durará el préstamo'
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const submitData: any = {
@@ -352,10 +366,21 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
         warrantyExpiration: warrantyDateValue
       };
 
+      if (wantsLoan) {
+        // No reasignar permanentemente: el préstamo se registra por separado
+        // y es el que mueve assignedTo/onLoan del equipo.
+        submitData.assignedTo = equipment?.assignedTo || '';
+        submitData.pendingLoan = {
+          borrowerId: formData.assignedTo,
+          days: loanDays,
+          notes: loanNotes || undefined
+        };
+      }
+
       if (!equipment) {
         submitData.id = entityId;
       }
-      
+
       const persistedEquipmentId = await onSubmit(submitData);
       const finalEquipmentId = equipment?.id || persistedEquipmentId || entityId;
       
@@ -437,19 +462,77 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
           </select>
         )}
         {fieldName === 'assignedTo' && (
-          <select
-            value={value}
-            onChange={(e) => handleChange(fieldName, e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-            aria-label="Asignar a"
-          >
-            <option value="">Sin asignar</option>
-            {users.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.name} ({user.username})
-              </option>
-            ))}
-          </select>
+          <>
+            <select
+              value={value}
+              onChange={(e) => handleChange(fieldName, e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+              aria-label="Asignar a"
+            >
+              <option value="">Sin asignar</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name} ({user.username})
+                </option>
+              ))}
+            </select>
+
+            {equipment?.onLoan ? (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                Este equipo ya está en préstamo activo. Usa "Registrar devolución" desde la tarjeta del equipo antes de reasignarlo.
+              </p>
+            ) : Boolean(value) && (
+              <div className="mt-2 border border-gray-200 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-700/50">
+                <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Tipo de asignación</p>
+                <div className="flex gap-4 mb-2">
+                  <label className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="assignMode"
+                      checked={assignMode === 'permanent'}
+                      onChange={() => setAssignMode('permanent')}
+                    />
+                    Asignación permanente
+                  </label>
+                  <label className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="assignMode"
+                      checked={assignMode === 'loan'}
+                      onChange={() => setAssignMode('loan')}
+                    />
+                    Préstamo temporal
+                  </label>
+                </div>
+                {assignMode === 'loan' && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Días de préstamo</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={loanDays}
+                        onChange={(e) => setLoanDays(parseInt(e.target.value, 10) || 0)}
+                        className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Notas (opcional)</label>
+                      <input
+                        type="text"
+                        value={loanNotes}
+                        onChange={(e) => setLoanNotes(e.target.value)}
+                        className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
+                      />
+                    </div>
+                    <p className="col-span-2 text-xs text-gray-500 dark:text-gray-400">
+                      Al guardar se registrará el préstamo y se generará la carta responsiva de préstamo temporal automáticamente.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
         {['purchaseDate', 'warrantyExpiration'].includes(fieldName) && (
           <input

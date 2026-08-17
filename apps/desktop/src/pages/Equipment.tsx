@@ -245,12 +245,30 @@ const Equipment = () => {
         return;
       }
 
+      // Si el equipo está en préstamo activo, usar el formato de carta con datos del préstamo
+      let loanInfo: { startDate: Date; dueDate: Date; days: number; previousAssignedToName?: string } | undefined;
+      if (eq.onLoan) {
+        const activeLoan = await getActiveLoanForEquipment(eq.id);
+        if (activeLoan) {
+          const previousAssignedUser = activeLoan.previousAssignedTo
+            ? users.find((u) => u.id === activeLoan.previousAssignedTo)
+            : undefined;
+          loanInfo = {
+            startDate: activeLoan.loanDate,
+            dueDate: activeLoan.dueDate,
+            days: activeLoan.days,
+            previousAssignedToName: activeLoan.previousAssignedToName || previousAssignedUser?.name
+          };
+        }
+      }
+
       // Generar PDF
       await generateCartaResponsivaPDF({
         employee: assignedUser,
         equipment: eq,
         generatedBy: userData?.name || 'Sistema',
-        notes: eq.notes
+        notes: eq.notes,
+        loan: loanInfo
       });
       showToast({
         type: 'success',
@@ -340,35 +358,91 @@ const Equipment = () => {
     }
   };
 
+  const processPendingLoan = async (
+    equipmentId: string,
+    equipmentSnapshot: EquipmentType,
+    pendingLoan: { borrowerId: string; days: number; notes?: string }
+  ) => {
+    const borrower = users.find((u) => u.id === pendingLoan.borrowerId);
+    if (!borrower) return;
+
+    const previousAssignedUser = equipmentSnapshot.assignedTo
+      ? users.find((u) => u.id === equipmentSnapshot.assignedTo)
+      : undefined;
+
+    const loan = await createEquipmentLoan({
+      equipmentId,
+      company: equipmentSnapshot.company,
+      borrowerId: borrower.id,
+      borrowerName: borrower.name,
+      days: pendingLoan.days,
+      notes: pendingLoan.notes,
+      generatedBy: userData?.id,
+      generatedByName: userData?.name || 'Sistema'
+    });
+
+    await generateCartaResponsivaPDF({
+      employee: borrower,
+      equipment: { ...equipmentSnapshot, id: equipmentId },
+      generatedBy: userData?.name || 'Sistema',
+      notes: pendingLoan.notes,
+      loan: {
+        startDate: loan.loanDate,
+        dueDate: loan.dueDate,
+        days: loan.days,
+        previousAssignedToName: previousAssignedUser?.name
+      }
+    });
+
+    showToast({
+      type: 'success',
+      title: 'Préstamo registrado',
+      message: `Carta responsiva de préstamo generada para ${borrower.name}`
+    });
+  };
+
   const handleSubmit = async (data: any): Promise<string> => {
+    const { pendingLoan, ...restData } = data;
     try {
       if (editingEquipment) {
-        const { id: _ignoredId, ...updateData } = data;
+        const { id: _ignoredId, ...updateData } = restData;
         await updateEquipment(editingEquipment.id, updateData);
-        
-        setShowForm(false);
-        setEditingEquipment(null);
-        await loadEquipment(false);
-        showToast({
-          type: 'success',
-          title: 'Equipo actualizado',
-          message: 'Los cambios se guardaron correctamente'
-        });
-        return editingEquipment.id;
-      } else {
-        const createdId = await createEquipment({
-          ...data,
-          createdBy: userData?.id || ''
-        });
+
+        if (pendingLoan) {
+          await processPendingLoan(editingEquipment.id, { ...editingEquipment, ...updateData }, pendingLoan);
+        }
 
         setShowForm(false);
         setEditingEquipment(null);
         await loadEquipment(false);
-        showToast({
-          type: 'success',
-          title: 'Equipo creado',
-          message: 'El equipo se guardo correctamente'
+        if (!pendingLoan) {
+          showToast({
+            type: 'success',
+            title: 'Equipo actualizado',
+            message: 'Los cambios se guardaron correctamente'
+          });
+        }
+        return editingEquipment.id;
+      } else {
+        const createdId = await createEquipment({
+          ...restData,
+          createdBy: userData?.id || ''
         });
+
+        if (pendingLoan) {
+          await processPendingLoan(createdId, { ...restData, id: createdId } as EquipmentType, pendingLoan);
+        }
+
+        setShowForm(false);
+        setEditingEquipment(null);
+        await loadEquipment(false);
+        if (!pendingLoan) {
+          showToast({
+            type: 'success',
+            title: 'Equipo creado',
+            message: 'El equipo se guardo correctamente'
+          });
+        }
         return createdId;
       }
     } catch (error) {
