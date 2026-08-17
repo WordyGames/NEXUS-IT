@@ -11,7 +11,7 @@ interface EquipmentLoanModalProps {
 
 const EquipmentLoanModal = ({ equipment, users, onConfirm, onCancel }: EquipmentLoanModalProps) => {
   const [borrowerId, setBorrowerId] = useState(equipment.assignedTo || '');
-  const [days, setDays] = useState(30);
+  const [days, setDays] = useState<number | ''>('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,12 +75,15 @@ const EquipmentLoanModal = ({ equipment, users, onConfirm, onCancel }: Equipment
               type="number"
               min={1}
               value={days}
-              onChange={(e) => setDays(Number(e.target.value))}
+              onChange={(e) => setDays(e.target.value === '' ? '' : Number(e.target.value))}
+              placeholder="Ej. 30"
               className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <p className="text-xs text-slate-400 mt-1">
-              Se devuelve el {dueDatePreview.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}
-            </p>
+            {days !== '' && Number(days) > 0 && (
+              <p className="text-xs text-slate-400 mt-1">
+                Se devuelve el {dueDatePreview.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
+            )}
           </div>
 
           <div>

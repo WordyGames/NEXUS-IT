@@ -32,7 +32,7 @@ const EquipmentScreen = ({ navigation }: any) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loanTarget, setLoanTarget] = useState<Equipment | null>(null);
   const [loanBorrowerId, setLoanBorrowerId] = useState('');
-  const [loanDays, setLoanDays] = useState('30');
+  const [loanDays, setLoanDays] = useState('');
   const [loanNotes, setLoanNotes] = useState('');
   const [loanSubmitting, setLoanSubmitting] = useState(false);
   const [returningId, setReturningId] = useState<string | null>(null);
@@ -111,7 +111,7 @@ const EquipmentScreen = ({ navigation }: any) => {
   const openLoanModal = (eq: Equipment) => {
     setLoanTarget(eq);
     setLoanBorrowerId(eq.assignedTo || '');
-    setLoanDays('30');
+    setLoanDays('');
     setLoanNotes('');
   };
 
@@ -329,7 +329,7 @@ const EquipmentScreen = ({ navigation }: any) => {
               value={loanDays}
               onChangeText={setLoanDays}
               keyboardType="number-pad"
-              placeholder="30"
+              placeholder="Ej. 30"
             />
 
             <Text style={styles.label}>Notas (opcional)</Text>

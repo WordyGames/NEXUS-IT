@@ -60,7 +60,7 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
   const [uploading, setUploading] = useState(false);
   const [entityId] = useState<string>(() => generateEntityId(equipment?.id));
   const [assignMode, setAssignMode] = useState<'permanent' | 'loan'>('permanent');
-  const [loanDays, setLoanDays] = useState<number>(30);
+  const [loanDays, setLoanDays] = useState<number | ''>('');
   const [loanNotes, setLoanNotes] = useState('');
   const [formData, setFormData] = useState({
     company: equipment?.company || Company.GRUPO_AMEX,
@@ -344,8 +344,9 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
     }
 
     const wantsLoan = assignMode === 'loan' && Boolean(formData.assignedTo) && !equipment?.onLoan;
+    const loanDaysValue = Number(loanDays);
 
-    if (wantsLoan && (!Number.isFinite(loanDays) || loanDays <= 0)) {
+    if (wantsLoan && (!Number.isFinite(loanDaysValue) || loanDaysValue <= 0)) {
       showToast({
         type: 'warning',
         title: 'Días de préstamo inválidos',
@@ -372,7 +373,7 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
         submitData.assignedTo = equipment?.assignedTo || '';
         submitData.pendingLoan = {
           borrowerId: formData.assignedTo,
-          days: loanDays,
+          days: loanDaysValue,
           notes: loanNotes || undefined
         };
       }
@@ -512,7 +513,8 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
                         type="number"
                         min={1}
                         value={loanDays}
-                        onChange={(e) => setLoanDays(parseInt(e.target.value, 10) || 0)}
+                        onChange={(e) => setLoanDays(e.target.value === '' ? '' : parseInt(e.target.value, 10) || 0)}
+                        placeholder="Ej. 30"
                         className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
                       />
                     </div>
