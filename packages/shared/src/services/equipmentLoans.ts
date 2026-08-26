@@ -1,6 +1,7 @@
 import { supabase } from '../config/supabase';
 import { CreateEquipmentLoanInput, EquipmentLoan, EquipmentLoanFilters } from '../types';
 import { getEquipmentById, updateEquipment } from './equipment';
+import { getUserById } from './users';
 
 const toDate = (v: string | null | undefined): Date | undefined => {
   if (!v) return undefined;
@@ -82,6 +83,15 @@ export const createEquipmentLoan = async (input: CreateEquipmentLoanInput): Prom
   const equipment = await getEquipmentById(input.equipmentId);
   if (!equipment) throw new Error('Equipo no encontrado');
 
+  // Evita crear un segundo préstamo activo simultáneo sobre el mismo equipo
+  // (dos admins prestando el mismo equipo casi a la vez, doble clic, etc.).
+  const existingActive = await getActiveLoanForEquipment(input.equipmentId);
+  if (existingActive) {
+    throw new Error('Este equipo ya tiene un préstamo activo. Regístralo como devuelto antes de crear uno nuevo.');
+  }
+
+  const previousAssignedUser = equipment.assignedTo ? await getUserById(equipment.assignedTo) : null;
+
   const loanDate = new Date();
   const dueDate = new Date(loanDate);
   dueDate.setDate(dueDate.getDate() + input.days);
@@ -92,7 +102,7 @@ export const createEquipmentLoan = async (input: CreateEquipmentLoanInput): Prom
     borrower_id: input.borrowerId ?? null,
     borrower_name: input.borrowerName,
     previous_assigned_to: equipment.assignedTo ?? null,
-    previous_assigned_to_name: null, // se resuelve en la UI si se necesita mostrar
+    previous_assigned_to_name: previousAssignedUser?.name ?? null,
     loan_date: loanDate.toISOString().slice(0, 10),
     due_date: dueDate.toISOString().slice(0, 10),
     days: input.days,
@@ -131,8 +141,12 @@ export const returnEquipmentLoan = async (loanId: string): Promise<void> => {
     .eq('id', loanId);
   if (error) throw error;
 
+  // Importante: si el equipo no tenía dueño antes del préstamo, previousAssignedTo
+  // es `undefined`, y updateEquipment ignora un campo `undefined` (lo trata como
+  // "no tocar"). Hay que pasar `null` explícito para que sí limpie assigned_to,
+  // si no el equipo se queda mostrando al prestatario como dueño para siempre.
   await updateEquipment(loan.equipmentId, {
-    assignedTo: loan.previousAssignedTo,
+    assignedTo: (loan.previousAssignedTo ?? null) as any,
     onLoan: false,
     loanDueDate: undefined
   });
@@ -156,7 +170,7 @@ export const cancelEquipmentLoan = async (loanId: string): Promise<void> => {
   if (error) throw error;
 
   await updateEquipment(loan.equipmentId, {
-    assignedTo: loan.previousAssignedTo,
+    assignedTo: (loan.previousAssignedTo ?? null) as any,
     onLoan: false,
     loanDueDate: undefined
   });

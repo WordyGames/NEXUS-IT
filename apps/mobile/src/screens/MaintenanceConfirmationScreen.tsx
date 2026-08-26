@@ -111,7 +111,10 @@ const MaintenanceConfirmationScreen = ({ navigation }: any) => {
           `${mobileEnv.apiBaseUrl}/api/notifications/maintenance-time-confirmed-email`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              ...(mobileEnv.maintenanceEmailApiKey ? { 'x-nexus-api-key': mobileEnv.maintenanceEmailApiKey } : {})
+            },
             body: JSON.stringify({
               adminEmail: mobileEnv.adminEmail,
               adminName: 'Luis',

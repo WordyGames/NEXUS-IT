@@ -148,10 +148,10 @@ const TicketDetail = ({ ticket, onClose, onUpdate, currentUserId, currentUserNam
   };
 
   const priorityColors: Record<TicketPriority, string> = {
-    [TicketPriority.LOW]: 'bg-gray-100 text-gray-800',
-    [TicketPriority.MEDIUM]: 'bg-blue-100 text-blue-800',
-    [TicketPriority.HIGH]: 'bg-orange-100 text-orange-800',
-    [TicketPriority.URGENT]: 'bg-red-100 text-red-800'
+    [TicketPriority.LOW]: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-100',
+    [TicketPriority.MEDIUM]: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100',
+    [TicketPriority.HIGH]: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100',
+    [TicketPriority.URGENT]: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
   };
 
   return (

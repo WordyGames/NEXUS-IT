@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   Wrench, Plus, Calendar, AlertTriangle, CheckCircle2, Clock,
-  Filter, Download, List, CalendarCheck, ShieldCheck, Search, RefreshCw
+  Filter, Download, List, CalendarCheck, ShieldCheck, Search, RefreshCw,
+  Eye, Pencil, Trash2
 } from 'lucide-react';
 import {
   Maintenance,
@@ -264,9 +265,24 @@ const Maintenances = () => {
                 <option value={MaintenanceType.ACTUALIZACION}>Actualización</option>
                 <option value={MaintenanceType.INSPECCION}>Inspección</option>
               </select>
-              <input type="text" placeholder="Buscar equipo o título..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={selectCls} />
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  aria-label="Buscar equipo o título"
+                  placeholder="Buscar equipo o título..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className={`${selectCls} pl-8`}
+                />
+              </div>
             </div>
           </Card>
+
+          {/* Contador de resultados */}
+          <p className="text-xs text-slate-500 dark:text-slate-400 px-1">
+            {maintenances.length} mantenimiento{maintenances.length !== 1 ? 's' : ''} encontrado{maintenances.length !== 1 ? 's' : ''}
+          </p>
 
           {/* Tabla */}
           {maintenances.length === 0 ? (
@@ -318,10 +334,16 @@ const Maintenances = () => {
                         </td>
                         {canManage && (
                           <td className="px-5 py-3.5">
-                            <div className="flex items-center gap-3">
-                              <button type="button" onClick={() => { setSelected(m); setShowDetail(true); }} className="text-xs text-green-600 dark:text-green-400 hover:underline font-medium">Ver</button>
-                              <button type="button" onClick={() => { setSelected(m); setShowStatusEditor(true); }} className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium">Editar</button>
-                              <button type="button" onClick={() => handleDelete(m.id)} className="text-xs text-red-600 dark:text-red-400 hover:underline font-medium">Eliminar</button>
+                            <div className="flex items-center gap-1">
+                              <button type="button" onClick={() => { setSelected(m); setShowDetail(true); }} aria-label="Ver mantenimiento" title="Ver" className="p-1.5 rounded-lg text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
+                                <Eye size={15} />
+                              </button>
+                              <button type="button" onClick={() => { setSelected(m); setShowStatusEditor(true); }} aria-label="Editar mantenimiento" title="Editar" className="p-1.5 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+                                <Pencil size={15} />
+                              </button>
+                              <button type="button" onClick={() => handleDelete(m.id)} aria-label="Eliminar mantenimiento" title="Eliminar" className="p-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                                <Trash2 size={15} />
+                              </button>
                             </div>
                           </td>
                         )}

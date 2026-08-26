@@ -13,11 +13,14 @@ import {
 } from '@nexus-it/shared';
 import TicketForm from '../components/TicketForm';
 import TicketDetail from '../components/TicketDetail';
-import { Download, Plus, ClipboardList } from 'lucide-react';
+import { Download, Plus, ClipboardList, ChevronLeft, ChevronRight } from 'lucide-react';
 import { exportTicketsToExcel } from '../utils/exportToExcel';
 import { useUiFeedback } from '../contexts/UiFeedbackContext';
 import { getTicketSortValue } from '../utils/dateUtils';
 import { Spinner, Card, Button, EmptyState, ticketStatusBadge, priorityBadge } from '../components/ui';
+import { usePagination } from '../hooks/usePagination';
+
+const PAGE_SIZE = 25;
 
 const normalizePriority = (value: unknown): TicketPriority =>
   Object.values(TicketPriority).includes(value as TicketPriority)
@@ -41,10 +44,15 @@ const Tickets = () => {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [companyFilter, setCompanyFilter] = useState<Company | ''>('');
+  const { page, setPage, paginated: paginatedTickets, totalPages } = usePagination(tickets, PAGE_SIZE);
 
   useEffect(() => {
     loadTickets();
   }, [companyFilter, canViewAllTickets, userData?.id, userData?.username, userData?.name]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [companyFilter]);
 
   useEffect(() => {
     if (ticketIdFromUrl && tickets.length > 0) {
@@ -110,9 +118,14 @@ const Tickets = () => {
   };
 
   const handleOpenDetail = async (ticket: Ticket) => {
-    const full = await getTicketById(ticket.id);
-    setSelectedTicket(full ?? ticket);
-    setShowDetail(true);
+    try {
+      const full = await getTicketById(ticket.id);
+      setSelectedTicket(full ?? ticket);
+      setShowDetail(true);
+    } catch (error) {
+      console.error('Error loading ticket detail:', error);
+      showToast({ type: 'error', title: 'Error', message: 'No se pudo cargar el detalle del ticket' });
+    }
   };
 
   const handleCloseDetail = () => {
@@ -194,7 +207,7 @@ const Tickets = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {tickets.map((ticket) => {
+                {paginatedTickets.map((ticket) => {
                   const safePriority = normalizePriority((ticket as any).priority);
                   const safeStatus = normalizeStatus((ticket as any).status);
                   return (
@@ -231,6 +244,23 @@ const Tickets = () => {
               </tbody>
             </table>
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100">
+              <span className="text-sm text-slate-500 dark:text-slate-400">
+                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, tickets.length)} de {tickets.length} tickets
+              </span>
+              <div className="flex items-center gap-1">
+                <button type="button" aria-label="Página anterior" onClick={() => setPage((p) => p - 1)} disabled={page === 1} className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-30 transition-colors border border-slate-200 dark:border-slate-700">
+                  <ChevronLeft size={15} />
+                </button>
+                <span className="text-sm text-slate-600 dark:text-slate-300 px-3">{page} / {totalPages}</span>
+                <button type="button" aria-label="Página siguiente" onClick={() => setPage((p) => p + 1)} disabled={page === totalPages} className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-30 transition-colors border border-slate-200 dark:border-slate-700">
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+            </div>
+          )}
         </Card>
       )}
 

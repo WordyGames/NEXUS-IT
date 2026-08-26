@@ -11,6 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   Company,
   Ticket,
+  UserPermission,
   getUnreadNotifications,
   getEquipment,
   getEquipmentStats,
@@ -23,9 +24,8 @@ import {
 } from '@nexus-it/shared';
 
 const DashboardScreen = ({ navigation }: any) => {
-  const { userData, logout, isAdmin } = useAuth();
-  const normalizedUsername = userData?.username?.trim().toLowerCase() || '';
-  const canSeeGlobalDashboard = isAdmin || normalizedUsername === 'lsolis';
+  const { userData, logout, isAdmin, hasPermission } = useAuth();
+  const canSeeGlobalDashboard = isAdmin || hasPermission(UserPermission.DASHBOARD_ADMIN);
   const [stats, setStats] = useState<any>(null);
   const [userEquipmentCount, setUserEquipmentCount] = useState(0);
   const [userTicketsCount, setUserTicketsCount] = useState(0);

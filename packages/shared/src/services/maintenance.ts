@@ -189,6 +189,13 @@ export const updateMaintenance = async (id: string, updates: Partial<Maintenance
     if (val !== undefined) clean[col] = val;
   }
 
+  // Defensa adicional: si se limpia assignedTo explícitamente (null/'') sin
+  // mandar assignedToName, limpiar también el nombre para que no queden
+  // desincronizados (mismo patrón de bug ya visto con puesto/departamento).
+  if ('assignedTo' in (updates as any) && !(updates as any).assignedTo && !('assignedToName' in (updates as any))) {
+    clean.assigned_to_name = null;
+  }
+
   const dateMap: Record<string, string> = {
     scheduledDate: 'scheduled_date',
     completedDate: 'completed_date',

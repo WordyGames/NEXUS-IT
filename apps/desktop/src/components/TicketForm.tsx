@@ -91,6 +91,14 @@ const TicketForm = ({ ticket, onSubmit, onCancel, userName }: TicketFormProps) =
 
       await onSubmit(submitData);
       await flushPendingDeletes();
+    } catch (error) {
+      // onSubmit (Tickets.tsx) ya muestra un toast de error y vuelve a
+      // lanzar la excepción para que este formulario sepa que falló y no
+      // se cierre; sin este catch, ese "re-throw" se convertía en un
+      // unhandled promise rejection (React no espera la promesa de
+      // onSubmit={handleSubmit}). Solo lo registramos, no hay que
+      // duplicar el toast.
+      console.error('Error al guardar ticket:', error);
     } finally {
       setLoading(false);
     }

@@ -3,6 +3,24 @@ import { Upload, X, Download, File as FileIcon, Image } from 'lucide-react';
 import { Attachment, uploadFile, generateStoragePath, validateFile, formatFileSize } from '@nexus-it/shared';
 import { useUiFeedback } from '../contexts/UiFeedbackContext';
 
+// Tipos permitidos para adjuntos de tickets y mantenimientos: imágenes y
+// documentos comunes de oficina. Se excluyen deliberadamente HTML/SVG/JS
+// y otros tipos ejecutables por el navegador.
+const ALLOWED_ATTACHMENT_TYPES = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+  'text/csv'
+];
+
 interface FileUploadProps {
   entityId: string;
   entityType: 'tickets' | 'maintenances';
@@ -64,9 +82,11 @@ const FileUpload: React.FC<FileUploadProps> = ({
         }
 
         const file = files[i];
-        
-        // Validar archivo
-        const validation = validateFile(file, maxSizeMB);
+
+        // Validar archivo: whitelist de tipos permitidos para adjuntos de
+        // tickets/mantenimientos (evita subir HTML/SVG/scripts al bucket
+        // público de Supabase, que podrían ejecutarse como XSS almacenado).
+        const validation = validateFile(file, maxSizeMB, ALLOWED_ATTACHMENT_TYPES);
         if (!validation.valid) {
           showToast({
             type: 'error',

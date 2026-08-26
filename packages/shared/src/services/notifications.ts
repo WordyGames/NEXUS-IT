@@ -77,19 +77,22 @@ export async function getUnreadNotifications(userId: string): Promise<number> {
 }
 
 export async function markNotificationAsRead(notificationId: string): Promise<void> {
-  await supabase.from('notifications').update({ read: true }).eq('id', notificationId);
+  const { error } = await supabase.from('notifications').update({ read: true }).eq('id', notificationId);
+  if (error) console.error('[notifications] markNotificationAsRead falló:', error);
 }
 
 export async function markAllAsRead(userId: string): Promise<void> {
-  await supabase
+  const { error } = await supabase
     .from('notifications')
     .update({ read: true })
     .eq('user_id', userId)
     .eq('read', false);
+  if (error) console.error('[notifications] markAllAsRead falló:', error);
 }
 
 export async function deleteNotification(notificationId: string): Promise<void> {
-  await supabase.from('notifications').delete().eq('id', notificationId);
+  const { error } = await supabase.from('notifications').delete().eq('id', notificationId);
+  if (error) console.error('[notifications] deleteNotification falló:', error);
 }
 
 export async function createWarrantyExpiringNotification(
@@ -105,7 +108,7 @@ export async function createWarrantyExpiringNotification(
   const dedupeKey = `warranty:${equipment.id}:${warrantyDate.toISOString().slice(0, 10)}`;
   if (await hasRecentDuplicate({ userId, type: NotificationType.WARRANTY_EXPIRING, dedupeKey, cooldownMs: WARRANTY_COOLDOWN_MS })) return;
 
-  await supabase.from('notifications').insert({
+  const { error } = await supabase.from('notifications').insert({
     user_id: userId,
     type: NotificationType.WARRANTY_EXPIRING,
     dedupe_key: dedupeKey,
@@ -115,6 +118,7 @@ export async function createWarrantyExpiringNotification(
     equipment_id: equipment.id,
     expires_at: warrantyDate.toISOString()
   });
+  if (error) console.error('[notifications] createWarrantyExpiringNotification falló:', error);
 }
 
 export async function createMaintenanceUpcomingNotification(
@@ -132,7 +136,7 @@ export async function createMaintenanceUpcomingNotification(
     const dedupeKey = `maintenance:${maintenance.id}:${dateKey}`;
     if (await hasRecentDuplicate({ userId, type: NotificationType.MAINTENANCE_UPCOMING, dedupeKey, cooldownMs: MAINTENANCE_COOLDOWN_MS })) continue;
 
-    await supabase.from('notifications').insert({
+    const { error } = await supabase.from('notifications').insert({
       user_id: userId,
       type: NotificationType.MAINTENANCE_UPCOMING,
       dedupe_key: dedupeKey,
@@ -143,6 +147,7 @@ export async function createMaintenanceUpcomingNotification(
       equipment_id: maintenance.equipmentId,
       expires_at: scheduledDate.toISOString()
     });
+    if (error) console.error('[notifications] createMaintenanceUpcomingNotification falló:', error);
   }
 }
 
@@ -161,7 +166,7 @@ export async function createTicketStatusChangeNotification(
     const dedupeKey = `ticket-status:${ticket.id}:${previousStatus}->${ticket.status}:${changedBy}`;
     if (await hasRecentDuplicate({ userId, type: NotificationType.TICKET_STATUS_CHANGED, dedupeKey, cooldownMs: STATUS_COOLDOWN_MS })) continue;
 
-    await supabase.from('notifications').insert({
+    const { error } = await supabase.from('notifications').insert({
       user_id: userId,
       type: NotificationType.TICKET_STATUS_CHANGED,
       dedupe_key: dedupeKey,
@@ -171,6 +176,7 @@ export async function createTicketStatusChangeNotification(
       ticket_id: ticket.id,
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
     });
+    if (error) console.error('[notifications] createTicketStatusChangeNotification falló:', error);
   }
 }
 
@@ -189,7 +195,7 @@ export async function createTicketCommentNotification(
     const dedupeKey = `ticket-comment:${ticket.id}:${commentedBy}:${excerpt.trim().toLowerCase().slice(0, 40)}`;
     if (await hasRecentDuplicate({ userId, type: NotificationType.TICKET_COMMENTED, dedupeKey, cooldownMs: COMMENT_COOLDOWN_MS })) continue;
 
-    await supabase.from('notifications').insert({
+    const { error } = await supabase.from('notifications').insert({
       user_id: userId,
       type: NotificationType.TICKET_COMMENTED,
       dedupe_key: dedupeKey,
@@ -199,14 +205,16 @@ export async function createTicketCommentNotification(
       ticket_id: ticket.id,
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
     });
+    if (error) console.error('[notifications] createTicketCommentNotification falló:', error);
   }
 }
 
 export async function cleanExpiredNotifications(): Promise<void> {
-  await supabase
+  const { error } = await supabase
     .from('notifications')
     .delete()
     .lt('expires_at', new Date().toISOString());
+  if (error) console.error('[notifications] cleanExpiredNotifications falló:', error);
 }
 
 export async function getNotificationsSummary(userId: string) {

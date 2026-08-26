@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const { getSmtpConfig } = require('./_smtpConfig');
+const { escapeHtml, requireApiKey, applyCors } = require('./_security');
 
 const toReadableDate = (value) => {
   if (!value) return 'No especificada';
@@ -15,9 +16,7 @@ const toReadableDate = (value) => {
 const sanitize = (value) => (value || '').trim();
 
 module.exports = async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  applyCors(req, res);
 
   if (req.method === 'OPTIONS') {
     res.status(200).json({ ok: true });
@@ -28,6 +27,8 @@ module.exports = async function handler(req, res) {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
+
+  if (!requireApiKey(req, res)) return;
 
   try {
     const smtp = getSmtpConfig();
@@ -70,7 +71,7 @@ module.exports = async function handler(req, res) {
         
         <div style="background: #f3f4f6; padding: 20px; border-radius: 0 0 8px 8px;">
           <p style="margin: 0 0 16px;">
-            Hola${adminName ? ` <strong>${adminName}</strong>` : ''},
+            Hola${adminName ? ` <strong>${escapeHtml(adminName)}</strong>` : ''},
           </p>
 
           <p style="margin: 0 0 20px;">
@@ -82,35 +83,35 @@ module.exports = async function handler(req, res) {
               <tbody>
                 <tr>
                   <td style="padding: 6px 0; color: #6b7280; font-weight: bold; width: 120px;">Equipo:</td>
-                  <td style="padding: 6px 0; color: #1f2937;">${equipmentName}</td>
+                  <td style="padding: 6px 0; color: #1f2937;">${escapeHtml(equipmentName)}</td>
                 </tr>
                 <tr>
                   <td style="padding: 6px 0; color: #6b7280; font-weight: bold;">Empresa:</td>
-                  <td style="padding: 6px 0; color: #1f2937;">${company}</td>
+                  <td style="padding: 6px 0; color: #1f2937;">${escapeHtml(company)}</td>
                 </tr>
                 <tr>
                   <td style="padding: 6px 0; color: #6b7280; font-weight: bold;">Tipo:</td>
-                  <td style="padding: 6px 0; color: #1f2937;">${title}</td>
+                  <td style="padding: 6px 0; color: #1f2937;">${escapeHtml(title)}</td>
                 </tr>
                 <tr>
                   <td style="padding: 6px 0; color: #6b7280; font-weight: bold;">Fecha:</td>
-                  <td style="padding: 6px 0; color: #1f2937;">${readableDate}</td>
+                  <td style="padding: 6px 0; color: #1f2937;">${escapeHtml(readableDate)}</td>
                 </tr>
                 <tr style="background: #f0fdf4;">
                   <td style="padding: 8px 0; color: #059669; font-weight: bold;">⏰ Hora:</td>
-                  <td style="padding: 8px 0; color: #059669; font-weight: bold; font-size: 18px;">${scheduledTime}</td>
+                  <td style="padding: 8px 0; color: #059669; font-weight: bold; font-size: 18px;">${escapeHtml(scheduledTime)}</td>
                 </tr>
                 <tr>
                   <td style="padding: 6px 0; color: #6b7280; font-weight: bold;">Confirmado por:</td>
-                  <td style="padding: 6px 0; color: #1f2937;">${confirmedByName}</td>
+                  <td style="padding: 6px 0; color: #1f2937;">${escapeHtml(confirmedByName)}</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
           <p style="margin: 0; color: #6b7280; font-size: 14px;">
-            Ya puedes agregar este mantenimiento a tu agenda. 
-            ${scheduledTime && readableDate ? `<br/>Está programado para el <strong>${readableDate} a las ${scheduledTime}</strong>.` : ''}
+            Ya puedes agregar este mantenimiento a tu agenda.
+            ${scheduledTime && readableDate ? `<br/>Está programado para el <strong>${escapeHtml(readableDate)} a las ${escapeHtml(scheduledTime)}</strong>.` : ''}
           </p>
         </div>
       </div>

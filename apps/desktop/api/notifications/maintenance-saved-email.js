@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const { getSmtpConfig } = require('./_smtpConfig');
+const { escapeHtml, requireApiKey, applyCors } = require('./_security');
 
 const toReadableDate = (value) => {
   if (!value) return 'No especificada';
@@ -17,9 +18,7 @@ const toReadableDate = (value) => {
 const sanitize = (value) => (value || '').trim();
 
 module.exports = async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  applyCors(req, res);
 
   if (req.method === 'OPTIONS') {
     res.status(200).json({ ok: true });
@@ -30,6 +29,8 @@ module.exports = async function handler(req, res) {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
+
+  if (!requireApiKey(req, res)) return;
 
   try {
     const smtp = getSmtpConfig();
@@ -67,18 +68,18 @@ module.exports = async function handler(req, res) {
     const html = `
       <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.5;">
         <h2 style="margin: 0 0 12px; color: #0f3d5e;">Mantenimiento programado</h2>
-        <p>Hola${recipientName ? ` <strong>${recipientName}</strong>` : ''},</p>
+        <p>Hola${recipientName ? ` <strong>${escapeHtml(recipientName)}</strong>` : ''},</p>
         <p>Se programó un mantenimiento para tu equipo.</p>
         <ul>
-          <li><strong>Equipo:</strong> ${equipmentName || 'N/A'}</li>
-          <li><strong>Empresa:</strong> ${company || 'N/A'}</li>
-          <li><strong>Tipo/Título:</strong> ${title || 'N/A'}</li>
-          <li><strong>Fecha programada:</strong> ${readableDate}</li>
-          ${assignedToName ? `<li><strong>Asignado a:</strong> ${assignedToName}</li>` : ''}
-          ${maintenanceId ? `<li><strong>ID de mantenimiento:</strong> ${maintenanceId}</li>` : ''}
+          <li><strong>Equipo:</strong> ${escapeHtml(equipmentName) || 'N/A'}</li>
+          <li><strong>Empresa:</strong> ${escapeHtml(company) || 'N/A'}</li>
+          <li><strong>Tipo/Título:</strong> ${escapeHtml(title) || 'N/A'}</li>
+          <li><strong>Fecha programada:</strong> ${escapeHtml(readableDate)}</li>
+          ${assignedToName ? `<li><strong>Asignado a:</strong> ${escapeHtml(assignedToName)}</li>` : ''}
+          ${maintenanceId ? `<li><strong>ID de mantenimiento:</strong> ${escapeHtml(maintenanceId)}</li>` : ''}
         </ul>
         <p>Por favor, confírmanos a qué hora tienes disponible tu equipo para poder realizar el mantenimiento sin afectar tus actividades.</p>
-        <p style="margin-top: 20px;">Gracias,<br />${createdByName || 'Soporte TI'}</p>
+        <p style="margin-top: 20px;">Gracias,<br />${escapeHtml(createdByName) || 'Soporte TI'}</p>
       </div>
     `;
 

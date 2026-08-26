@@ -228,6 +228,13 @@ const MaintenanceForm = ({ onClose, onSubmit, initialData }: MaintenanceFormProp
         if (selectedUser) {
           maintenanceData.assignedToName = selectedUser.name;
         }
+      } else if (initialData?.assignedTo) {
+        // Se quitó la asignación que existía: hay que limpiarla explícitamente
+        // (assignedTo/assignedToName), si no updateMaintenance no toca esas
+        // columnas y el mantenimiento se queda "asignado" al técnico anterior
+        // en la base de datos aunque el formulario ya lo muestre sin asignar.
+        maintenanceData.assignedTo = null as any;
+        maintenanceData.assignedToName = null as any;
       }
       if (notificationEmail.trim()) {
         maintenanceData.notificationEmail = notificationEmail.trim();

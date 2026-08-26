@@ -35,10 +35,10 @@ const EquipmentCard = ({
   canEdit
 }: EquipmentCardProps) => {
   const statusColors: Record<string, string> = {
-    active: 'bg-green-100 text-green-800',
-    inactive: 'bg-gray-100 text-gray-800',
-    maintenance: 'bg-yellow-100 text-yellow-800',
-    retired: 'bg-red-100 text-red-800'
+    active: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
+    inactive: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
+    maintenance: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
+    retired: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
   };
 
   const toDate = (value: any): Date => {
@@ -182,6 +182,7 @@ const EquipmentCard = ({
           onClick={onShowQR}
           className="px-3 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded text-sm transition-colors flex items-center gap-1"
           title="Ver código QR"
+          aria-label="Ver código QR"
         >
           <QrCode size={16} />
         </button>
@@ -189,6 +190,7 @@ const EquipmentCard = ({
           onClick={onGenerateCarta}
           className="px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded text-sm transition-colors flex items-center gap-1"
           title="Generar Carta Responsiva"
+          aria-label="Generar Carta Responsiva"
         >
           <FileText size={16} />
         </button>
@@ -197,6 +199,7 @@ const EquipmentCard = ({
             onClick={onLoan}
             className="px-3 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded text-sm transition-colors flex items-center gap-1"
             title="Prestar equipo por días"
+            aria-label="Prestar equipo por días"
           >
             <CalendarClock size={16} />
           </button>
@@ -206,6 +209,7 @@ const EquipmentCard = ({
             onClick={onReturnLoan}
             className="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded text-sm transition-colors flex items-center gap-1"
             title="Registrar devolución del préstamo"
+            aria-label="Registrar devolución del préstamo"
           >
             <Undo2 size={16} />
           </button>

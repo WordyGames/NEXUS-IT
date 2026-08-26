@@ -16,6 +16,7 @@ import {
   TicketCategory,
   TicketPriority,
   TicketStatus,
+  UserPermission,
   addTicketComment,
   createTicket,
   getTickets,
@@ -89,7 +90,7 @@ const normalizeCategory = (value: unknown): TicketCategory => (
 );
 
 const TicketsScreen = ({ route }: any) => {
-  const { userData, isAdmin } = useAuth();
+  const { userData, isAdmin, hasPermission } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -97,9 +98,8 @@ const TicketsScreen = ({ route }: any) => {
   const [changingTicketId, setChangingTicketId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
 
-  const normalizedUsername = userData?.username?.trim().toLowerCase() || '';
-  const canManageTicketStatus = normalizedUsername === 'lsolis';
-  const canViewAllTickets = isAdmin || canManageTicketStatus;
+  const canManageTicketStatus = isAdmin || hasPermission(UserPermission.TICKETS_CHANGE_STATUS);
+  const canViewAllTickets = isAdmin || hasPermission(UserPermission.TICKETS_VIEW_ALL) || canManageTicketStatus;
   const currentUserDisplayName = userData?.name || userData?.username || 'Usuario';
 
   const [form, setForm] = useState({
@@ -222,7 +222,7 @@ const TicketsScreen = ({ route }: any) => {
     }
 
     if (!canManageTicketStatus) {
-      Alert.alert('Sin permisos', 'Solo el perfil lsolis puede cerrar o actualizar tickets desde celular.');
+      Alert.alert('Sin permisos', 'No tienes permiso para cerrar o actualizar tickets desde el celular.');
       return;
     }
 

@@ -13,6 +13,7 @@ export const mobileEnv = {
     readExpoPublicEnv('EXPO_PUBLIC_API_BASE_URL') ??
     'https://nexus-it-wordygames-projects.vercel.app',
   adminEmail: readExpoPublicEnv('EXPO_PUBLIC_ADMIN_EMAIL'),
+  maintenanceEmailApiKey: readExpoPublicEnv('EXPO_PUBLIC_MAINTENANCE_EMAIL_API_KEY'),
 };
 
 export const assertMobileNotificationEnv = (): void => {

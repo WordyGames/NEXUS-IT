@@ -41,23 +41,30 @@ const rowToMessage = (row: any): SupportChatMessage => ({
 });
 
 const ensureThread = async (userId: string, userName: string): Promise<string> => {
-  const { data: existing } = await supabase
+  // Antes: select → si no existe, insert. Si dos mensajes llegaban casi al
+  // mismo tiempo (p.ej. doble tap en móvil con mala señal), ambos podían
+  // pasar el "select" sin encontrar hilo y terminar insertando dos filas
+  // duplicadas para el mismo user_id (viola la intención de "un hilo por
+  // usuario" aunque no haya UNIQUE constraint). Con upsert sobre user_id la
+  // operación es atómica: crea si no existe, actualiza si ya existe.
+  // Importante: NO incluir has_unread_for_user/has_unread_for_admin aquí.
+  // Postgres solo actualiza en el conflicto las columnas presentes en el
+  // payload; si las incluyéramos con `false`, cada vez que un usuario
+  // reabriera el chat se borraría el "no leído" pendiente del otro lado
+  // aunque nadie lo hubiera marcado como leído. Al omitirlas, en un INSERT
+  // nuevo usan su valor DEFAULT (false) de la tabla, y en un UPDATE por
+  // conflicto simplemente no se tocan.
+  const { data, error } = await supabase
     .from('support_chats')
+    .upsert(
+      {
+        user_id: userId,
+        user_name: userName
+      },
+      { onConflict: 'user_id', ignoreDuplicates: false }
+    )
     .select('id')
-    .eq('user_id', userId)
     .single();
-
-  if (existing) {
-    await supabase.from('support_chats').update({ user_name: userName }).eq('user_id', userId);
-    return existing.id;
-  }
-
-  const { data, error } = await supabase.from('support_chats').insert({
-    user_id: userId,
-    user_name: userName,
-    has_unread_for_user: false,
-    has_unread_for_admin: false
-  }).select('id').single();
 
   if (error) throw error;
   return data.id;
@@ -242,18 +249,20 @@ export const sendSupportChatMessage = async (params: {
 
 export const markSupportChatAsReadByUser = async (userId: string): Promise<void> => {
   if (!userId?.trim()) return;
-  await supabase.from('support_chats').update({
+  const { error } = await supabase.from('support_chats').update({
     has_unread_for_user: false,
     user_last_read_at: new Date().toISOString()
   }).eq('user_id', userId.trim());
+  if (error) console.error('[supportChat] markSupportChatAsReadByUser falló:', error);
 };
 
 export const markSupportChatAsReadByAdmin = async (userId: string): Promise<void> => {
   if (!userId?.trim()) return;
-  await supabase.from('support_chats').update({
+  const { error } = await supabase.from('support_chats').update({
     has_unread_for_admin: false,
     admin_last_read_at: new Date().toISOString()
   }).eq('user_id', userId.trim());
+  if (error) console.error('[supportChat] markSupportChatAsReadByAdmin falló:', error);
 };
 
 export const getSupportChatUnreadCountForAdmin = async (maxItems = 500): Promise<number> => {

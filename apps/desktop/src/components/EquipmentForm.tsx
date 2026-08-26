@@ -401,6 +401,12 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
       }
 
       await flushPendingDeletes();
+    } catch (error) {
+      // onSubmit (Equipment.tsx) ya muestra el toast de error y vuelve a
+      // lanzar la excepción; sin este catch, ese "re-throw" quedaba como
+      // un unhandled promise rejection porque React no espera la promesa
+      // de un onSubmit de formulario.
+      console.error('Error al guardar equipo:', error);
     } finally {
       setLoading(false);
     }
@@ -671,6 +677,7 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
                 type="button"
                 onClick={() => { void handleRemovePhoto(); }}
                 title="Eliminar foto"
+                aria-label="Eliminar foto"
                 className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition"
               >
                 <X size={16} />

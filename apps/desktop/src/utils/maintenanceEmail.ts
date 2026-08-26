@@ -32,11 +32,13 @@ export const sendMaintenanceSavedEmail = async ({
 }: MaintenanceEmailPayload): Promise<void> => {
   const baseUrl = getApiBaseUrl();
   const endpoint = `${baseUrl || ''}/api/notifications/maintenance-saved-email`;
+  const apiKey = import.meta.env.VITE_MAINTENANCE_EMAIL_API_KEY?.trim();
 
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      ...(apiKey ? { 'x-nexus-api-key': apiKey } : {})
     },
     body: JSON.stringify({
       recipientEmail,

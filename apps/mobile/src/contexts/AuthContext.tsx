@@ -2,16 +2,18 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { 
+import {
   Company,
-  User, 
-  UserRole, 
+  User,
+  UserRole,
   UserSession,
+  UserPermission,
   db,
   createUser,
-  signIn, 
-  signOut, 
-  getUserById 
+  signIn,
+  signOut,
+  getUserById,
+  hasUserPermission
 } from '@nexus-it/shared';
 
 interface AuthContextType {
@@ -29,6 +31,7 @@ interface AuthContextType {
   }) => Promise<void>;
   logout: () => Promise<void>;
   isAdmin: boolean;
+  hasPermission: (permission: UserPermission) => boolean;
   refreshUser: () => Promise<void>;
 }
 
@@ -216,6 +219,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     register,
     logout,
     isAdmin: userData?.role === UserRole.ADMIN,
+    hasPermission: (permission: UserPermission) => hasUserPermission(userData, permission),
     refreshUser
   };
 

@@ -36,7 +36,11 @@ export const generateStoragePath = (
 ): string => {
   const timestamp = Date.now();
   const sanitized = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
-  return `${type}/${entityId}/${timestamp}-${sanitized}`;
+  // Defensa en profundidad: entityId normalmente ya es un UUID de la base de
+  // datos, pero se sanitiza igual (evita '../' u otros separadores de ruta si
+  // alguna vez llega de una fuente no confiable).
+  const safeEntityId = String(entityId).replace(/[^a-zA-Z0-9_-]/g, '_');
+  return `${type}/${safeEntityId}/${timestamp}-${sanitized}`;
 };
 
 export const extractStoragePathFromURL = (url: string): string | null => {
