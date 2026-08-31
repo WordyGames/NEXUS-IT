@@ -2,6 +2,7 @@ import { supabase } from '../config/supabase';
 import { Equipment, EquipmentFilters } from '../types';
 import { deleteFile, resolveAttachmentStoragePath } from './storage';
 import { isValidUuid } from '../utils/helpers';
+import { withOfflineCache } from '../utils/offlineCache';
 
 export type EquipmentChangesUnsubscribe = () => void;
 
@@ -36,31 +37,33 @@ const rowToEquipment = (row: any): Equipment => ({
 });
 
 export const getEquipment = async (filters?: EquipmentFilters): Promise<Equipment[]> => {
-  let q = supabase.from('equipment').select('*');
+  return withOfflineCache('equipment', async () => {
+    let q = supabase.from('equipment').select('*');
 
-  if (filters?.company) q = q.eq('company', filters.company);
-  if (filters?.type) q = q.eq('type', filters.type);
-  if (filters?.status) q = q.eq('status', filters.status);
-  if (filters?.assignedTo) q = q.eq('assigned_to', filters.assignedTo);
+    if (filters?.company) q = q.eq('company', filters.company);
+    if (filters?.type) q = q.eq('type', filters.type);
+    if (filters?.status) q = q.eq('status', filters.status);
+    if (filters?.assignedTo) q = q.eq('assigned_to', filters.assignedTo);
 
-  q = q.order('created_at', { ascending: false });
+    q = q.order('created_at', { ascending: false });
 
-  const { data, error } = await q;
-  if (error) throw error;
+    const { data, error } = await q;
+    if (error) throw error;
 
-  let equipment = (data ?? []).map(rowToEquipment);
+    let equipment = (data ?? []).map(rowToEquipment);
 
-  if (filters?.search) {
-    const s = filters.search.toLowerCase();
-    equipment = equipment.filter(eq =>
-      eq.name.toLowerCase().includes(s) ||
-      eq.specs?.hostname?.toLowerCase().includes(s) ||
-      eq.specs?.serialNumber?.toLowerCase().includes(s) ||
-      (eq.location ?? '').toLowerCase().includes(s)
-    );
-  }
+    if (filters?.search) {
+      const s = filters.search.toLowerCase();
+      equipment = equipment.filter(eq =>
+        eq.name.toLowerCase().includes(s) ||
+        eq.specs?.hostname?.toLowerCase().includes(s) ||
+        eq.specs?.serialNumber?.toLowerCase().includes(s) ||
+        (eq.location ?? '').toLowerCase().includes(s)
+      );
+    }
 
-  return equipment;
+    return equipment;
+  }, filters);
 };
 
 export const getEquipmentById = async (id: string, company?: string): Promise<Equipment | null> => {

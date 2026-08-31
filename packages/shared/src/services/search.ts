@@ -33,8 +33,21 @@ export const globalSearch = async (query: string): Promise<SearchResult[]> => {
   const results: SearchResult[] = [];
 
   try {
+    // Las 4 fuentes son independientes entre sí: se piden en paralelo
+    // (antes eran 4 round trips secuenciales, ahora es 1).
+    // getUsers() puede fallar por permisos (usuarios no-admin) sin bloquear al resto.
+    const [equipment, tickets, maintenances, users] = await Promise.all([
+      getEquipment(),
+      getTickets(),
+      getMaintenances(),
+      getUsers().catch(() => {
+        // Si no hay permisos para buscar usuarios, simplemente no los incluye
+        console.debug('No se pueden buscar usuarios');
+        return [] as User[];
+      })
+    ]);
+
     // Buscar equipos
-    const equipment = await getEquipment();
     const equipmentResults = equipment
       .filter(
         eq =>
@@ -55,7 +68,6 @@ export const globalSearch = async (query: string): Promise<SearchResult[]> => {
     results.push(...equipmentResults);
 
     // Buscar tickets
-    const tickets = await getTickets();
     const ticketResults = tickets
       .filter(
         t =>
@@ -75,7 +87,6 @@ export const globalSearch = async (query: string): Promise<SearchResult[]> => {
     results.push(...ticketResults);
 
     // Buscar mantenimientos
-    const maintenances = await getMaintenances();
     const maintenanceResults = maintenances
       .filter(
         m =>
@@ -95,27 +106,21 @@ export const globalSearch = async (query: string): Promise<SearchResult[]> => {
     results.push(...maintenanceResults);
 
     // Buscar usuarios (solo para admins)
-    try {
-      const users = await getUsers();
-      const userResults = users
-        .filter(
-          u =>
-            u.name.toLowerCase().includes(lowerQuery) ||
-            u.username.toLowerCase().includes(lowerQuery)
-        )
-        .map(u => ({
-          type: 'user' as const,
-          id: u.id,
-          title: u.name,
-          subtitle: `@${u.username} - ${u.role}`,
-          company: u.company,
-          data: u
-        }));
-      results.push(...userResults);
-    } catch (err) {
-      // Si no hay permisos para buscar usuarios, simplemente no los incluye
-      console.debug('No se pueden buscar usuarios');
-    }
+    const userResults = users
+      .filter(
+        u =>
+          u.name.toLowerCase().includes(lowerQuery) ||
+          u.username.toLowerCase().includes(lowerQuery)
+      )
+      .map(u => ({
+        type: 'user' as const,
+        id: u.id,
+        title: u.name,
+        subtitle: `@${u.username} - ${u.role}`,
+        company: u.company,
+        data: u
+      }));
+    results.push(...userResults);
 
     return results.slice(0, 50); // Máximo 50 resultados
   } catch (error) {

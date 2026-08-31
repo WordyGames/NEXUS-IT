@@ -5,6 +5,7 @@ import {
 } from '../types';
 import { generateTicketNumber } from '../utils/helpers';
 import { deleteFile, resolveAttachmentStoragePath } from './storage';
+import { withOfflineCache } from '../utils/offlineCache';
 
 const toDate = (v: string | null | undefined): Date | undefined => {
   if (!v) return undefined;
@@ -52,33 +53,35 @@ const rowToComment = (row: any): TicketComment => ({
 });
 
 export const getTickets = async (filters?: TicketFilters): Promise<Ticket[]> => {
-  let q = supabase.from('tickets').select('*');
+  return withOfflineCache('tickets', async () => {
+    let q = supabase.from('tickets').select('*');
 
-  if (filters?.company) q = q.eq('company', filters.company);
-  if (filters?.status) q = q.eq('status', filters.status);
-  if (filters?.priority) q = q.eq('priority', filters.priority);
-  if (filters?.category) q = q.eq('category', filters.category);
-  if (filters?.assignedTo) q = q.eq('assigned_to', filters.assignedTo);
-  if (filters?.createdBy) q = q.eq('created_by', filters.createdBy);
-  if (filters?.createdByName) q = q.eq('created_by_name', filters.createdByName);
+    if (filters?.company) q = q.eq('company', filters.company);
+    if (filters?.status) q = q.eq('status', filters.status);
+    if (filters?.priority) q = q.eq('priority', filters.priority);
+    if (filters?.category) q = q.eq('category', filters.category);
+    if (filters?.assignedTo) q = q.eq('assigned_to', filters.assignedTo);
+    if (filters?.createdBy) q = q.eq('created_by', filters.createdBy);
+    if (filters?.createdByName) q = q.eq('created_by_name', filters.createdByName);
 
-  q = q.order('created_at', { ascending: false });
+    q = q.order('created_at', { ascending: false });
 
-  const { data, error } = await q;
-  if (error) throw error;
+    const { data, error } = await q;
+    if (error) throw error;
 
-  let tickets = (data ?? []).map(r => rowToTicket(r));
+    let tickets = (data ?? []).map(r => rowToTicket(r));
 
-  if (filters?.search) {
-    const s = filters.search.toLowerCase();
-    tickets = tickets.filter(t =>
-      t.title.toLowerCase().includes(s) ||
-      t.description.toLowerCase().includes(s) ||
-      t.ticketNumber.toLowerCase().includes(s)
-    );
-  }
+    if (filters?.search) {
+      const s = filters.search.toLowerCase();
+      tickets = tickets.filter(t =>
+        t.title.toLowerCase().includes(s) ||
+        t.description.toLowerCase().includes(s) ||
+        t.ticketNumber.toLowerCase().includes(s)
+      );
+    }
 
-  return tickets;
+    return tickets;
+  }, filters);
 };
 
 export const getTicketById = async (id: string, company?: string): Promise<Ticket | null> => {

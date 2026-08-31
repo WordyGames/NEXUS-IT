@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Search, X, Loader } from 'lucide-react';
 import { Equipment, Ticket, Maintenance, globalSearch, SearchResult, saveSearchHistory } from '@nexus-it/shared';
 
@@ -52,6 +52,11 @@ const SearchModal: React.FC<SearchModalProps> = ({
     const timer = setTimeout(handleSearch, 300);
     return () => clearTimeout(timer);
   }, [query]);
+
+  const highlightRegex = useMemo(
+    () => (query ? new RegExp(`(${escapeRegExp(query)})`, 'gi') : null),
+    [query]
+  );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     switch (e.key) {
@@ -172,7 +177,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
                     {/* Title */}
                     <h3 className="font-medium text-gray-900 dark:text-white truncate">
-                      {highlightMatch(result.title, query)}
+                      {highlightMatch(result.title, query, highlightRegex)}
                     </h3>
 
                     {/* Subtitle */}
@@ -229,10 +234,13 @@ const getTypeLabel = (type: string): string => {
   return labels[type] || type;
 };
 
-const highlightMatch = (text: string, query: string): React.ReactNode => {
-  if (!query) return text;
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-  const parts = text.split(new RegExp(`(${query})`, 'gi'));
+// Recibe el RegExp ya compilado para no reconstruirlo en cada resultado renderizado.
+const highlightMatch = (text: string, query: string, regex: RegExp | null): React.ReactNode => {
+  if (!query || !regex) return text;
+
+  const parts = text.split(regex);
   return parts.map((part, i) =>
     part.toLowerCase() === query.toLowerCase() ? (
       <mark key={i} className="bg-yellow-200 dark:bg-yellow-900">

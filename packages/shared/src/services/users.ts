@@ -1,6 +1,7 @@
 import { supabase } from '../config/supabase';
 import { User, UserRole, Company, UserSession } from '../types';
 import { getDefaultPermissionsForRole } from '../utils/permissions';
+import { withOfflineCache } from '../utils/offlineCache';
 
 const toDate = (value: string | Date | null | undefined): Date | undefined => {
   if (!value) return undefined;
@@ -40,14 +41,22 @@ export const getUserByUsername = async (username: string): Promise<User | null> 
 };
 
 export const getUserById = async (uid: string): Promise<User | null> => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', uid)
-    .single();
+  // Se cachea por uid: si falla por falta de conexión, se devuelve el último
+  // perfil conocido (crítico para no cerrarle la sesión al usuario cuando
+  // AuthContext valida su sesión al abrir la app sin internet). Si el error
+  // no es de red (p.ej. usuario realmente no encontrado), se conserva el
+  // comportamiento original de devolver null.
+  return withOfflineCache('user-by-id', async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', uid)
+      .single();
 
-  if (error || !data) return null;
-  return profileToUser(data);
+    if (error) throw error;
+    if (!data) return null;
+    return profileToUser(data);
+  }, uid).catch(() => null);
 };
 
 export const getUsers = async (): Promise<User[]> => {

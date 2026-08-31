@@ -6,6 +6,7 @@ import {
 import { getEquipment, getEquipmentById } from './equipment';
 import { isAdmin as isAdminUser } from './users';
 import { deleteFile, resolveAttachmentStoragePath } from './storage';
+import { withOfflineCache } from '../utils/offlineCache';
 
 const toDate = (v: string | null | undefined): Date | undefined => {
   if (!v) return undefined;
@@ -45,41 +46,43 @@ const rowToMaintenance = (row: any): Maintenance => ({
 });
 
 export const getMaintenances = async (filters?: MaintenanceFilters): Promise<Maintenance[]> => {
-  let q = supabase.from('maintenances').select('*');
+  return withOfflineCache('maintenances', async () => {
+    let q = supabase.from('maintenances').select('*');
 
-  if (filters?.company) q = q.eq('company', filters.company);
-  if (filters?.equipmentId) q = q.eq('equipment_id', filters.equipmentId);
-  if (filters?.type) q = q.eq('type', filters.type);
-  if (filters?.status) q = q.eq('status', filters.status);
-  if (filters?.assignedTo) q = q.eq('assigned_to', filters.assignedTo);
+    if (filters?.company) q = q.eq('company', filters.company);
+    if (filters?.equipmentId) q = q.eq('equipment_id', filters.equipmentId);
+    if (filters?.type) q = q.eq('type', filters.type);
+    if (filters?.status) q = q.eq('status', filters.status);
+    if (filters?.assignedTo) q = q.eq('assigned_to', filters.assignedTo);
 
-  q = q.order('scheduled_date', { ascending: true });
+    q = q.order('scheduled_date', { ascending: true });
 
-  const { data, error } = await q;
-  if (error) throw error;
+    const { data, error } = await q;
+    if (error) throw error;
 
-  let maintenances = (data ?? []).map(rowToMaintenance);
+    let maintenances = (data ?? []).map(rowToMaintenance);
 
-  if (filters?.dateFrom || filters?.dateTo) {
-    maintenances = maintenances.filter(m => {
-      const d = new Date(m.scheduledDate as any);
-      if (filters.dateFrom && d < filters.dateFrom) return false;
-      if (filters.dateTo && d > filters.dateTo) return false;
-      return true;
-    });
-  }
+    if (filters?.dateFrom || filters?.dateTo) {
+      maintenances = maintenances.filter(m => {
+        const d = new Date(m.scheduledDate as any);
+        if (filters.dateFrom && d < filters.dateFrom) return false;
+        if (filters.dateTo && d > filters.dateTo) return false;
+        return true;
+      });
+    }
 
-  if (filters?.search) {
-    const s = filters.search.toLowerCase();
-    maintenances = maintenances.filter(m =>
-      m.title.toLowerCase().includes(s) ||
-      m.equipmentName.toLowerCase().includes(s) ||
-      (m.description ?? '').toLowerCase().includes(s) ||
-      m.assignedToName?.toLowerCase().includes(s)
-    );
-  }
+    if (filters?.search) {
+      const s = filters.search.toLowerCase();
+      maintenances = maintenances.filter(m =>
+        m.title.toLowerCase().includes(s) ||
+        m.equipmentName.toLowerCase().includes(s) ||
+        (m.description ?? '').toLowerCase().includes(s) ||
+        m.assignedToName?.toLowerCase().includes(s)
+      );
+    }
 
-  return maintenances;
+    return maintenances;
+  }, filters);
 };
 
 export const filterMaintenancesForUser = async (
@@ -335,21 +338,31 @@ export const deleteMaintenance = async (id: string): Promise<void> => {
 };
 
 export const getMaintenanceStats = async () => {
+  // getUpcomingMaintenances/getOverdueMaintenances vuelven a pedir a la BD el mismo
+  // conjunto (status PROGRAMADO) que ya viene incluido en `all`. En vez de 3 round
+  // trips, se pide una sola vez y el resto se deriva en memoria.
   const all = await getMaintenances();
-  const upcoming = await getUpcomingMaintenances();
-  const overdue = await getOverdueMaintenances();
 
-  const byStatus = all.reduce((acc, m) => {
-    acc[m.status] = (acc[m.status] || 0) + 1;
-    return acc;
-  }, {} as Record<MaintenanceStatus, number>);
+  const now = new Date();
+  const next7 = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-  const byType = all.reduce((acc, m) => {
-    acc[m.type] = (acc[m.type] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const byStatus = {} as Record<MaintenanceStatus, number>;
+  const byType = {} as Record<string, number>;
+  let upcoming = 0;
+  let overdue = 0;
 
-  return { total: all.length, upcoming: upcoming.length, overdue: overdue.length, byStatus, byType };
+  for (const m of all) {
+    byStatus[m.status] = (byStatus[m.status] || 0) + 1;
+    byType[m.type] = (byType[m.type] || 0) + 1;
+
+    if (m.status === MaintenanceStatus.PROGRAMADO) {
+      const d = new Date(m.scheduledDate as any);
+      if (d >= now && d <= next7) upcoming++;
+      if (d < now) overdue++;
+    }
+  }
+
+  return { total: all.length, upcoming, overdue, byStatus, byType };
 };
 
 export const getPendingTimeConfirmationMaintenances = async (
