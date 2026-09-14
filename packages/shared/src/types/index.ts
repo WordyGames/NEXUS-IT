@@ -31,7 +31,8 @@ export interface Equipment {
   id: string;
   company: Company;
   name: string;
-  type: 'desktop' | 'laptop' | 'phone' | 'tablet' | 'server' | 'printer' | 'router' | 'switch' | 'other';
+  type: 'desktop' | 'laptop' | 'phone' | 'tablet' | 'server' | 'printer' | 'router' | 'switch'
+    | 'monitor' | 'keyboard' | 'mouse' | 'headset' | 'webcam' | 'dock' | 'ups' | 'scanner' | 'accessory' | 'other';
   specs: EquipmentSpecs;
   location: string;
   assignedTo?: string;

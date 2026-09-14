@@ -44,6 +44,21 @@ const generateAttachmentId = (): string => {
   return `att-mobile-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 };
 
+const EQUIPMENT_TYPES: Array<{ value: Equipment['type']; label: string }> = [
+  { value: 'phone', label: 'Teléfono' },
+  { value: 'tablet', label: 'Tablet' },
+  { value: 'monitor', label: 'Monitor' },
+  { value: 'keyboard', label: 'Teclado' },
+  { value: 'mouse', label: 'Mouse' },
+  { value: 'headset', label: 'Audífonos' },
+  { value: 'webcam', label: 'Webcam' },
+  { value: 'dock', label: 'Dock / Base' },
+  { value: 'ups', label: 'No-break / UPS' },
+  { value: 'scanner', label: 'Escáner' },
+  { value: 'accessory', label: 'Accesorio' },
+  { value: 'other', label: 'Otro' }
+];
+
 const sanitize = (value: string): string => value.trim();
 
 type CartaOutputMode = 'print' | 'pdf' | 'print_and_pdf';
@@ -85,7 +100,7 @@ const MobileEnrollmentScreen = () => {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showGooglePassword, setShowGooglePassword] = useState(false);
-  const [detectedEquipmentType, setDetectedEquipmentType] = useState<'phone' | 'tablet'>('phone');
+  const [detectedEquipmentType, setDetectedEquipmentType] = useState<Equipment['type']>('phone');
   const [letterLoadingId, setLetterLoadingId] = useState<string | null>(null);
   const [includeEmployeeSignature, setIncludeEmployeeSignature] = useState(false);
   const [employeeSignature, setEmployeeSignature] = useState<SignatureData | null>(null);
@@ -428,24 +443,19 @@ const MobileEnrollmentScreen = () => {
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Datos del Equipo</Text>
 
-        <Text style={styles.label}>Tipo detectado</Text>
+        <Text style={styles.label}>Tipo de activo</Text>
         <View style={styles.typeChipRow}>
-          <TouchableOpacity
-            style={[styles.chip, detectedEquipmentType === 'phone' && styles.chipSelected]}
-            onPress={() => setDetectedEquipmentType('phone')}
-          >
-            <Text style={[styles.chipText, detectedEquipmentType === 'phone' && styles.chipTextSelected]}>
-              Teléfono
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.chip, detectedEquipmentType === 'tablet' && styles.chipSelected]}
-            onPress={() => setDetectedEquipmentType('tablet')}
-          >
-            <Text style={[styles.chipText, detectedEquipmentType === 'tablet' && styles.chipTextSelected]}>
-              Tablet
-            </Text>
-          </TouchableOpacity>
+          {EQUIPMENT_TYPES.map((type) => (
+            <TouchableOpacity
+              key={type.value}
+              style={[styles.chip, detectedEquipmentType === type.value && styles.chipSelected]}
+              onPress={() => setDetectedEquipmentType(type.value)}
+            >
+              <Text style={[styles.chipText, detectedEquipmentType === type.value && styles.chipTextSelected]}>
+                {type.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         <Text style={styles.label}>Empresa</Text>
@@ -839,6 +849,7 @@ const styles = StyleSheet.create({
   },
   typeChipRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginBottom: 8
   },

@@ -259,6 +259,16 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
       case 'router':
       case 'switch':
         return [...baseFields, 'specs.manufacturer', 'specs.model', 'specs.ipAddress', 'specs.macAddress'];
+      case 'monitor':
+      case 'keyboard':
+      case 'mouse':
+      case 'headset':
+      case 'webcam':
+      case 'dock':
+      case 'ups':
+      case 'scanner':
+      case 'accessory':
+        return [...baseFields, 'specs.manufacturer', 'specs.model', 'specs.serialNumber'];
       default:
         return baseFields;
     }
@@ -451,6 +461,15 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
             <option value="printer">Impresora</option>
             <option value="router">Router</option>
             <option value="switch">Switch</option>
+            <option value="monitor">Monitor</option>
+            <option value="keyboard">Teclado</option>
+            <option value="mouse">Mouse</option>
+            <option value="headset">Audífonos / Diadema</option>
+            <option value="webcam">Webcam</option>
+            <option value="dock">Dock / Base</option>
+            <option value="ups">No-break / UPS</option>
+            <option value="scanner">Escáner</option>
+            <option value="accessory">Accesorio</option>
             <option value="other">Otro</option>
           </select>
         )}

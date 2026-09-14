@@ -84,7 +84,7 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   doc.text('CARTA RESPONSIVA', pageWidth / 2, 12, { align: 'center' });
 
   doc.setFontSize(9);
-  doc.text(loan ? 'EQUIPO DE CÓMPUTO · PRÉSTAMO TEMPORAL' : 'EQUIPO DE CÓMPUTO', pageWidth / 2, 20, { align: 'center' });
+  doc.text(loan ? 'ACTIVO DE TI · PRÉSTAMO TEMPORAL' : 'ACTIVO DE TI ASIGNADO', pageWidth / 2, 20, { align: 'center' });
 
   yPos = 35;
 

@@ -1,24 +1,77 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import isDev from 'electron-is-dev';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 let mainWindow: BrowserWindow | null = null;
 
 const getRuntimeContext = () => {
   const portableExecutableDir = process.env.PORTABLE_EXECUTABLE_DIR;
   const portableExecutableFile = process.env.PORTABLE_EXECUTABLE_FILE;
+  // macOS has no Electron "portable" target like Windows. A packaged .app
+  // started from an external volume is the equivalent USB workflow.
+  const isMacExternalApp = process.platform === 'darwin' && process.execPath.startsWith('/Volumes/');
 
   return {
-    isPortableMode: Boolean(portableExecutableDir || portableExecutableFile),
+    isPortableMode: Boolean(portableExecutableDir || portableExecutableFile || isMacExternalApp),
     portableExecutableDir: portableExecutableDir || undefined,
     portableExecutableFile: portableExecutableFile || undefined,
     platform: process.platform
   };
+};
+
+const detectMacSpecs = async () => {
+  const specs: Record<string, string> = { manufacturer: 'Apple' };
+
+  try {
+    const { stdout } = await execFileAsync('system_profiler', [
+      '-json', 'SPHardwareDataType', 'SPSoftwareDataType', 'SPDisplaysDataType'
+    ]);
+    const profile = JSON.parse(stdout) as Record<string, Array<Record<string, unknown>>>;
+    const hardware = profile.SPHardwareDataType?.[0] || {};
+    const software = profile.SPSoftwareDataType?.[0] || {};
+    const display = profile.SPDisplaysDataType?.[0] || {};
+    const graphics = (display.spdisplays_ndrvs as Array<Record<string, unknown>> | undefined)?.[0] || {};
+    const read = (source: Record<string, unknown>, ...keys: string[]) => {
+      const value = keys.map(key => source[key]).find(value => typeof value === 'string' && value.trim());
+      return typeof value === 'string' ? value.trim() : '';
+    };
+
+    specs.model = read(hardware, 'machine_model', 'model_name', 'machine_name');
+    specs.serialNumber = read(hardware, 'serial_number');
+    specs.cpu = read(hardware, 'chip_type', 'processor_name', 'current_processor_speed');
+    specs.ram = read(hardware, 'physical_memory');
+    specs.os = read(software, 'os_version', 'system_version');
+    specs.gpu = read(graphics, 'sppci_model', '_name', 'spdisplays_vendor');
+  } catch (error) {
+    console.error('Error leyendo system_profiler:', error);
+  }
+
+  try {
+    const { stdout } = await execFileAsync('scutil', ['--get', 'ComputerName']);
+    specs.hostname = stdout.trim();
+  } catch (error) {
+    console.error('Error detectando nombre de la Mac:', error);
+  }
+
+  try {
+    const { stdout } = await execFileAsync('df', ['-k', '/']);
+    const lines = stdout.trim().split(/\r?\n/);
+    const values = lines[lines.length - 1]?.trim().split(/\s+/) || [];
+    const kilobytes = Number(values[1]);
+    if (Number.isFinite(kilobytes) && kilobytes > 0) {
+      specs.storage = `${Math.round(kilobytes / (1024 * 1024))} GB`;
+    }
+  } catch (error) {
+    console.error('Error detectando almacenamiento de la Mac:', error);
+  }
+
+  return specs;
 };
 
 // Auto-updater configuration
@@ -109,6 +162,11 @@ ipcMain.handle('get-runtime-context', async () => {
 // System info detection
 ipcMain.handle('detect-system-specs', async () => {
   try {
+    if (process.platform === 'darwin') return detectMacSpecs();
+    if (process.platform !== 'win32') {
+      throw new Error(`Sistema operativo no compatible para el escáner: ${process.platform}`);
+    }
+
     const specs: any = {};
 
     // CPU

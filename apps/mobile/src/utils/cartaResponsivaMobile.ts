@@ -342,7 +342,7 @@ const buildHtml = (
 
         <div class="header">
           <h1>CARTA RESPONSIVA</h1>
-          <h2>${loan ? 'EQUIPO DE CÓMPUTO · PRÉSTAMO TEMPORAL' : 'EQUIPO DE CÓMPUTO'}</h2>
+          <h2>${loan ? 'ACTIVO DE TI · PRÉSTAMO TEMPORAL' : 'ACTIVO DE TI ASIGNADO'}</h2>
         </div>
 
         <div class="content">

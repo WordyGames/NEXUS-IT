@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Computer, Smartphone, Printer, Network, HardDrive, MonitorIcon, RefreshCw } from 'lucide-react';
+import { Computer, Smartphone, Printer, Network, HardDrive, MonitorIcon, RefreshCw, Keyboard, Mouse, Headphones, Webcam, ScanLine } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Equipment, getEquipment, subscribeEquipmentChanges } from '@nexus-it/shared';
 import { toDate } from '../utils/dateUtils';
@@ -10,6 +10,12 @@ const getEquipmentIcon = (type: string) => {
   switch (type.toLowerCase()) {
     case 'laptop':  return <Computer     size={36} className={`${cls} text-blue-500`} />;
     case 'desktop': return <MonitorIcon  size={36} className={`${cls} text-purple-500`} />;
+    case 'monitor': return <MonitorIcon  size={36} className={`${cls} text-purple-500`} />;
+    case 'keyboard': return <Keyboard    size={36} className={`${cls} text-slate-500`} />;
+    case 'mouse':    return <Mouse       size={36} className={`${cls} text-slate-500`} />;
+    case 'headset':  return <Headphones  size={36} className={`${cls} text-indigo-500`} />;
+    case 'webcam':   return <Webcam      size={36} className={`${cls} text-sky-500`} />;
+    case 'scanner':  return <ScanLine    size={36} className={`${cls} text-amber-500`} />;
     case 'phone':   return <Smartphone   size={36} className={`${cls} text-green-500`} />;
     case 'tablet':  return <Smartphone   size={36} className={`${cls} text-teal-500`} />;
     case 'printer': return <Printer      size={36} className={`${cls} text-orange-500`} />;

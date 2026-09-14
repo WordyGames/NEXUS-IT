@@ -1,0 +1,52 @@
+name: Compilar NEXUS IT para Mac USB
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/desktop/**'
+      - 'packages/shared/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/macos-usb-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-usb-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-macos-usb:
+    name: Generar app macOS para USB
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Verificar tipos del escritorio
+        run: npm run typecheck --workspace=apps/desktop
+
+      - name: Crear paquete USB para Mac
+        run: npm run dist:mac:usb --workspace=apps/desktop
+
+      - name: Publicar descarga de la app
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEXUS-IT-Mac-USB
+          path: apps/desktop/release/*.zip
+          if-no-files-found: error
+          retention-days: 30
