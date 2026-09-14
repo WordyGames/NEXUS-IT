@@ -40,6 +40,18 @@ jobs:
       - name: Verificar tipos del escritorio
         run: npm run typecheck --workspace=apps/desktop
 
+      - name: Generar icono de macOS
+        run: |
+          ICONSET="apps/desktop/assets/NEXUS-IT.iconset"
+          SOURCE="apps/mobile/assets/icon.png"
+          mkdir -p "$ICONSET"
+          for SIZE in 16 32 128 256 512; do
+            sips -z "$SIZE" "$SIZE" "$SOURCE" --out "$ICONSET/icon_${SIZE}x${SIZE}.png"
+            DOUBLE_SIZE=$((SIZE * 2))
+            sips -z "$DOUBLE_SIZE" "$DOUBLE_SIZE" "$SOURCE" --out "$ICONSET/icon_${SIZE}x${SIZE}@2x.png"
+          done
+          iconutil -c icns "$ICONSET" -o apps/desktop/assets/icon.icns
+
       - name: Crear paquete USB para Mac
         run: npm run dist:mac:usb --workspace=apps/desktop
 
