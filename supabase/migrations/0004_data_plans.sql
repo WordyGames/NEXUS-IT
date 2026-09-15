@@ -3,15 +3,18 @@
 -- Proyecto: nexus-it
 -- Fecha: 2026-09-15
 --
--- Objetivo: registrar las lineas/planes de datos moviles contratados
--- (SIM, MiFi/hotspot, modem con SIM, etc.) para poder monitorear el
--- gasto mensual total y el limite de datos contratado por linea.
+-- Registra planes de datos moviles (SIM/hotspot) contratados por la
+-- empresa para monitorear el gasto mensual. Solo datos del contrato
+-- (proveedor, numero, plan, limite de GB, costo mensual, dia de corte),
+-- NO telemetria de uso/consumo real. Vinculable opcionalmente a un
+-- equipo existente.
 --
--- Alcance de esta version: solo datos del CONTRATO (proveedor, numero,
--- plan, limite de GB, costo mensual, dia de corte). No incluye consumo
--- real de datos (requeriria integrarse con la API de cada proveedor,
--- que normalmente no es publica) — se puede agregar despues como una
--- tabla de lecturas periodicas si se consigue acceso a esa API.
+-- Nota: esta base usa permisos por usuario (private.has_nexus_permission,
+-- ver profiles.permissions) en vez de aislamiento por company via
+-- current_company(), a diferencia del esquema original de nexus-it antes
+-- de consolidarse. Las politicas de este archivo siguen el mismo patron
+-- que equipment/tickets para mantener consistencia con el resto del
+-- sistema.
 -- =====================================================================
 
 create table if not exists public.data_plans (
@@ -39,20 +42,21 @@ create index if not exists data_plans_status_idx on public.data_plans(status);
 
 alter table public.data_plans enable row level security;
 
--- Mismo esquema de aislamiento por tenant que equipment/tickets (migracion 0001).
-drop policy if exists data_plans_tenant_select on public.data_plans;
-create policy data_plans_tenant_select on public.data_plans
-  for select using (company = public.current_company());
+drop policy if exists data_plans_select_authorized on public.data_plans;
+create policy data_plans_select_authorized on public.data_plans
+  for select using (
+    private.has_nexus_permission('data_plans.view') or private.has_nexus_permission('data_plans.manage')
+  );
 
-drop policy if exists data_plans_tenant_insert on public.data_plans;
-create policy data_plans_tenant_insert on public.data_plans
-  for insert with check (company = public.current_company());
+drop policy if exists data_plans_insert_managers on public.data_plans;
+create policy data_plans_insert_managers on public.data_plans
+  for insert with check (private.has_nexus_permission('data_plans.manage'));
 
-drop policy if exists data_plans_tenant_update on public.data_plans;
-create policy data_plans_tenant_update on public.data_plans
-  for update using (company = public.current_company())
-  with check (company = public.current_company());
+drop policy if exists data_plans_update_managers on public.data_plans;
+create policy data_plans_update_managers on public.data_plans
+  for update using (private.has_nexus_permission('data_plans.manage'))
+  with check (private.has_nexus_permission('data_plans.manage'));
 
-drop policy if exists data_plans_tenant_delete on public.data_plans;
-create policy data_plans_tenant_delete on public.data_plans
-  for delete using (company = public.current_company());
+drop policy if exists data_plans_delete_managers on public.data_plans;
+create policy data_plans_delete_managers on public.data_plans
+  for delete using (private.has_nexus_permission('data_plans.manage'));
