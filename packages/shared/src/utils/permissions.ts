@@ -23,7 +23,9 @@ const USER_DEFAULT_PERMISSIONS: Record<UserPermission, boolean> = {
   [UserPermission.TICKETS_VIEW]: true,
   [UserPermission.TICKETS_VIEW_ALL]: false,
   [UserPermission.TICKETS_CHANGE_STATUS]: false,
-  [UserPermission.NOTIFICATIONS_VIEW]: true
+  [UserPermission.NOTIFICATIONS_VIEW]: true,
+  [UserPermission.DATA_PLANS_VIEW]: false,
+  [UserPermission.DATA_PLANS_MANAGE]: false
 };
 
 const ADMIN_DEFAULT_PERMISSIONS: Record<UserPermission, boolean> = buildAllPermissions(true);
