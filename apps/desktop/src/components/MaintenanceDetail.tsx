@@ -109,12 +109,12 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
       // Header
       pdf.setTextColor(...darkGray);
       pdf.setFontSize(18);
-      pdf.setFont(undefined, 'bold');
+      pdf.setFont('helvetica', 'bold');
       pdf.text('REPORTE DE MANTENIMIENTO', pageWidth / 2, yPosition, { align: 'center' });
 
       yPosition += 8;
       pdf.setFontSize(10);
-      pdf.setFont(undefined, 'normal');
+      pdf.setFont('helvetica', 'normal');
       pdf.text(`ID: ${maintenance.id}`, pageWidth / 2, yPosition, { align: 'center' });
 
       yPosition += 15;
@@ -125,7 +125,7 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
         pdf.rect(10, yPosition, pageWidth - 20, 8, 'F');
         pdf.setTextColor(255, 255, 255);
         pdf.setFontSize(11);
-        pdf.setFont(undefined, 'bold');
+        pdf.setFont('helvetica', 'bold');
         pdf.text(sanitizePdfText(title), 15, yPosition + 6);
         yPosition += 12;
       };
@@ -133,9 +133,9 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
       const addField = (label: string, value: string) => {
         pdf.setTextColor(...darkGray);
         pdf.setFontSize(9);
-        pdf.setFont(undefined, 'bold');
+        pdf.setFont('helvetica', 'bold');
         pdf.text(sanitizePdfText(label), 15, yPosition);
-        pdf.setFont(undefined, 'normal');
+        pdf.setFont('helvetica', 'normal');
         const valueWidth = pageWidth - 80;
         const wrappedValue = pdf.splitTextToSize(sanitizePdfText(value), valueWidth);
         pdf.text(wrappedValue, 50, yPosition);
@@ -155,7 +155,7 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
       addSection('DESCRIPCIÓN');
       pdf.setTextColor(...darkGray);
       pdf.setFontSize(8);
-      pdf.setFont(undefined, 'normal');
+      pdf.setFont('helvetica', 'normal');
       const descLines = pdf.splitTextToSize(maintenance.description || 'Sin descripción', pageWidth - 30);
       pdf.text(descLines, 15, yPosition);
       yPosition += descLines.length * 4 + 10;
@@ -187,14 +187,14 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
         pdf.setFontSize(8);
         maintenance.tasks.forEach((task) => {
           const symbol = task.completed ? '[x]' : '[ ]';
-          pdf.setFont(undefined, 'normal');
+          pdf.setFont('helvetica', 'normal');
           const taskText = sanitizePdfText(`${symbol} ${task.description}`);
           const taskLines = pdf.splitTextToSize(taskText, pageWidth - 30);
           pdf.text(taskLines, 15, yPosition);
           yPosition += taskLines.length * 4;
           if (task.completed && task.completedBy) {
             pdf.setTextColor(120, 120, 120);
-            pdf.setFont(undefined, 'italic');
+            pdf.setFont('helvetica', 'italic');
             pdf.text(sanitizePdfText(`    Completada por ${task.completedBy}`), 15, yPosition);
             yPosition += 4;
             pdf.setTextColor(...darkGray);
@@ -208,7 +208,7 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
         addSection('NOTAS ADICIONALES');
         pdf.setTextColor(...darkGray);
         pdf.setFontSize(8);
-        pdf.setFont(undefined, 'normal');
+        pdf.setFont('helvetica', 'normal');
         const noteLines = pdf.splitTextToSize(sanitizePdfText(maintenance.notes), pageWidth - 30);
         pdf.text(noteLines, 15, yPosition);
         yPosition += noteLines.length * 4 + 5;
@@ -219,7 +219,7 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
         addSection('COSTO');
         pdf.setTextColor(...darkGray);
         pdf.setFontSize(11);
-        pdf.setFont(undefined, 'bold');
+        pdf.setFont('helvetica', 'bold');
         pdf.text(`$${maintenance.cost.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`, 15, yPosition);
         yPosition += 10;
       }
@@ -227,7 +227,7 @@ const MaintenanceDetail: React.FC<MaintenanceDetailProps> = ({
       // Footer
       pdf.setTextColor(150, 150, 150);
       pdf.setFontSize(7);
-      pdf.setFont(undefined, 'normal');
+      pdf.setFont('helvetica', 'normal');
       pdf.text(sanitizePdfText('Este documento fue generado automaticamente por NEXUS IT'), pageWidth / 2, pageHeight - 10, { align: 'center' });
       pdf.text(sanitizePdfText(`Generado: ${formatDate(new Date())}`), pageWidth / 2, pageHeight - 5, { align: 'center' });
 
