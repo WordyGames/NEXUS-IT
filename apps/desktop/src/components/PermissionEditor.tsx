@@ -24,6 +24,8 @@ const permissionLabels: Record<UserPermission, string> = {
   [UserPermission.TICKETS_VIEW_ALL]:     'Ver tickets de todos',
   [UserPermission.TICKETS_CHANGE_STATUS]:'Cambiar estado de tickets',
   [UserPermission.NOTIFICATIONS_VIEW]:   'Ver notificaciones',
+  [UserPermission.DATA_PLANS_VIEW]:      'Ver planes de datos',
+  [UserPermission.DATA_PLANS_MANAGE]:    'Crear/editar/eliminar planes de datos',
 };
 
 const permissionGroups: Array<{ title: string; permissions: UserPermission[] }> = [
@@ -38,6 +40,10 @@ const permissionGroups: Array<{ title: string; permissions: UserPermission[] }> 
       UserPermission.MAINTENANCES_VIEW, UserPermission.MAINTENANCES_MANAGE,
       UserPermission.WARRANTY_VIEW,
     ],
+  },
+  {
+    title: 'Planes de datos',
+    permissions: [UserPermission.DATA_PLANS_VIEW, UserPermission.DATA_PLANS_MANAGE],
   },
   {
     title: 'Tickets',
@@ -55,6 +61,8 @@ function normalize(values: Record<UserPermission, boolean>): Record<UserPermissi
   if (!v[UserPermission.EQUIPMENT_VIEW])   v[UserPermission.EQUIPMENT_MANAGE] = false;
   if (v[UserPermission.MAINTENANCES_MANAGE]) v[UserPermission.MAINTENANCES_VIEW] = true;
   if (!v[UserPermission.MAINTENANCES_VIEW])  v[UserPermission.MAINTENANCES_MANAGE] = false;
+  if (v[UserPermission.DATA_PLANS_MANAGE]) v[UserPermission.DATA_PLANS_VIEW] = true;
+  if (!v[UserPermission.DATA_PLANS_VIEW])  v[UserPermission.DATA_PLANS_MANAGE] = false;
   if (v[UserPermission.TICKETS_VIEW_ALL] || v[UserPermission.TICKETS_CHANGE_STATUS]) v[UserPermission.TICKETS_VIEW] = true;
   if (!v[UserPermission.TICKETS_VIEW]) { v[UserPermission.TICKETS_VIEW_ALL] = false; v[UserPermission.TICKETS_CHANGE_STATUS] = false; }
   if (v[UserPermission.USERS_MANAGE])  v[UserPermission.USERS_VIEW]  = true;

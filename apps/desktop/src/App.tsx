@@ -14,6 +14,7 @@ const GlobalSearch = lazy(() => import('./components/GlobalSearch').then((module
 const Login = lazy(() => import('./pages/Login'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Equipment = lazy(() => import('./pages/Equipment'));
+const DataPlans = lazy(() => import('./pages/DataPlans'));
 const MyEquipment = lazy(() => import('./pages/MyEquipment'));
 const Tickets = lazy(() => import('./pages/Tickets'));
 const Maintenances = lazy(() => import('./pages/Maintenances'));
@@ -99,6 +100,14 @@ function App() {
                     element={
                       <PrivateRoute requiredPermission={UserPermission.EQUIPMENT_VIEW}>
                         <Equipment />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="data-plans"
+                    element={
+                      <PrivateRoute requiredPermission={UserPermission.DATA_PLANS_VIEW}>
+                        <DataPlans />
                       </PrivateRoute>
                     }
                   />

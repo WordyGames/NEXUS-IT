@@ -4,6 +4,7 @@ import {
   Cpu,
   LayoutDashboard,
   Monitor,
+  Smartphone,
   ClipboardList,
   CalendarCheck,
   Wrench,
@@ -27,6 +28,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { path: '/dashboard',               label: 'Dashboard',       icon: LayoutDashboard, permission: UserPermission.DASHBOARD_ADMIN },
   { path: '/equipment',               label: 'Equipos',         icon: Monitor,         permission: UserPermission.EQUIPMENT_VIEW   },
+  { path: '/data-plans',              label: 'Planes de Datos', icon: Smartphone,      permission: UserPermission.DATA_PLANS_VIEW  },
   { path: '/tickets',                 label: 'Tickets',         icon: ClipboardList,   permission: UserPermission.TICKETS_VIEW     },
   { path: '/maintenance-confirmation',label: 'Confirmar Horas', icon: CalendarCheck,   permission: UserPermission.TICKETS_VIEW     },
   { path: '/maintenances',            label: 'Mantenimientos',  icon: Wrench,          permission: UserPermission.MAINTENANCES_VIEW},

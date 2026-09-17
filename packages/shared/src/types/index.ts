@@ -266,7 +266,9 @@ export enum UserPermission {
   TICKETS_VIEW = 'tickets.view',
   TICKETS_VIEW_ALL = 'tickets.view_all',
   TICKETS_CHANGE_STATUS = 'tickets.change_status',
-  NOTIFICATIONS_VIEW = 'notifications.view'
+  NOTIFICATIONS_VIEW = 'notifications.view',
+  DATA_PLANS_VIEW = 'data_plans.view',
+  DATA_PLANS_MANAGE = 'data_plans.manage'
 }
 
 export type UserPermissions = Partial<Record<UserPermission, boolean>>;
@@ -313,6 +315,47 @@ export interface DashboardStats {
   resolvedTickets: number;
   averageResolutionTime: number; // en horas
 }
+
+// Planes de datos moviles (lineas contratadas) — permite monitorear el
+// gasto mensual y el limite de datos contratado por linea. No incluye
+// consumo real (requeriria la API de cada proveedor); solo los datos
+// del contrato.
+export enum DataPlanProvider {
+  TELCEL = 'telcel',
+  ATT = 'att',
+  MOVISTAR = 'movistar',
+  UNEFON = 'unefon',
+  OTRO = 'otro'
+}
+
+export interface DataPlan {
+  id: string;
+  company: Company;
+  provider: DataPlanProvider;
+  providerOther?: string; // cuando provider === OTRO
+  phoneNumber: string;
+  planName: string;
+  dataLimitGb?: number; // vacio/undefined = ilimitado
+  monthlyCost: number;
+  billingDay: number; // dia de corte del mes, 1-31
+  equipmentId?: string; // equipo vinculado (opcional)
+  status: 'active' | 'suspended' | 'cancelled';
+  contractStartDate?: Date | Timestamp;
+  notes?: string;
+  createdAt: Date | Timestamp;
+  updatedAt: Date | Timestamp;
+  createdBy: string;
+}
+
+export interface DataPlanFilters {
+  company?: Company;
+  status?: DataPlan['status'];
+  provider?: DataPlanProvider;
+  equipmentId?: string;
+  search?: string;
+}
+
+export type CreateDataPlanInput = Omit<DataPlan, 'id' | 'createdAt' | 'updatedAt'> & { createdBy: string };
 
 // Tipo para filtros
 export interface EquipmentFilters {
