@@ -1,4 +1,4 @@
-import jsPDF from 'jspdf';
+import jsPDF, { GState } from 'jspdf';
 import { Company, Equipment, User } from '@nexus-it/shared';
 
 // Importar imágenes de fondo - Vite las procesará automáticamente
@@ -66,11 +66,11 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
     try {
       // Reducir opacidad para LIUMAQ para hacer el fondo más claro
       if (equipment.company === Company.EQUIPOS_OSENAL) {
-        doc.setGlobalAlpha(0.15);
+        doc.setGState(new GState({ opacity: 0.15 }));
       }
       // Agregar imagen de fondo (cubre toda la página)
       doc.addImage(backgroundImage, 'PNG', 0, 0, pageWidth, pageHeight);
-      doc.setGlobalAlpha(1.0); // Restaurar opacidad
+      doc.setGState(new GState({ opacity: 1.0 })); // Restaurar opacidad
     } catch (error) {
       console.error('[Carta PDF] Error al agregar imagen de fondo:', error);
     }
