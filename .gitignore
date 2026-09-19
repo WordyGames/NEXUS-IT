@@ -11,6 +11,10 @@ dist/
 build/
 out/
 
+# Excepción: recursos de empaquetado de electron-builder (no es output generado)
+!apps/desktop/build/
+!apps/desktop/build/**
+
 # Electron
 release/
 *.exe

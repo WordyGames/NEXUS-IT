@@ -1,4 +1,4 @@
-name: Compilar NEXUS IT para Mac USB
+name: Compilar NEXUS IT para macOS (DMG + ZIP)
 
 on:
   push:
@@ -15,12 +15,46 @@ permissions:
   contents: read
 
 concurrency:
-  group: macos-usb-build-${{ github.ref }}
+  group: macos-build-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-macos-usb:
-    name: Generar app macOS para USB
+  # Detecta si los secretos de firma/notarización de Apple están configurados
+  # en el repositorio, sin exponer su valor. Esto decide si se compila el
+  # instalador de PRODUCCIÓN (firmado y notarizado) o solo un build de
+  # PRUEBA sin firmar.
+  check-apple-credentials:
+    name: Verificar credenciales de Apple
+    runs-on: ubuntu-latest
+    outputs:
+      has-signing: ${{ steps.check.outputs.has-signing }}
+    steps:
+      - name: Comprobar secretos configurados
+        id: check
+        env:
+          HAS_CSC_LINK: ${{ secrets.CSC_LINK }}
+          HAS_CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          HAS_APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          HAS_APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          HAS_APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          if [ -n "$HAS_CSC_LINK" ] && [ -n "$HAS_CSC_KEY_PASSWORD" ] && \
+             [ -n "$HAS_APPLE_API_KEY" ] && [ -n "$HAS_APPLE_API_KEY_ID" ] && \
+             [ -n "$HAS_APPLE_API_ISSUER" ]; then
+            echo "has-signing=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-signing=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ---------------------------------------------------------------------
+  # DISTRIBUCIÓN DE PRUEBA: se ejecuta siempre. Si faltan credenciales de
+  # Apple, este es el único build disponible (sin firma, NO apto para
+  # repartir a usuarios finales: macOS mostrará advertencias de Gatekeeper).
+  # ---------------------------------------------------------------------
+  build-macos-test:
+    name: Build de prueba (sin firmar)
+    needs: check-apple-credentials
+    if: needs.check-apple-credentials.outputs.has-signing == 'false'
     runs-on: macos-latest
     timeout-minutes: 30
 
@@ -39,8 +73,9 @@ jobs:
 
       - name: Verificar tipos del escritorio
         run: npm run typecheck --workspace=apps/desktop
-        # Hay errores de tipos heredados en servicios compartidos ajenos al empaquetado.
-        # Se conserva el chequeo visible, pero el build nativo es la validación decisiva.
+        # Hay errores de tipos heredados en componentes ajenos al empaquetado
+        # (ver reporte aparte). Se conserva el chequeo visible para no
+        # perderlo de vista, pero no bloquea la generación del instalador.
         continue-on-error: true
 
       - name: Generar icono de macOS
@@ -55,13 +90,154 @@ jobs:
           done
           iconutil -c icns "$ICONSET" -o apps/desktop/assets/icon.icns
 
-      - name: Crear paquete USB para Mac
-        run: npm run dist:mac:usb --workspace=apps/desktop
+      - name: Compilar DMG + ZIP (sin firmar)
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run dist:mac --workspace=apps/desktop
 
-      - name: Publicar descarga de la app
+      - name: Preparar artifacts
+        run: |
+          cd apps/desktop/release
+          cp "$(ls *.dmg | head -n1)" "NEXUS-IT-Mac-Installer-UNSIGNED-TEST.dmg"
+          cp "$(ls *.zip | head -n1)" "NEXUS-IT-Mac-USB-UNSIGNED-TEST.zip"
+
+      - name: Publicar DMG de prueba (sin firmar)
+        uses: actions/upload-artifact@v4
+        with:
+          name: TEST-UNSIGNED-NEXUS-IT-Mac-Installer
+          path: apps/desktop/release/NEXUS-IT-Mac-Installer-UNSIGNED-TEST.dmg
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publicar ZIP de prueba (sin firmar)
+        uses: actions/upload-artifact@v4
+        with:
+          name: TEST-UNSIGNED-NEXUS-IT-Mac-USB
+          path: apps/desktop/release/NEXUS-IT-Mac-USB-UNSIGNED-TEST.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Resumen
+        run: |
+          echo "### ⚠️ Build de PRUEBA sin firmar" >> "$GITHUB_STEP_SUMMARY"
+          echo "Faltan uno o más secretos de Apple Developer (CSC_LINK, CSC_KEY_PASSWORD, APPLE_API_KEY, APPLE_API_KEY_ID, APPLE_API_ISSUER)." >> "$GITHUB_STEP_SUMMARY"
+          echo "Este DMG/ZIP no está firmado ni notarizado: macOS mostrará 'app dañada' o bloqueo de Gatekeeper al abrirlo en otra Mac." >> "$GITHUB_STEP_SUMMARY"
+          echo "Úsalo solo para pruebas internas en equipos donde se desactive Gatekeeper manualmente." >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------
+  # DISTRIBUCIÓN DE PRODUCCIÓN: firmada con certificado Developer ID y
+  # notarizada por Apple. Solo se ejecuta cuando los 5 secretos existen.
+  # ---------------------------------------------------------------------
+  build-macos-release:
+    name: Build de producción (firmado + notarizado)
+    needs: check-apple-credentials
+    if: needs.check-apple-credentials.outputs.has-signing == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Verificar tipos del escritorio
+        run: npm run typecheck --workspace=apps/desktop
+        # Hay errores de tipos heredados en componentes ajenos al empaquetado
+        # (ver reporte aparte). Se conserva el chequeo visible para no
+        # perderlo de vista, pero no bloquea la generación del instalador.
+        continue-on-error: true
+
+      - name: Generar icono de macOS
+        run: |
+          ICONSET="apps/desktop/assets/NEXUS-IT.iconset"
+          SOURCE="apps/mobile/assets/icon.png"
+          mkdir -p "$ICONSET"
+          for SIZE in 16 32 128 256 512; do
+            sips -z "$SIZE" "$SIZE" "$SOURCE" --out "$ICONSET/icon_${SIZE}x${SIZE}.png"
+            DOUBLE_SIZE=$((SIZE * 2))
+            sips -z "$DOUBLE_SIZE" "$DOUBLE_SIZE" "$SOURCE" --out "$ICONSET/icon_${SIZE}x${SIZE}@2x.png"
+          done
+          iconutil -c icns "$ICONSET" -o apps/desktop/assets/icon.icns
+
+      - name: Preparar API Key de notarización (App Store Connect)
+        env:
+          APPLE_API_KEY_B64: ${{ secrets.APPLE_API_KEY }}
+        run: |
+          # El secreto APPLE_API_KEY guarda el archivo AuthKey_XXXX.p8 codificado
+          # en base64 (GitHub Secrets solo admite texto). electron-builder /
+          # @electron/notarize requieren una RUTA de archivo en la variable de
+          # entorno APPLE_API_KEY, así que aquí lo decodificamos a un archivo
+          # temporal y sobreescribimos esa misma variable con su ruta.
+          KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
+          echo "$APPLE_API_KEY_B64" | base64 --decode > "$KEY_PATH"
+          echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
+
+      - name: Compilar, firmar y notarizar DMG + ZIP
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: npm run dist:mac --workspace=apps/desktop
+
+      - name: Limpiar API Key temporal
+        if: always()
+        run: rm -f "$RUNNER_TEMP/AuthKey.p8"
+
+      - name: Validar instalación desde /Applications
+        run: |
+          set -euo pipefail
+          DMG_PATH=$(ls apps/desktop/release/*.dmg | head -n1)
+          MOUNT_DIR=$(mktemp -d)
+          hdiutil attach "$DMG_PATH" -mountpoint "$MOUNT_DIR" -nobrowse -quiet
+          APP_NAME=$(ls "$MOUNT_DIR" | grep '\.app$')
+          cp -R "$MOUNT_DIR/$APP_NAME" /Applications/
+          hdiutil detach "$MOUNT_DIR" -quiet
+
+          echo "Verificando firma de código..."
+          codesign --verify --deep --strict --verbose=2 "/Applications/$APP_NAME"
+
+          echo "Verificando que Gatekeeper acepte la app notarizada..."
+          spctl --assess --type execute --verbose "/Applications/$APP_NAME"
+
+          echo "Verificando el sello de notarización (stapling)..."
+          xcrun stapler validate "/Applications/$APP_NAME"
+
+          echo "Instalador validado correctamente: se abre desde /Applications sin advertencias de macOS."
+
+      - name: Preparar artifacts
+        run: |
+          cd apps/desktop/release
+          cp "$(ls *.dmg | head -n1)" "NEXUS-IT-Mac-Installer.dmg"
+          cp "$(ls *.zip | head -n1)" "NEXUS-IT-Mac-USB.zip"
+
+      - name: Publicar instalador DMG (producto principal)
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEXUS-IT-Mac-Installer
+          path: apps/desktop/release/NEXUS-IT-Mac-Installer.dmg
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publicar ZIP portable para USB (opcional)
         uses: actions/upload-artifact@v4
         with:
           name: NEXUS-IT-Mac-USB
-          path: apps/desktop/release/*.zip
+          path: apps/desktop/release/NEXUS-IT-Mac-USB.zip
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 90
+
+      - name: Resumen
+        run: |
+          echo "### ✅ Build de PRODUCCIÓN firmado y notarizado" >> "$GITHUB_STEP_SUMMARY"
+          echo "- NEXUS-IT-Mac-Installer.dmg — instalar arrastrando a /Applications" >> "$GITHUB_STEP_SUMMARY"
+          echo "- NEXUS-IT-Mac-USB.zip — copia portable opcional para USB" >> "$GITHUB_STEP_SUMMARY"
+          echo "Verificado con codesign, spctl y xcrun stapler validate." >> "$GITHUB_STEP_SUMMARY"
