@@ -1,6 +1,21 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+
+// Electron carga el renderer empaquetado con `loadFile` (protocolo file://).
+// Bajo file://, Chromium trata los <script type="module" crossorigin> y
+// <link rel="modulepreload" crossorigin> como peticiones CORS con origen
+// null y falla en silencio: los módulos nunca se ejecutan, React nunca
+// monta y la ventana queda en blanco. Vite agrega `crossorigin` por
+// defecto pensando en un despliegue http(s); aquí lo quitamos del HTML
+// final para que la app funcione al abrirse desde /Applications o USB.
+const stripCrossorigin = (): Plugin => ({
+  name: 'strip-crossorigin-for-file-protocol',
+  transformIndexHtml: {
+    order: 'post',
+    handler: (html) => html.replace(/\s+crossorigin(="[^"]*")?/g, '')
+  }
+});
 
 const getManualChunk = (id: string): string | undefined => {
   if (!id.includes('node_modules')) {
@@ -45,7 +60,7 @@ const getManualChunk = (id: string): string | undefined => {
 };
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), stripCrossorigin()],
   base: './',
   build: {
     outDir: 'dist/renderer',
