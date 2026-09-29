@@ -104,6 +104,27 @@ const applySheetTableOptions = (ws: XLSX.WorkSheet, rowCount: number, columnCoun
   (ws as any)['!freeze'] = { xSplit: 0, ySplit: 1 };
 };
 
+const appendReportSummary = (
+  wb: XLSX.WorkBook,
+  title: string,
+  totalRecords: number,
+  metrics: Array<[string, string | number]>
+) => {
+  const rows = [
+    ['NEXUS IT'],
+    [title],
+    [],
+    ['Generado el', new Date().toLocaleString('es-MX')],
+    ['Total de registros', totalRecords],
+    ...metrics,
+    [],
+    ['Nota', 'Consulta la hoja de detalle para filtrar y revisar cada registro.']
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{ wch: 28 }, { wch: 64 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Resumen');
+};
+
 const escapeExcelCriteria = (value: string): string => value.replace(/"/g, '""');
 
 /**
@@ -356,7 +377,13 @@ export const exportTicketsToExcel = (tickets: Ticket[], filename = 'tickets') =>
       { wch: 18 }, // Fecha resolución
     ];
     ws['!cols'] = colWidths;
+    applySheetTableOptions(ws, data.length, colWidths.length);
 
+    appendReportSummary(wb, 'Reporte de tickets', data.length, [
+      ['Tickets abiertos', tickets.filter(ticket => ticket.status === 'open').length],
+      ['Tickets resueltos', tickets.filter(ticket => ticket.status === 'resolved').length],
+      ['Sin asignar', tickets.filter(ticket => !ticket.assignedToName).length]
+    ]);
     XLSX.utils.book_append_sheet(wb, ws, 'Tickets');
 
     const timestamp = new Date().toISOString().split('T')[0];
@@ -417,7 +444,13 @@ export const exportMaintenancesToExcel = (maintenances: Maintenance[], filename 
       { wch: 18 }, // Fecha
     ];
     ws['!cols'] = colWidths;
+    applySheetTableOptions(ws, data.length, colWidths.length);
 
+    appendReportSummary(wb, 'Reporte de mantenimientos', data.length, [
+      ['Programados', maintenances.filter(item => item.status === MaintenanceStatus.PROGRAMADO).length],
+      ['Completados', maintenances.filter(item => item.status === MaintenanceStatus.COMPLETADO).length],
+      ['Costo total', maintenances.reduce((sum, item) => sum + (Number(item.cost) || 0), 0)]
+    ]);
     XLSX.utils.book_append_sheet(wb, ws, 'Mantenimientos');
 
     const timestamp = new Date().toISOString().split('T')[0];
