@@ -10,6 +10,9 @@ const execFileAsync = promisify(execFile);
 
 let mainWindow: BrowserWindow | null = null;
 
+// Interfaz publicada en Vercel (proyecto `desktop`). Se puede cambiar con NEXUS_REMOTE_URL.
+const REMOTE_APP_URL = process.env.NEXUS_REMOTE_URL || 'https://desktop-wordygames-projects.vercel.app';
+
 const getRuntimeContext = () => {
   const portableExecutableDir = process.env.PORTABLE_EXECUTABLE_DIR;
   const portableExecutableFile = process.env.PORTABLE_EXECUTABLE_FILE;
@@ -98,7 +101,16 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+    // Actualización automática: la interfaz se carga desde Vercel (siempre la
+    // última versión publicada). Sin internet, o si tarda/falla, se usa la
+    // copia incluida en el .exe.
+    const win = mainWindow;
+    const localIndex = path.join(__dirname, '../renderer/index.html');
+    const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000));
+    Promise.race([win.loadURL(REMOTE_APP_URL), timeout]).catch((err) => {
+      console.warn('[NEXUS IT] Usando interfaz local:', err?.message ?? err);
+      if (!win.isDestroyed()) void win.loadFile(localIndex);
+    });
   }
 
   mainWindow.once('ready-to-show', () => {
