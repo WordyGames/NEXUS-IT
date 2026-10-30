@@ -30,13 +30,15 @@ interface GenerateCartaResponsivaMobileOptions {
 const COMPANY_COLORS: Record<Company, { primary: string; secondary: string }> = {
   [Company.ESPECIAS_NATURALES]: { primary: '#2E7D32', secondary: '#66BB6A' },
   [Company.GRUPO_AMEX]: { primary: '#1565C0', secondary: '#42A5F5' },
-  [Company.EQUIPOS_OSENAL]: { primary: '#C62828', secondary: '#EF5350' }
+  [Company.EQUIPOS_OSENAL]: { primary: '#C62828', secondary: '#EF5350' },
+  ['THE SMASHED GRAIL']: { primary: '#7A1F1F', secondary: '#8A8582' }
 };
 
 const COMPANY_BACKGROUNDS: Record<Company, number> = {
   [Company.GRUPO_AMEX]: require('../../assets/carta-backgrounds/amex.png'),
   [Company.ESPECIAS_NATURALES]: require('../../assets/carta-backgrounds/aromata.png'),
-  [Company.EQUIPOS_OSENAL]: require('../../assets/carta-backgrounds/liumaq.png')
+  [Company.EQUIPOS_OSENAL]: require('../../assets/carta-backgrounds/liumaq.png'),
+  ['THE SMASHED GRAIL']: require('../../assets/carta-backgrounds/smashedgrail.png')
 };
 
 const backgroundCache = new Map<Company, string>();
@@ -124,7 +126,7 @@ const buildHtml = (
     includeEmployeeSignature,
     employeeSignatureDataUri
   } = options;
-  const colors = COMPANY_COLORS[equipment.company];
+  const colors = COMPANY_COLORS[equipment.company] ?? { primary: '#455A64', secondary: '#90A4AE' };
   const margin = equipment.company === Company.ESPECIAS_NATURALES ? 40 : 20;
 
   const conditionsList = (loan ? buildLoanConditions(loan) : CONDITIONS).map((condition, index) => (

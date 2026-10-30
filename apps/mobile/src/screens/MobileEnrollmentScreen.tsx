@@ -12,7 +12,6 @@ import {
   View
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import {
   Attachment,
   Company,
@@ -22,13 +21,14 @@ import {
   generateStoragePath,
   getEquipment,
   getUsers,
-  storage,
+  supabase,
   triggerEquipmentNotifications
 } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
 import { detectCurrentMobileDevice } from '../utils/deviceDetection';
 import { generateCartaResponsivaMobile } from '../utils/cartaResponsivaMobile';
 import { SignatureData, SignaturePad } from '../components/SignaturePad';
+import { useCompanies } from '../hooks/useCompanies';
 
 const generateEntityId = (): string => {
   if (typeof globalThis.crypto?.randomUUID === 'function') {
@@ -88,6 +88,7 @@ const buildInitialForm = (company: Company) => ({
 });
 
 const MobileEnrollmentScreen = () => {
+  const companies = useCompanies();
   const { userData, isAdmin } = useAuth();
   const defaultCompany = (userData?.company || Company.GRUPO_AMEX) as Company;
   const [form, setForm] = useState(() => buildInitialForm(defaultCompany));
@@ -190,19 +191,20 @@ const MobileEnrollmentScreen = () => {
   const uploadImage = async (uri: string): Promise<Attachment> => {
     const filename = uri.split('/').pop() || `mobile-photo-${Date.now()}.jpg`;
     const storagePath = generateStoragePath('equipment', currentEntityId, filename);
-    const storageRef = ref(storage, storagePath);
-
     const response = await fetch(uri);
-    const blob = await response.blob();
+    const bytes = await response.arrayBuffer();
 
-    await uploadBytes(storageRef, blob);
-    const downloadURL = await getDownloadURL(storageRef);
+    const { error } = await supabase.storage
+      .from('attachments')
+      .upload(storagePath, bytes, { contentType: 'image/jpeg', upsert: true });
+    if (error) throw error;
+    const downloadURL = supabase.storage.from('attachments').getPublicUrl(storagePath).data.publicUrl;
 
     return {
       id: generateAttachmentId(),
       fileName: filename,
       fileType: 'image/jpeg',
-      fileSize: blob.size,
+      fileSize: bytes.byteLength,
       url: downloadURL,
       storagePath,
       uploadedBy: userData?.id || 'mobile-user',
@@ -461,7 +463,7 @@ const MobileEnrollmentScreen = () => {
         <Text style={styles.label}>Empresa</Text>
         {isAdmin ? (
           <View style={styles.companyRow}>
-            {Object.values(Company).map((company) => (
+            {companies.map((company) => (
               <TouchableOpacity
                 key={company}
                 style={[

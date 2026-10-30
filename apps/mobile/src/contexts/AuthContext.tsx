@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, getDoc, Timestamp } from 'firebase/firestore';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import {
   Company,
@@ -8,12 +7,13 @@ import {
   UserRole,
   UserSession,
   UserPermission,
-  db,
   createUser,
   signIn,
+  getCurrentSession,
   signOut,
   getUserById,
-  hasUserPermission
+  hasUserPermission,
+  refreshCompanies
 } from '@nexus-it/shared';
 
 interface AuthContextType {
@@ -36,28 +36,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-const MOBILE_SESSION_KEY = 'nexus-it-mobile-session-id';
 const MOBILE_LAST_PROFILE_KEY = 'nexus-it-mobile-last-profile';
-const SESSION_RESTORE_TIMEOUT_MS = 8000;
-
-type SessionWithId = UserSession & { id?: string };
-
-const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number): Promise<T | null> => {
-  let timeoutRef: ReturnType<typeof setTimeout> | null = null;
-
-  const timeoutPromise = new Promise<null>((resolve) => {
-    timeoutRef = setTimeout(() => resolve(null), timeoutMs);
-  });
-
-  const result = await Promise.race([promise, timeoutPromise]);
-
-  if (timeoutRef) {
-    clearTimeout(timeoutRef);
-  }
-
-  return result as T | null;
-};
-
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -71,39 +50,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userData, setUserData] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const restoreSession = async (): Promise<SessionWithId | null> => {
-    const sessionId = await AsyncStorage.getItem(MOBILE_SESSION_KEY);
-    if (!sessionId) return null;
-
-    const sessionRef = doc(db, 'sessions', sessionId);
-    const sessionSnap = await withTimeout(getDoc(sessionRef), SESSION_RESTORE_TIMEOUT_MS);
-
-    if (!sessionSnap || !sessionSnap.exists()) {
-      await AsyncStorage.removeItem(MOBILE_SESSION_KEY);
-      return null;
-    }
-
-    const session = {
-      id: sessionSnap.id,
-      ...sessionSnap.data()
-    } as SessionWithId;
-
-    const expiresAtRaw = session.expiresAt as any;
-    const expiresAt = expiresAtRaw instanceof Timestamp
-      ? expiresAtRaw.toDate()
-      : new Date(expiresAtRaw);
-
-    if (Number.isNaN(expiresAt.getTime()) || expiresAt < new Date()) {
-      await AsyncStorage.removeItem(MOBILE_SESSION_KEY);
-      return null;
-    }
-
-    return session;
-  };
-
   const loadUserData = async () => {
     try {
-      const session = await restoreSession();
+      const session = await getCurrentSession();
       
       if (session) {
         const data = await getUserById(session.userId);
@@ -145,13 +94,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     loadUserData();
   }, []);
 
+  useEffect(() => {
+    if (userData?.id) void refreshCompanies();
+  }, [userData?.id]);
+
   const login = async (username: string, password: string) => {
     const normalizedUsername = username.trim().toLowerCase();
-    const session = await signIn(normalizedUsername, password) as SessionWithId;
-
-    if (session.id) {
-      await AsyncStorage.setItem(MOBILE_SESSION_KEY, session.id);
-    }
+    const session = await signIn(normalizedUsername, password);
 
     const data = await getUserById(session.userId);
     setUserData(data);
@@ -201,7 +150,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
-    await AsyncStorage.removeItem(MOBILE_SESSION_KEY);
     await signOut();
     setCurrentSession(null);
     setUserData(null);

@@ -10,8 +10,10 @@ import {
 } from 'react-native';
 import { Company } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
+import { useCompanies } from '../hooks/useCompanies';
 
 const RegisterScreen = ({ navigation }: any) => {
+  const companies = useCompanies();
   const { register } = useAuth();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
@@ -150,7 +152,7 @@ const RegisterScreen = ({ navigation }: any) => {
 
         <Text style={styles.label}>Empresa</Text>
         <View style={styles.companyRow}>
-          {Object.values(Company).map((company) => (
+          {companies.map((company) => (
             <TouchableOpacity
               key={company}
               style={[styles.companyChip, form.company === company && styles.companyChipSelected]}

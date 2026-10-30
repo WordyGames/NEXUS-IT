@@ -24,6 +24,7 @@ import {
   updateTicket
 } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
+import { useCompanies } from '../hooks/useCompanies';
 
 const PRIORITY_LABELS: Record<TicketPriority, string> = {
   [TicketPriority.LOW]: 'Baja',
@@ -90,6 +91,7 @@ const normalizeCategory = (value: unknown): TicketCategory => (
 );
 
 const TicketsScreen = ({ route }: any) => {
+  const companies = useCompanies();
   const { userData, isAdmin, hasPermission } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -364,7 +366,7 @@ const TicketsScreen = ({ route }: any) => {
             <>
               <Text style={styles.label}>Empresa</Text>
               <View style={styles.optionsRow}>
-                {Object.values(Company).map((company) => (
+                {companies.map((company) => (
                   <TouchableOpacity
                     key={company}
                     style={[styles.optionChip, form.company === company && styles.optionChipSelected]}

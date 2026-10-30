@@ -22,8 +22,10 @@ import {
   subscribeSupportChatThread,
   subscribeSupportChatThreads
 } from '@nexus-it/shared';
+import { useCompanies } from '../hooks/useCompanies';
 
 const DashboardScreen = ({ navigation }: any) => {
+  const companies = useCompanies();
   const { userData, logout, isAdmin, hasPermission } = useAuth();
   const canSeeGlobalDashboard = isAdmin || hasPermission(UserPermission.DASHBOARD_ADMIN);
   const [stats, setStats] = useState<any>(null);
@@ -253,7 +255,7 @@ const DashboardScreen = ({ navigation }: any) => {
       {canSeeGlobalDashboard && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Empresas</Text>
-          {Object.values(Company).map((company) => (
+          {companies.map((company) => (
             <View key={company} style={styles.companyCard}>
               <Text style={styles.companyName}>{company}</Text>
               <Text style={styles.companyCount}>

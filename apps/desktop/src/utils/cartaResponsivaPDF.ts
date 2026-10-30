@@ -5,6 +5,7 @@ import { Company, Equipment, User } from '@nexus-it/shared';
 import amexBg from '../assets/carta-backgrounds/amex.png';
 import aromataBg from '../assets/carta-backgrounds/aromata.png';
 import liumaqBg from '../assets/carta-backgrounds/liumaq.png';
+import smashedGrailBg from '../assets/carta-backgrounds/smashedgrail.png';
 
 interface CartaResponsivaLoanInfo {
   startDate: Date;
@@ -28,13 +29,15 @@ const formatDate = (date: Date): string =>
 const COMPANY_COLORS: Record<string, { primary: string; secondary: string }> = {
   [Company.ESPECIAS_NATURALES]: { primary: '#2E7D32', secondary: '#66BB6A' },
   [Company.GRUPO_AMEX]: { primary: '#1565C0', secondary: '#42A5F5' },
-  [Company.EQUIPOS_OSENAL]: { primary: '#C62828', secondary: '#EF5350' }
+  [Company.EQUIPOS_OSENAL]: { primary: '#C62828', secondary: '#EF5350' },
+  ['THE SMASHED GRAIL']: { primary: '#7A1F1F', secondary: '#8A8582' }
 };
 
 const COMPANY_BACKGROUNDS: Record<string, string> = {
   [Company.GRUPO_AMEX]: amexBg,
   [Company.ESPECIAS_NATURALES]: aromataBg,
-  [Company.EQUIPOS_OSENAL]: liumaqBg
+  [Company.EQUIPOS_OSENAL]: liumaqBg,
+  ['THE SMASHED GRAIL']: smashedGrailBg
 };
 
 export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Promise<void> => {
