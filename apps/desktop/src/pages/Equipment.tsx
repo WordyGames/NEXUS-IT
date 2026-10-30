@@ -16,8 +16,7 @@ import {
   subscribeEquipmentChanges,
   createEquipmentLoan,
   getActiveLoanForEquipment,
-  returnEquipmentLoan
-} from '@nexus-it/shared';
+  returnEquipmentLoan, getCompanyList } from '@nexus-it/shared';
 import EquipmentCard from '../components/EquipmentCard';
 import EquipmentForm from '../components/EquipmentForm';
 import EquipmentQRCode from '../components/EquipmentQRCode';
@@ -503,7 +502,7 @@ const Equipment = () => {
               className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             >
               <option value="">Todas</option>
-              {Object.values(Company).map((company) => (
+              {getCompanyList().map((company) => (
                 <option key={company} value={company}>{company}</option>
               ))}
             </select>

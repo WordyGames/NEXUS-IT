@@ -19,12 +19,14 @@ export interface Attachment {
   createdAt: Date | Timestamp;
 }
 
-// Enum para empresas
-export enum Company {
-  ESPECIAS_NATURALES = 'ESPECIAS NATURALES DEL NORTE',
-  GRUPO_AMEX = 'GRUPO AMEX',
-  EQUIPOS_OSENAL = 'EQUIPOS OSENAL'
-}
+// Empresas base. La lista completa es dinámica (tabla public.companies, ver
+// services/companies.ts); por eso `Company` es string y no un enum cerrado.
+export const Company: Readonly<Record<'ESPECIAS_NATURALES' | 'GRUPO_AMEX' | 'EQUIPOS_OSENAL', string>> = {
+  ESPECIAS_NATURALES: 'ESPECIAS NATURALES DEL NORTE',
+  GRUPO_AMEX: 'GRUPO AMEX',
+  EQUIPOS_OSENAL: 'EQUIPOS OSENAL'
+};
+export type Company = string;
 
 // Tipo para equipos
 export interface Equipment {

@@ -21,6 +21,8 @@ import {
   Equipment,
   Ticket
 } from '@nexus-it/shared';
+import { useCompanies } from '../hooks/useCompanies';
+import AddCompanyButton from '../components/AddCompanyButton';
 import CompanyCard from '../components/CompanyCard';
 import DashboardUserView from '../components/DashboardUserView';
 import DashboardCharts from '../components/DashboardCharts';
@@ -64,12 +66,17 @@ const Dashboard = () => {
   const [actionLoadingById, setActionLoadingById] = useState<Record<string, 'start' | 'complete' | 'reschedule'>>({});
   const [loading, setLoading] = useState(true);
 
-  const companies = [
-    { name: Company.ESPECIAS_NATURALES, color: 'especias' },
-    { name: Company.GRUPO_AMEX, color: 'grupo-amex' },
-
-    { name: Company.EQUIPOS_OSENAL, color: 'equipos-osenal' }
-  ];
+  const companyNames = useCompanies();
+  const BASE_COLORS: Record<string, string> = {
+    [Company.ESPECIAS_NATURALES]: 'especias',
+    [Company.GRUPO_AMEX]: 'grupo-amex',
+    [Company.EQUIPOS_OSENAL]: 'equipos-osenal'
+  };
+  const EXTRA_COLORS = ['amex-juarez', 'montacargas'];
+  const companies = companyNames.map((name, i) => ({
+    name,
+    color: BASE_COLORS[name] ?? EXTRA_COLORS[(i - Object.keys(BASE_COLORS).length) % EXTRA_COLORS.length]
+  }));
 
   const loadUserTickets = useCallback(async () => {
     if (!userData) return [] as Ticket[];
@@ -579,7 +586,10 @@ const Dashboard = () => {
 
       {/* Tarjetas por Empresa */}
       <div>
-        <h2 className="text-lg font-semibold text-slate-800 mb-3">Empresas</h2>
+        <div className="flex items-center gap-3 mb-3">
+          <h2 className="text-lg font-semibold text-slate-800">Empresas</h2>
+          <AddCompanyButton />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {companies.map((company) => (
             <CompanyCard

@@ -4,8 +4,7 @@ import {
   TicketPriority,
   Company,
   UserPermission,
-  Attachment,
-} from '@nexus-it/shared';
+  Attachment, getCompanyList } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
 import { useUiFeedback } from '../contexts/UiFeedbackContext';
 import { useAttachmentManager } from '../hooks/useAttachmentManager';
@@ -160,7 +159,7 @@ const TicketForm = ({ ticket, onSubmit, onCancel, userName }: TicketFormProps) =
                 title={isCompanyLocked ? 'Empresa asignada por tu perfil' : 'Seleccionar empresa'}
                 required
               >
-                {Object.values(Company).map((c) => (
+                {getCompanyList().map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>

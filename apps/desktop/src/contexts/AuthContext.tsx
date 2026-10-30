@@ -9,7 +9,8 @@ import {
   getCurrentSession,
   getUserById,
   resolveUserPermissions,
-  hasUserPermission
+  hasUserPermission,
+  refreshCompanies
 } from '@nexus-it/shared';
 
 interface AuthContextType {
@@ -73,6 +74,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     loadUserData();
   }, []);
+
+  useEffect(() => {
+    if (userData?.id) void refreshCompanies();
+  }, [userData?.id]);
 
   const login = async (username: string, password: string) => {
     const session = await signIn(username, password);

@@ -14,8 +14,7 @@ import {
   deleteDataPlan,
   getDataPlansSpendSummary,
   subscribeDataPlanChanges,
-  getEquipment
-} from '@nexus-it/shared';
+  getEquipment, getCompanyList } from '@nexus-it/shared';
 import DataPlanForm from '../components/DataPlanForm';
 import { Plus, Smartphone, Wallet, Database, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useUiFeedback } from '../contexts/UiFeedbackContext';
@@ -239,7 +238,7 @@ const DataPlans = () => {
               className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             >
               <option value="">Todas</option>
-              {Object.values(Company).map((c) => (
+              {getCompanyList().map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Company, DataPlan, DataPlanProvider, Equipment } from '@nexus-it/shared';
+import { Company, DataPlan, DataPlanProvider, Equipment, getCompanyList } from '@nexus-it/shared';
 import { Button } from './ui';
 
 interface DataPlanFormProps {
@@ -102,7 +102,7 @@ const DataPlanForm: React.FC<DataPlanFormProps> = ({ plan, defaultCompany, equip
           <div>
             <label className={labelClass}>Empresa</label>
             <select value={company} onChange={(e) => setCompany(e.target.value as Company)} className={inputClass}>
-              {Object.values(Company).map((c) => (
+              {getCompanyList().map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>

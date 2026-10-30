@@ -8,6 +8,7 @@ export * from './services/equipmentLoans';
 export * from './services/dataPlans';
 export * from './services/tickets';
 export * from './services/users';
+export * from './services/companies';
 export * from './services/maintenance';
 export * from './services/search';
 export * from './services/storage';

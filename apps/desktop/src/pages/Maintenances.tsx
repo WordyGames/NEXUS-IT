@@ -17,8 +17,7 @@ import {
   getMaintenanceById,
   getUpcomingMaintenances,
   getOverdueMaintenances,
-  Company,
-} from '@nexus-it/shared';
+  Company, getCompanyList } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
 import { useUiFeedback } from '../contexts/UiFeedbackContext';
 import MaintenanceForm from '../components/MaintenanceForm';
@@ -45,7 +44,7 @@ const readFilters = (): PersistedFilters => {
     if (!raw) return {};
     const p = JSON.parse(raw) as PersistedFilters;
     return {
-      companyFilter: Object.values(Company).includes(p.companyFilter as Company) ? p.companyFilter : '',
+      companyFilter: typeof p.companyFilter === 'string' ? p.companyFilter : '',
       statusFilter:  Object.values(MaintenanceStatus).includes(p.statusFilter as MaintenanceStatus) ? p.statusFilter : '',
       typeFilter:    Object.values(MaintenanceType).includes(p.typeFilter as MaintenanceType) ? p.typeFilter : '',
       searchTerm:    typeof p.searchTerm === 'string' ? p.searchTerm : '',
@@ -248,7 +247,7 @@ const Maintenances = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <select aria-label="Empresa" value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value as any)} className={selectCls}>
                 <option value="">Todas las empresas</option>
-                {Object.values(Company).map((c) => <option key={c} value={c}>{c}</option>)}
+                {getCompanyList().map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
               <select aria-label="Estado" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className={selectCls}>
                 <option value="">Todos los estados</option>

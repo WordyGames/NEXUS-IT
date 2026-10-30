@@ -9,8 +9,8 @@ import {
   createUser,
   updateUser,
   changePassword,
-  deleteUser
-} from '@nexus-it/shared';
+  deleteUser, getCompanyList } from '@nexus-it/shared';
+import AddCompanyButton from '../components/AddCompanyButton';
 import { usePagination } from '../hooks/usePagination';
 import { useModal } from '../hooks/useModal';
 import PermissionEditor from '../components/PermissionEditor';
@@ -478,10 +478,9 @@ const Users = () => {
               </Field>
               <Field label="Empresa" required>
                 <select title="Empresa" value={formData.company} onChange={(e) => setFormData({ ...formData, company: e.target.value as Company })} className={inputCls} required>
-                  <option value={Company.ESPECIAS_NATURALES}>Especias Naturales del Norte</option>
-                  <option value={Company.GRUPO_AMEX}>Grupo AMEX</option>
-                  <option value={Company.EQUIPOS_OSENAL}>Equipos OSENAL</option>
+                  {getCompanyList().map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
+                <AddCompanyButton onAdded={(c) => setFormData({ ...formData, company: c })} />
               </Field>
               <Field label="Rol" required>
                 <select title="Rol" value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })} className={inputCls} required>
@@ -521,10 +520,9 @@ const Users = () => {
               </Field>
               <Field label="Empresa" required>
                 <select title="Empresa" value={editFormData.company} onChange={(e) => setEditFormData({ ...editFormData, company: e.target.value as Company })} className={inputCls} required>
-                  <option value={Company.ESPECIAS_NATURALES}>Especias Naturales del Norte</option>
-                  <option value={Company.GRUPO_AMEX}>Grupo AMEX</option>
-                  <option value={Company.EQUIPOS_OSENAL}>Equipos OSENAL</option>
+                  {getCompanyList().map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
+                <AddCompanyButton onAdded={(c) => setEditFormData({ ...editFormData, company: c })} />
               </Field>
               <Field label="Departamento">
                 <input type="text" placeholder="Departamento (opcional)" value={editFormData.department} onChange={(e) => setEditFormData({ ...editFormData, department: e.target.value })} className={inputCls} />

@@ -9,8 +9,7 @@ import {
   UserPermission,
   getTickets,
   getTicketById,
-  createTicket,
-} from '@nexus-it/shared';
+  createTicket, getCompanyList } from '@nexus-it/shared';
 import TicketForm from '../components/TicketForm';
 import TicketDetail from '../components/TicketDetail';
 import { Download, Plus, ClipboardList, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -160,7 +159,7 @@ const Tickets = () => {
               className="px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             >
               <option value="">Todas las empresas</option>
-              {Object.values(Company).map((c) => (
+              {getCompanyList().map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>

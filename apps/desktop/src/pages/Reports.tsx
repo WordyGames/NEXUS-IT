@@ -7,8 +7,7 @@ import {
   MaintenanceStatus,
   Company,
   getTickets,
-  getMaintenances
-} from '@nexus-it/shared';
+  getMaintenances, getCompanyList } from '@nexus-it/shared';
 import {
   BarChart,
   Bar,
@@ -211,7 +210,7 @@ const Reports: React.FC = () => {
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">Empresa</label>
             <select aria-label="Filtrar por empresa" value={company} onChange={(e) => setCompany(e.target.value as Company | '')} className={inputCls}>
               <option value="">Todas las empresas</option>
-              {Object.values(Company).map((c) => (
+              {getCompanyList().map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>

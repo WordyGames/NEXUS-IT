@@ -25,13 +25,13 @@ interface CartaResponsivaData {
 const formatDate = (date: Date): string =>
   date.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
-const COMPANY_COLORS = {
+const COMPANY_COLORS: Record<string, { primary: string; secondary: string }> = {
   [Company.ESPECIAS_NATURALES]: { primary: '#2E7D32', secondary: '#66BB6A' },
   [Company.GRUPO_AMEX]: { primary: '#1565C0', secondary: '#42A5F5' },
   [Company.EQUIPOS_OSENAL]: { primary: '#C62828', secondary: '#EF5350' }
 };
 
-const COMPANY_BACKGROUNDS = {
+const COMPANY_BACKGROUNDS: Record<string, string> = {
   [Company.GRUPO_AMEX]: amexBg,
   [Company.ESPECIAS_NATURALES]: aromataBg,
   [Company.EQUIPOS_OSENAL]: liumaqBg
@@ -39,7 +39,7 @@ const COMPANY_BACKGROUNDS = {
 
 export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Promise<void> => {
   const { employee, equipment, generatedBy, loan } = data;
-  const colors = COMPANY_COLORS[equipment.company];
+  const colors = COMPANY_COLORS[equipment.company] ?? { primary: '#37474F', secondary: '#90A4AE' };
 
   const doc = new jsPDF({
     orientation: 'portrait',

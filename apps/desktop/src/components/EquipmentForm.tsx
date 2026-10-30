@@ -10,8 +10,8 @@ import {
   validateFile,
   formatFileSize,
   Attachment,
-  generateUuid,
-} from '@nexus-it/shared';
+  generateUuid, getCompanyList } from '@nexus-it/shared';
+import AddCompanyButton from './AddCompanyButton';
 import { useAuth } from '../contexts/AuthContext';
 import { useUiFeedback } from '../contexts/UiFeedbackContext';
 import { useAttachmentManager } from '../hooks/useAttachmentManager';
@@ -433,6 +433,7 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
           {label}
         </label>
         {fieldName === 'company' && (
+          <>
           <select
             value={value}
             onChange={(e) => handleChange(fieldName, e.target.value)}
@@ -440,10 +441,12 @@ const EquipmentForm = ({ equipment, onSubmit, onCancel }: EquipmentFormProps) =>
             aria-label="Empresa"
             required
           >
-            {Object.values(Company).map((c) => (
+            {getCompanyList().map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
+          <AddCompanyButton onAdded={(c) => handleChange('company', c)} />
+          </>
         )}
         {fieldName === 'type' && (
           <select
