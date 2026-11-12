@@ -31,14 +31,16 @@ const COMPANY_COLORS: Record<Company, { primary: string; secondary: string }> = 
   [Company.ESPECIAS_NATURALES]: { primary: '#2E7D32', secondary: '#66BB6A' },
   [Company.GRUPO_AMEX]: { primary: '#1565C0', secondary: '#42A5F5' },
   [Company.EQUIPOS_OSENAL]: { primary: '#C62828', secondary: '#EF5350' },
-  ['THE SMASHED GRAIL']: { primary: '#7A1F1F', secondary: '#8A8582' }
+  ['THE SMASHED GRAIL']: { primary: '#7A1F1F', secondary: '#8A8582' },
+  ['MONTACARGAS DEL NORTE']: { primary: '#1565C0', secondary: '#42A5F5' }
 };
 
 const COMPANY_BACKGROUNDS: Record<Company, number> = {
   [Company.GRUPO_AMEX]: require('../../assets/carta-backgrounds/amex.png'),
   [Company.ESPECIAS_NATURALES]: require('../../assets/carta-backgrounds/aromata.png'),
   [Company.EQUIPOS_OSENAL]: require('../../assets/carta-backgrounds/liumaq.png'),
-  ['THE SMASHED GRAIL']: require('../../assets/carta-backgrounds/smashedgrail.png')
+  ['THE SMASHED GRAIL']: require('../../assets/carta-backgrounds/smashedgrail.png'),
+  ['MONTACARGAS DEL NORTE']: require('../../assets/carta-backgrounds/montacargasdelnorte.png')
 };
 
 const backgroundCache = new Map<Company, string>();
