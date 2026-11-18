@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -43,7 +43,17 @@ const Tickets = () => {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [companyFilter, setCompanyFilter] = useState<Company | ''>('');
-  const { page, setPage, paginated: paginatedTickets, totalPages } = usePagination(tickets, PAGE_SIZE);
+  const [query, setQuery] = useState('');
+  const filteredTickets = useMemo(() => {
+    const norm = (v: unknown) => String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const words = norm(query).split(/\s+/).filter(Boolean);
+    if (words.length === 0) return tickets;
+    return tickets.filter((t: any) => {
+      const hay = norm([t.title, t.description, t.company, t.createdByName, t.status, t.priority, t.category].join(' '));
+      return words.every((w) => hay.includes(w));
+    });
+  }, [tickets, query]);
+  const { page, setPage, paginated: paginatedTickets, totalPages } = usePagination(filteredTickets, PAGE_SIZE);
 
   useEffect(() => {
     loadTickets();
@@ -151,6 +161,14 @@ const Tickets = () => {
           <p className="text-sm text-slate-500">Sistema de soporte técnico</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          <input
+            type="search"
+            aria-label="Buscar ticket"
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+            placeholder="Buscar ticket..."
+            className="px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors w-56"
+          />
           {canViewAllTickets && (
             <select
               aria-label="Filtrar por empresa"
@@ -247,7 +265,7 @@ const Tickets = () => {
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100">
               <span className="text-sm text-slate-500 dark:text-slate-400">
-                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, tickets.length)} de {tickets.length} tickets
+                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredTickets.length)} de {filteredTickets.length} tickets
               </span>
               <div className="flex items-center gap-1">
                 <button type="button" aria-label="Página anterior" onClick={() => setPage((p) => p - 1)} disabled={page === 1} className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-30 transition-colors border border-slate-200 dark:border-slate-700">
