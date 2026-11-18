@@ -124,7 +124,6 @@ const buildHtml = (
   const { employee, equipment, generatedBy, loan } = data;
   const {
     backgroundDataUri,
-    dateString,
     includeEmployeeSignature,
     employeeSignatureDataUri
   } = options;
@@ -328,16 +327,6 @@ const buildHtml = (
           font-size: 10px;
           font-weight: 400;
         }
-        .footer {
-          position: absolute;
-          bottom: 24.5mm;
-          left: 0;
-          right: 0;
-          text-align: center;
-          font-size: 8px;
-          color: #6b7280;
-          z-index: 2;
-        }
       </style>
     </head>
     <body>
@@ -405,7 +394,6 @@ const buildHtml = (
           </div>
         </div>
 
-        <div class="footer">Generado: ${escapeHtml(dateString)}</div>
       </div>
     </body>
   </html>

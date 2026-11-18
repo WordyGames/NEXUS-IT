@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { matchesQuery } from '../utils/search';
 import {
   ActivityIndicator,
   Alert,
@@ -99,6 +100,7 @@ const TicketsScreen = ({ route }: any) => {
   const [saving, setSaving] = useState(false);
   const [changingTicketId, setChangingTicketId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [ticketQuery, setTicketQuery] = useState('');
 
   const canManageTicketStatus = isAdmin || hasPermission(UserPermission.TICKETS_CHANGE_STATUS);
   const canViewAllTickets = isAdmin || hasPermission(UserPermission.TICKETS_VIEW_ALL) || canManageTicketStatus;
@@ -286,7 +288,12 @@ const TicketsScreen = ({ route }: any) => {
     void loadTickets();
   };
 
-  const visibleTickets = useMemo(() => tickets, [tickets]);
+  const visibleTickets = useMemo(
+    () => tickets.filter((t) => matchesQuery(
+      ticketQuery, t.title, t.description, (t as any).company, (t as any).category, (t as any).status
+    )),
+    [tickets, ticketQuery]
+  );
 
   if (loading) {
     return (
@@ -391,9 +398,21 @@ const TicketsScreen = ({ route }: any) => {
         </View>
       )}
 
+      {tickets.length > 0 && (
+        <TextInput
+          style={styles.input}
+          value={ticketQuery}
+          onChangeText={setTicketQuery}
+          placeholder="Buscar ticket por título, empresa o estado"
+          autoCorrect={false}
+          autoCapitalize="none"
+          clearButtonMode="while-editing"
+        />
+      )}
+
       {visibleTickets.length === 0 ? (
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyText}>No hay tickets registrados</Text>
+          <Text style={styles.emptyText}>{tickets.length === 0 ? 'No hay tickets registrados' : 'Ningún ticket coincide con la búsqueda'}</Text>
         </View>
       ) : (
         visibleTickets.map((ticket) => (

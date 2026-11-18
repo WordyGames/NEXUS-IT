@@ -229,11 +229,7 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   doc.setFont('helvetica', 'normal');
   doc.text(generatedBy, xPosRH + signatureWidth / 2, signatureNameY, { align: 'center' });
 
-  // ===== PIE DE PÁGINA =====
-  doc.setFontSize(8);
-  doc.setTextColor(128, 128, 128);
   const dateStr = formatDate(new Date());
-  doc.text(`Generado: ${dateStr}`, pageWidth / 2, footerY + 2.5, { align: 'center' });
 
   // Guardar PDF
   const fileSuffix = loan ? `Prestamo_${formatDate(loan.dueDate).replace(/\//g, '-')}` : dateStr.replace(/\//g, '-');

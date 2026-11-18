@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityIndicator,
   Alert,
@@ -61,6 +62,8 @@ const EQUIPMENT_TYPES: Array<{ value: Equipment['type']; label: string }> = [
 
 const sanitize = (value: string): string => value.trim();
 
+const LAST_USED_KEY = 'nexus.enroll.lastUsed';
+
 type CartaOutputMode = 'print' | 'pdf' | 'print_and_pdf';
 
 const buildInitialForm = (company: Company) => ({
@@ -105,6 +108,13 @@ const MobileEnrollmentScreen = () => {
   const [letterLoadingId, setLetterLoadingId] = useState<string | null>(null);
   const [includeEmployeeSignature, setIncludeEmployeeSignature] = useState(false);
   const [employeeSignature, setEmployeeSignature] = useState<SignatureData | null>(null);
+  const [assigneeQuery, setAssigneeQuery] = useState('');
+  const [showDetails, setShowDetails] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+  const [showSignature, setShowSignature] = useState(false);
+  const [showRegistered, setShowRegistered] = useState(false);
+  const [registeredQuery, setRegisteredQuery] = useState('');
+  const [nameEdited, setNameEdited] = useState(false);
 
   useEffect(() => {
     setForm((prev) => ({
@@ -116,6 +126,37 @@ const MobileEnrollmentScreen = () => {
   useEffect(() => {
     void loadData();
   }, [userData?.company]);
+
+  // Recordar empresa, tipo y ubicacion de la ultima alta.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(LAST_USED_KEY);
+        if (!raw) return;
+        const last = JSON.parse(raw) as { company?: string; type?: Equipment['type']; location?: string };
+        setForm((prev) => ({
+          ...prev,
+          company: isAdmin && last.company ? (last.company as Company) : prev.company,
+          location: prev.location || last.location || ''
+        }));
+        if (last.type) setDetectedEquipmentType(last.type);
+      } catch {
+        // sin preferencia guardada
+      }
+    })();
+  }, []);
+
+  // Nombre automatico (marca + modelo) mientras no se haya escrito a mano.
+  useEffect(() => {
+    if (nameEdited) return;
+    const auto = [form.specs.manufacturer, form.specs.model]
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join(' ');
+    if (auto && auto !== form.name) {
+      setForm((prev) => ({ ...prev, name: auto }));
+    }
+  }, [form.specs.manufacturer, form.specs.model, nameEdited]);
 
   useEffect(() => {
     if (!form.assignedTo) return;
@@ -142,6 +183,44 @@ const MobileEnrollmentScreen = () => {
   const activeUsers = useMemo(
     () => users.filter((user) => user.isActive),
     [users]
+  );
+
+  // Buscador de personas: sin acentos ni mayusculas, por nombre, puesto o departamento.
+  const normalizeText = (value: string): string =>
+    value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+  const filteredUsers = useMemo(() => {
+    const q = normalizeText(assigneeQuery);
+    if (!q) return [];
+    const words = q.split(/\s+/);
+    return activeUsers
+      .filter((user) => {
+        const haystack = normalizeText(`${user.name} ${user.position || ''} ${user.department || ''}`);
+        return words.every((word) => haystack.includes(word));
+      })
+      .slice(0, 8);
+  }, [activeUsers, assigneeQuery]);
+
+  const filteredRegistered = useMemo(() => {
+    const q = normalizeText(registeredQuery);
+    const words = q ? q.split(/\s+/) : [];
+    return equipmentList
+      .filter((eq) => {
+        if (!words.length) return true;
+        const owner = users.find((user) => user.id === eq.assignedTo)?.name || '';
+        const haystack = normalizeText(
+          `${eq.name} ${eq.company} ${eq.specs?.serialNumber || ''} ${eq.specs?.model || ''} ${owner}`
+        );
+        return words.every((word) => haystack.includes(word));
+      })
+      .slice(0, 30);
+  }, [equipmentList, registeredQuery, users]);
+
+  const isPhoneLike = detectedEquipmentType === 'phone' || detectedEquipmentType === 'tablet';
+
+  const selectedAssignee = useMemo(
+    () => activeUsers.find((user) => user.id === form.assignedTo),
+    [activeUsers, form.assignedTo]
   );
 
   const loadData = async () => {
@@ -301,13 +380,14 @@ const MobileEnrollmentScreen = () => {
     }
   };
 
-  const resetFormState = () => {
+  const resetFormState = (keepLocation = '') => {
     const company = isAdmin ? form.company : defaultCompany;
-    setForm(buildInitialForm(company));
+    setForm({ ...buildInitialForm(company), location: keepLocation });
+    setNameEdited(false);
+    setAssigneeQuery('');
     setCurrentEntityId(generateEntityId());
     setPhotoAttachment(null);
     setShowGooglePassword(false);
-    setDetectedEquipmentType('phone');
   };
 
   const handleSaveEquipment = async () => {
@@ -408,7 +488,11 @@ const MobileEnrollmentScreen = () => {
         ]
       );
 
-      resetFormState();
+      void AsyncStorage.setItem(
+        LAST_USED_KEY,
+        JSON.stringify({ company: form.company, type: detectedEquipmentType, location })
+      ).catch(() => undefined);
+      resetFormState(location);
     } catch (error) {
       console.error('Error creating equipment from mobile:', error);
       Alert.alert('Error', 'No se pudo guardar el equipo');
@@ -491,7 +575,10 @@ const MobileEnrollmentScreen = () => {
         <TextInput
           style={styles.input}
           value={form.name}
-          onChangeText={(value) => setForm((prev) => ({ ...prev, name: value }))}
+          onChangeText={(value) => {
+            setNameEdited(true);
+            setForm((prev) => ({ ...prev, name: value }));
+          }}
           placeholder="Ej: Samsung A54 / iPhone"
         />
 
@@ -504,29 +591,60 @@ const MobileEnrollmentScreen = () => {
         />
 
         <Text style={styles.label}>Asignar a</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.assigneeRow}>
-          <TouchableOpacity
-            style={[styles.userChip, !form.assignedTo && styles.userChipSelected]}
-            onPress={() => setForm((prev) => ({ ...prev, assignedTo: '' }))}
-          >
-            <Text style={[styles.userChipText, !form.assignedTo && styles.userChipTextSelected]}>
-              Sin asignar
+        {selectedAssignee ? (
+          <View style={styles.assigneeSelected}>
+            <Text style={styles.assigneeSelectedText} numberOfLines={1}>
+              {selectedAssignee.name}
+              {selectedAssignee.position ? ` · ${selectedAssignee.position}` : ''}
             </Text>
-          </TouchableOpacity>
-          {activeUsers.map((user) => (
             <TouchableOpacity
-              key={user.id}
-              style={[styles.userChip, form.assignedTo === user.id && styles.userChipSelected]}
-              onPress={() => setForm((prev) => ({ ...prev, assignedTo: user.id }))}
+              onPress={() => {
+                setForm((prev) => ({ ...prev, assignedTo: '' }));
+                setAssigneeQuery('');
+              }}
             >
-              <Text style={[styles.userChipText, form.assignedTo === user.id && styles.userChipTextSelected]}>
-                {user.name}
-              </Text>
+              <Text style={styles.assigneeClear}>Quitar</Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
+          </View>
+        ) : (
+          <>
+            <TextInput
+              style={styles.input}
+              value={assigneeQuery}
+              onChangeText={setAssigneeQuery}
+              placeholder="Buscar persona (nombre, puesto o depto.)"
+              autoCorrect={false}
+              autoCapitalize="none"
+              clearButtonMode="while-editing"
+            />
+            {assigneeQuery.trim() && filteredUsers.length === 0 ? (
+              <Text style={styles.assigneeEmpty}>Sin resultados. Deja vacío para "Sin asignar".</Text>
+            ) : null}
+            <View style={styles.assigneeResults}>
+              {filteredUsers.map((user) => (
+                <TouchableOpacity
+                  key={user.id}
+                  style={styles.userChip}
+                  onPress={() => {
+                    setForm((prev) => ({ ...prev, assignedTo: user.id }));
+                    setAssigneeQuery('');
+                  }}
+                >
+                  <Text style={styles.userChipText}>
+                    {user.name}
+                    {user.position ? ` · ${user.position}` : ''}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        )}
 
-        <Text style={styles.label}>Notas</Text>
+        <TouchableOpacity onPress={() => setShowNotes((prev) => !prev)} style={styles.toggleRow}>
+          <Text style={styles.toggleText}>{showNotes ? '▲ Ocultar notas' : '▼ Agregar notas'}</Text>
+        </TouchableOpacity>
+        {showNotes && (
+          <>
         <TextInput
           style={[styles.input, styles.notesInput]}
           value={form.notes}
@@ -534,6 +652,8 @@ const MobileEnrollmentScreen = () => {
           placeholder="Observaciones adicionales"
           multiline
         />
+          </>
+        )}
       </View>
 
       <View style={styles.card}>
@@ -556,6 +676,8 @@ const MobileEnrollmentScreen = () => {
           onChangeText={(value) => setForm((prev) => ({ ...prev, specs: { ...prev.specs, serialNumber: value } }))}
           placeholder="Serial / identificador"
         />
+        {isPhoneLike && (
+          <>
         <TextInput
           style={styles.input}
           value={form.specs.imei}
@@ -573,6 +695,10 @@ const MobileEnrollmentScreen = () => {
           autoCapitalize="none"
           autoCorrect={false}
         />
+          </>
+        )}
+        {isPhoneLike && (
+          <>
         <Text style={styles.fieldInlineLabel}>Cuenta Google (correo)</Text>
         <TextInput
           style={styles.input}
@@ -601,6 +727,15 @@ const MobileEnrollmentScreen = () => {
           autoCapitalize="none"
           autoCorrect={false}
         />
+          </>
+        )}
+        <TouchableOpacity onPress={() => setShowDetails((prev) => !prev)} style={styles.toggleRow}>
+          <Text style={styles.toggleText}>
+            {showDetails ? '▲ Ocultar detalles técnicos' : '▼ Más detalles (SO, CPU, RAM, IP...)'}
+          </Text>
+        </TouchableOpacity>
+        {showDetails && (
+          <>
         <TextInput
           style={styles.input}
           value={form.specs.os}
@@ -643,6 +778,8 @@ const MobileEnrollmentScreen = () => {
           onChangeText={(value) => setForm((prev) => ({ ...prev, specs: { ...prev.specs, macAddress: value } }))}
           placeholder="MAC (opcional)"
         />
+          </>
+        )}
       </View>
 
       <View style={styles.card}>
@@ -672,7 +809,13 @@ const MobileEnrollmentScreen = () => {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Firma en celular y salida de carta</Text>
+        <TouchableOpacity onPress={() => setShowSignature((prev) => !prev)} style={styles.toggleRow}>
+          <Text style={styles.sectionTitle}>
+            {showSignature ? '▲' : '▼'} Firma digital en celular (opcional)
+          </Text>
+        </TouchableOpacity>
+        {showSignature && (
+          <>
 
         <View style={styles.switchRow}>
           <Text style={styles.switchLabel}>Incluir firma digital del empleado en la carta</Text>
@@ -701,6 +844,8 @@ const MobileEnrollmentScreen = () => {
             La carta se genera sin firma digital para imprimir y firmar después en papel.
           </Text>
         )}
+          </>
+        )}
       </View>
 
       <TouchableOpacity
@@ -714,11 +859,26 @@ const MobileEnrollmentScreen = () => {
       </TouchableOpacity>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Equipos registrados</Text>
-        {equipmentList.length === 0 ? (
-          <Text style={styles.emptyText}>No hay equipos registrados para esta empresa</Text>
+        <TouchableOpacity onPress={() => setShowRegistered((prev) => !prev)} style={styles.toggleRow}>
+          <Text style={styles.sectionTitle}>
+            {showRegistered ? '▲' : '▼'} Equipos registrados ({equipmentList.length})
+          </Text>
+        </TouchableOpacity>
+        {showRegistered && (
+          <>
+            <TextInput
+              style={styles.input}
+              value={registeredQuery}
+              onChangeText={setRegisteredQuery}
+              placeholder="Buscar por equipo, serial, empresa o persona"
+              autoCorrect={false}
+              autoCapitalize="none"
+              clearButtonMode="while-editing"
+            />
+        {filteredRegistered.length === 0 ? (
+          <Text style={styles.emptyText}>No hay equipos que coincidan</Text>
         ) : (
-          equipmentList.slice(0, 12).map((eq) => {
+          filteredRegistered.map((eq) => {
             const assignedUser = findUserById(eq.assignedTo);
             const isGenerating = letterLoadingId === eq.id;
             return (
@@ -752,6 +912,8 @@ const MobileEnrollmentScreen = () => {
               </View>
             );
           })
+        )}
+          </>
         )}
       </View>
     </ScrollView>
@@ -874,6 +1036,29 @@ const styles = StyleSheet.create({
   chipTextSelected: {
     color: '#ffffff'
   },
+  toggleRow: {
+    paddingVertical: 6,
+    marginBottom: 4
+  },
+  toggleText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1d4ed8'
+  },
+  assigneeSelected: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#0F3D5E',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 8
+  },
+  assigneeSelectedText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', flex: 1, marginRight: 12 },
+  assigneeClear: { color: '#FFD9A0', fontSize: 13, fontWeight: '700' },
+  assigneeEmpty: { color: '#6B7280', fontSize: 12, marginTop: 6 },
+  assigneeResults: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 },
   assigneeRow: {
     marginBottom: 10
   },
@@ -884,7 +1069,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#d1d5db',
     backgroundColor: '#ffffff',
-    marginRight: 8
+    marginRight: 8,
+    marginBottom: 8
   },
   userChipSelected: {
     borderColor: '#1d4ed8',

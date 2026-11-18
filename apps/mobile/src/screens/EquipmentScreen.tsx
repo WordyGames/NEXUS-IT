@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,9 @@ import {
 } from '@nexus-it/shared';
 import { useAuth } from '../contexts/AuthContext';
 import { generateCartaResponsivaMobile } from '../utils/cartaResponsivaMobile';
+import { matchesQuery } from '../utils/search';
+
+const PAGE_SIZE = 30;
 
 const EquipmentScreen = ({ navigation }: any) => {
   const { userData, isAdmin, hasPermission } = useAuth();
@@ -37,6 +40,25 @@ const EquipmentScreen = ({ navigation }: any) => {
   const [loanNotes, setLoanNotes] = useState('');
   const [loanSubmitting, setLoanSubmitting] = useState(false);
   const [returningId, setReturningId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [borrowerQuery, setBorrowerQuery] = useState('');
+
+  const filteredEquipment = useMemo(
+    () => equipment.filter((eq) => matchesQuery(
+      query, eq.name, eq.company, eq.type, eq.location, eq.specs?.serialNumber, eq.specs?.model, eq.specs?.manufacturer
+    )),
+    [equipment, query]
+  );
+
+  const borrowerMatches = useMemo(() => {
+    if (!borrowerQuery.trim()) return [];
+    return users
+      .filter((u) => u.isActive !== false && matchesQuery(borrowerQuery, u.name, u.position, u.department))
+      .slice(0, 8);
+  }, [users, borrowerQuery]);
+
+  const selectedBorrower = users.find((u) => u.id === loanBorrowerId);
 
   useEffect(() => {
     void loadEquipment();
@@ -112,6 +134,7 @@ const EquipmentScreen = ({ navigation }: any) => {
   const openLoanModal = (eq: Equipment) => {
     setLoanTarget(eq);
     setLoanBorrowerId(eq.assignedTo || '');
+    setBorrowerQuery('');
     setLoanDays('');
     setLoanNotes('');
   };
@@ -235,6 +258,21 @@ const EquipmentScreen = ({ navigation }: any) => {
         </TouchableOpacity>
       )}
 
+      {equipment.length > 0 && (
+        <TextInput
+          style={styles.input}
+          value={query}
+          onChangeText={(value) => {
+            setQuery(value);
+            setVisibleCount(PAGE_SIZE);
+          }}
+          placeholder="Buscar por equipo, serial, empresa o ubicación"
+          autoCorrect={false}
+          autoCapitalize="none"
+          clearButtonMode="while-editing"
+        />
+      )}
+
       {equipment.length === 0 ? (
         <View style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>
@@ -247,7 +285,7 @@ const EquipmentScreen = ({ navigation }: any) => {
           </Text>
         </View>
       ) : (
-        equipment.map((eq) => (
+        filteredEquipment.slice(0, visibleCount).map((eq) => (
           <View key={eq.id} style={styles.card}>
             <View style={styles.cardHeader}>
               <Text style={styles.name}>{eq.name}</Text>
@@ -302,6 +340,18 @@ const EquipmentScreen = ({ navigation }: any) => {
         ))
       )}
 
+      {equipment.length > 0 && filteredEquipment.length === 0 && (
+        <Text style={styles.emptyText}>Ningún equipo coincide con la búsqueda.</Text>
+      )}
+
+      {filteredEquipment.length > visibleCount && (
+        <TouchableOpacity style={styles.moreButton} onPress={() => setVisibleCount((n) => n + PAGE_SIZE)}>
+          <Text style={styles.moreButtonText}>
+            Mostrar más ({filteredEquipment.length - visibleCount} restantes)
+          </Text>
+        </TouchableOpacity>
+      )}
+
       <Modal visible={!!loanTarget} animationType="slide" transparent onRequestClose={closeLoanModal}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -313,19 +363,42 @@ const EquipmentScreen = ({ navigation }: any) => {
             )}
 
             <Text style={styles.label}>Prestar a</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.assigneeRow}>
-              {users.map((user) => (
-                <TouchableOpacity
-                  key={user.id}
-                  style={[styles.userChip, loanBorrowerId === user.id && styles.userChipSelected]}
-                  onPress={() => setLoanBorrowerId(user.id)}
-                >
-                  <Text style={[styles.userChipText, loanBorrowerId === user.id && styles.userChipTextSelected]}>
-                    {user.name}
-                  </Text>
+            {selectedBorrower ? (
+              <View style={styles.borrowerSelected}>
+                <Text style={styles.borrowerSelectedText} numberOfLines={1}>
+                  {selectedBorrower.name}
+                  {selectedBorrower.position ? ` · ${selectedBorrower.position}` : ''}
+                </Text>
+                <TouchableOpacity onPress={() => { setLoanBorrowerId(''); setBorrowerQuery(''); }}>
+                  <Text style={styles.borrowerClear}>Cambiar</Text>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
+              </View>
+            ) : (
+              <>
+                <TextInput
+                  style={styles.input}
+                  value={borrowerQuery}
+                  onChangeText={setBorrowerQuery}
+                  placeholder="Buscar persona (nombre, puesto o depto.)"
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                />
+                <View style={styles.borrowerResults}>
+                  {borrowerMatches.map((user) => (
+                    <TouchableOpacity
+                      key={user.id}
+                      style={styles.userChip}
+                      onPress={() => { setLoanBorrowerId(user.id); setBorrowerQuery(''); }}
+                    >
+                      <Text style={styles.userChipText}>
+                        {user.name}
+                        {user.position ? ` · ${user.position}` : ''}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
 
             <Text style={styles.label}>Duración (días)</Text>
             <TextInput
@@ -543,6 +616,28 @@ const styles = StyleSheet.create({
     minHeight: 70,
     textAlignVertical: 'top'
   },
+  moreButton: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#93c5fd',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center'
+  },
+  moreButtonText: { color: '#1d4ed8', fontWeight: '700', fontSize: 13 },
+  borrowerSelected: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#0F3D5E',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 8
+  },
+  borrowerSelectedText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', flex: 1, marginRight: 12 },
+  borrowerClear: { color: '#FFD9A0', fontSize: 13, fontWeight: '700' },
+  borrowerResults: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 },
   assigneeRow: {
     marginBottom: 10
   },
@@ -553,7 +648,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#d1d5db',
     backgroundColor: '#ffffff',
-    marginRight: 8
+    marginRight: 8,
+    marginBottom: 8
   },
   userChipSelected: {
     borderColor: '#1d4ed8',

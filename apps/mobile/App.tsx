@@ -1,3 +1,4 @@
+import './src/diagnostico';
 import './src/polyfills';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
