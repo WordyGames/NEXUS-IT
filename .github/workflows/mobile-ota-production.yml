@@ -51,4 +51,4 @@ jobs:
         run: |
           npm run prepare:expo
           SHORT_SHA="${GITHUB_SHA::7}"
-          eas update --channel production --message "ci(ota): ${SHORT_SHA}" --non-interactive
+          eas update --channel production --environment production --message "ci(ota): ${SHORT_SHA}" --non-interactive
