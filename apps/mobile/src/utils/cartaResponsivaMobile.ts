@@ -28,11 +28,11 @@ interface GenerateCartaResponsivaMobileOptions {
 }
 
 const COMPANY_COLORS: Record<Company, { primary: string; secondary: string }> = {
-  [Company.ESPECIAS_NATURALES]: { primary: '#2E7D32', secondary: '#66BB6A' },
-  [Company.GRUPO_AMEX]: { primary: '#1565C0', secondary: '#42A5F5' },
-  [Company.EQUIPOS_OSENAL]: { primary: '#C62828', secondary: '#EF5350' },
+  [Company.ESPECIAS_NATURALES]: { primary: '#1F1D24', secondary: '#8D8A90' },
+  [Company.GRUPO_AMEX]: { primary: '#D44A00', secondary: '#FF5800' },
+  [Company.EQUIPOS_OSENAL]: { primary: '#1C2A66', secondary: '#D65A1F' },
   ['THE SMASHED GRAIL']: { primary: '#7A1F1F', secondary: '#8A8582' },
-  ['MONTACARGAS DEL NORTE']: { primary: '#1565C0', secondary: '#42A5F5' }
+  ['MONTACARGAS DEL NORTE']: { primary: '#D44A00', secondary: '#FF5800' }
 };
 
 const COMPANY_BACKGROUNDS: Record<Company, number> = {
@@ -129,7 +129,7 @@ const buildHtml = (
     employeeSignatureDataUri
   } = options;
   const colors = COMPANY_COLORS[equipment.company] ?? { primary: '#455A64', secondary: '#90A4AE' };
-  const margin = equipment.company === Company.ESPECIAS_NATURALES ? 40 : 20;
+  const margin = 20;
 
   const conditionsList = (loan ? buildLoanConditions(loan) : CONDITIONS).map((condition, index) => (
     `<li><span class="num">${index + 1}.</span> ${escapeHtml(condition)}</li>`
@@ -203,7 +203,7 @@ const buildHtml = (
           height: 279mm;
           object-fit: cover;
           z-index: 0;
-          opacity: ${equipment.company === Company.EQUIPOS_OSENAL ? 0.15 : 1};
+          opacity: 1;
         }
         .header {
           position: absolute;
@@ -229,7 +229,7 @@ const buildHtml = (
         .content {
           position: relative;
           z-index: 2;
-          padding: 35mm ${margin}mm 18mm ${margin}mm;
+          padding: 35mm ${margin}mm 24mm ${margin}mm;
           min-height: 279mm;
           display: flex;
           flex-direction: column;
@@ -330,7 +330,7 @@ const buildHtml = (
         }
         .footer {
           position: absolute;
-          bottom: 9mm;
+          bottom: 24.5mm;
           left: 0;
           right: 0;
           text-align: center;

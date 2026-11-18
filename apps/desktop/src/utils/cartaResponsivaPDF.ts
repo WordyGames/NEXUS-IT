@@ -28,11 +28,11 @@ const formatDate = (date: Date): string =>
   date.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
 const COMPANY_COLORS: Record<string, { primary: string; secondary: string }> = {
-  [Company.ESPECIAS_NATURALES]: { primary: '#2E7D32', secondary: '#66BB6A' },
-  [Company.GRUPO_AMEX]: { primary: '#1565C0', secondary: '#42A5F5' },
-  [Company.EQUIPOS_OSENAL]: { primary: '#C62828', secondary: '#EF5350' },
+  [Company.ESPECIAS_NATURALES]: { primary: '#1F1D24', secondary: '#8D8A90' },
+  [Company.GRUPO_AMEX]: { primary: '#D44A00', secondary: '#FF5800' },
+  [Company.EQUIPOS_OSENAL]: { primary: '#1C2A66', secondary: '#D65A1F' },
   ['THE SMASHED GRAIL']: { primary: '#7A1F1F', secondary: '#8A8582' },
-  ['MONTACARGAS DEL NORTE']: { primary: '#1565C0', secondary: '#42A5F5' }
+  ['MONTACARGAS DEL NORTE']: { primary: '#D44A00', secondary: '#FF5800' }
 };
 
 const COMPANY_BACKGROUNDS: Record<string, string> = {
@@ -57,7 +57,7 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   const pageHeight = doc.internal.pageSize.getHeight();
   
   // Ajustar márgenes según la empresa para mejor alineación y evitar superposición con franjas decorativas
-  const margin = equipment.company === Company.ESPECIAS_NATURALES ? 40 : 20;
+  const margin = 20;
   let yPos = margin;
   const compactLayout = {
     sectionTitleGap: 8,
@@ -70,10 +70,6 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   const backgroundImage = COMPANY_BACKGROUNDS[equipment.company];
   if (backgroundImage) {
     try {
-      // Reducir opacidad para LIUMAQ para hacer el fondo más claro
-      if (equipment.company === Company.EQUIPOS_OSENAL) {
-        doc.setGState(new GState({ opacity: 0.15 }));
-      }
       // Agregar imagen de fondo (cubre toda la página)
       doc.addImage(backgroundImage, 'PNG', 0, 0, pageWidth, pageHeight);
       doc.setGState(new GState({ opacity: 1.0 })); // Restaurar opacidad
@@ -205,7 +201,7 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   // Posicionar firmas de forma dinámica para evitar solapamiento con el contenido.
   const signatureBlockHeight = 24;
   const signatureTopPadding = 4;
-  const footerY = pageHeight - 10;
+  const footerY = pageHeight - 27; // el pie decorativo de la hoja ocupa los ultimos ~23 mm
   const maxSignatureTop = footerY - signatureBlockHeight;
   const desiredSignatureTop = yPos + signatureTopPadding;
   yPos = Math.min(desiredSignatureTop, maxSignatureTop);
@@ -237,7 +233,7 @@ export const generateCartaResponsivaPDF = async (data: CartaResponsivaData): Pro
   doc.setFontSize(8);
   doc.setTextColor(128, 128, 128);
   const dateStr = formatDate(new Date());
-  doc.text(`Generado: ${dateStr}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+  doc.text(`Generado: ${dateStr}`, pageWidth / 2, footerY + 2.5, { align: 'center' });
 
   // Guardar PDF
   const fileSuffix = loan ? `Prestamo_${formatDate(loan.dueDate).replace(/\//g, '-')}` : dateStr.replace(/\//g, '-');
